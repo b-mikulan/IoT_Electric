@@ -1,0 +1,154 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<KNX xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" CreatedBy="ETS6" ToolVersion="6.4.8718.0" xmlns="http://knx.org/xml/project/23">
+  <Project Id="P-0293">
+    <Installations>
+      <Installation Name="" BCUKey="4294967295" IPRoutingLatencyTolerance="2000">
+        <Topology>
+          <Area Id="P-0293-0_A-1" Address="0" Puid="1">
+            <Line Id="P-0293-0_L-1" Address="0" Puid="2">
+              <Segment Id="P-0293-0_S-1" Number="0" MediumTypeRefId="MT-5" Puid="3" />
+            </Line>
+          </Area>
+          <Area Id="P-0293-0_A-2" Address="1" Puid="4">
+            <Line Id="P-0293-0_L-2" Address="0" Puid="5">
+              <Segment Id="P-0293-0_S-2" Number="0" MediumTypeRefId="MT-5" Puid="6" />
+            </Line>
+            <Line Id="P-0293-0_L-3" Address="1" Puid="7">
+              <Segment Id="P-0293-0_S-3" Number="0" MediumTypeRefId="MT-0" Puid="8">
+                <DeviceInstance Id="P-0293-0_DI-1" Address="1" Name="" ProductRefId="M-0064_H-SpaceLogic.20KNX.20Switch.20Secure-1_P-MTN6705.2D0008S" Hardware2ProgramRefId="M-0064_H-SpaceLogic.20KNX.20Switch.20Secure-1_HP-5810-10-901E" Comment="" Description="Actuator" SerialNumber="AGR3Na/j" ApplicationProgramLoaded="true" CommunicationPartLoaded="true" IndividualAddressLoaded="true" MediumConfigLoaded="true" ParametersLoaded="true" IsActivityCalculated="true" LastModified="2026-04-03T14:32:05.7280522Z" CheckSums="AQABAAEAAAACAAAAAwEAAAABYu4EBwAAAAESAAGfCgHKfwHZAgEJEgFGWAFoUw==" LoadedImage="7VpLTsMwEB2nDZEKCCFFKivOAGWLOAFStkhsWPQWSIglZ+mqF+FGSIPtdBzHv0YOtArMs5xMxhO/eW6a2FEECKgA4EzWmbYA3gppiwc4IJaqVLHWxrQ0siztFquHlHc5KFblEMuiqSiLxjqH8TtABuNoUDfDubwZ1nL/COrGCCXIG2WLe20WiatXuI7iHWQpzm9uV3ctBV3h7pWe+if4fw1K9EXur1SiJxshUemtjX1KX+X+c6GV5sITHcJ2HnTXga70pjZmYZEIO3AmS4J7FePMxfR0emeJIRoG6VyH3QfWuRiSagzT+z3zwDotsE6vK9bJOgNgnZlgnRaOo1PNmPW0mabVuDPRHJLheNBqisKfrav5POiZetdkCO0JfxcN5GwrnR9jDHAaBrSTtQORtojdMQ2OOxZh1j6vydnRiZ3Obs2CNCo9/16dHmdMZ5dGUCcNxnR0WhR935+6bnvtQTPhTPbWsQY8rJN1sk6vf9bppM06k44wa8DDOn9IJ72qfT4F+CpHvaqFdgY9po4F8zM/8zM/82dVWhxm1d3jJruM4WZ+5md+5mf+7EILgadLgIuZ+ugj8DHKdq5euZdle7Tx2l3sf6YdJqKKaFlPUAtHHCUCgV7aE9AAoL9IjwG9GHdxnhPhOgb1EdWCOFQLR/zjCHpcfNQA16C+7LZafXv3hIrY3w==" LastDownload="2026-04-03T14:37:29.3051152Z" LastUsedAPDULength="15" ReadMaxAPDULength="55" Puid="10">
+                  <ParameterInstanceRefs>
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-85_R-85" Value="0123" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-2_R-2" Value="0" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-84_R-84" Value="0" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-147_R-147" Value="Entrance light" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-775_R-775" Value="Bathroom fan" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-938_R-938" Value="Kitchen lights" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-29_R-29" Value="6" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-5_R-5" Value="6" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-6_R-6" Value="170" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-13_R-13" Value="6" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-14_R-14" Value="170" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-38_R-38" Value="7" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-11_R-11" Value="7" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-12_R-12" Value="170" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-19_R-19" Value="7" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-20_R-20" Value="170" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-2357_R-2357" Value="Test Lights" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-309_R-309" Value="Kitchen Roller Shutter" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-1566_R-1566" Value="Entrance lights" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-1729_R-1729" Value="Bathroom fan" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_UP-1827_R-1827" Value="1" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_UP-1867_R-1867" Value="1" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-1873_R-1873" Value="100" />
+                    <ParameterInstanceRef RefId="M-0064_A-5810-10-901E_P-2892_R-2892" Value="Living room Venetian Blinds" />
+                  </ParameterInstanceRefs>
+                  <ComObjectInstanceRefs>
+                    <ComObjectInstanceRef RefId="O-55_R-52" ChannelId="CH-2" Links="GA-5" />
+                    <ComObjectInstanceRef RefId="O-56_R-53" ChannelId="CH-2" Links="GA-6" />
+                    <ComObjectInstanceRef RefId="O-57_R-54" ChannelId="CH-2" Links="GA-7" />
+                    <ComObjectInstanceRef RefId="O-70_R-64" ChannelId="CH-2" Links="GA-9" />
+                    <ComObjectInstanceRef RefId="O-75_R-68" ChannelId="CH-2" Links="GA-11" />
+                    <ComObjectInstanceRef RefId="O-76_R-69" ChannelId="CH-2" Links="GA-12" />
+                    <ComObjectInstanceRef RefId="O-77_R-100" ChannelId="CH-7" Links="GA-3" />
+                    <ComObjectInstanceRef RefId="O-83_R-108" ChannelId="CH-7" Links="GA-4" />
+                    <ComObjectInstanceRef RefId="O-88_R-148" ChannelId="CH-10" Links="GA-1" />
+                    <ComObjectInstanceRef RefId="O-94_R-156" ChannelId="CH-10" Links="GA-2" />
+                    <ComObjectInstanceRef RefId="O-99_R-157" ChannelId="CH-13" Links="GA-25" />
+                    <ComObjectInstanceRef RefId="O-103_R-162" ChannelId="CH-13" Links="GA-26" />
+                    <ComObjectInstanceRef RefId="O-105_R-165" ChannelId="CH-13" Links="GA-27" />
+                    <ComObjectInstanceRef RefId="O-121_R-241" ChannelId="CH-21" Links="GA-15" />
+                    <ComObjectInstanceRef RefId="O-122_R-242" ChannelId="CH-21" Links="GA-16" />
+                    <ComObjectInstanceRef RefId="O-123_R-243" ChannelId="CH-21" Links="GA-17" />
+                    <ComObjectInstanceRef RefId="O-124_R-244" ChannelId="CH-21" Links="GA-18" />
+                    <ComObjectInstanceRef RefId="O-136_R-255" ChannelId="CH-21" Links="GA-19" />
+                    <ComObjectInstanceRef RefId="O-137_R-256" ChannelId="CH-21" Links="GA-20" />
+                    <ComObjectInstanceRef RefId="O-141_R-260" ChannelId="CH-21" Links="GA-21" />
+                    <ComObjectInstanceRef RefId="O-142_R-261" ChannelId="CH-21" Links="GA-22" />
+                    <ComObjectInstanceRef RefId="O-110_R-205" ChannelId="CH-16" Links="GA-28" />
+                    <ComObjectInstanceRef RefId="O-116_R-213" ChannelId="CH-16" Links="GA-29" />
+                  </ComObjectInstanceRefs>
+                  <GroupObjectTree>
+                    <Nodes>
+                      <Node Type="Channel" RefId="CH-2" GroupObjectInstances="O-55_R-52 O-56_R-53 O-57_R-54 O-70_R-64 O-75_R-68 O-76_R-69" />
+                      <Node Type="Channel" RefId="CH-7" GroupObjectInstances="O-77_R-100 O-83_R-108" />
+                      <Node Type="Channel" RefId="CH-10" GroupObjectInstances="O-88_R-148 O-94_R-156" />
+                      <Node Type="Channel" RefId="CH-13" GroupObjectInstances="O-99_R-157 O-103_R-162 O-105_R-165" />
+                      <Node Type="Channel" RefId="CH-16" GroupObjectInstances="O-110_R-205 O-116_R-213" />
+                      <Node Type="Channel" RefId="CH-21" GroupObjectInstances="O-121_R-241 O-122_R-242 O-123_R-243 O-124_R-244 O-136_R-255 O-137_R-256 O-141_R-260 O-142_R-261" />
+                    </Nodes>
+                  </GroupObjectTree>
+                  <Security SequenceNumberTimestamp="2026-04-03T14:37:29.3141169Z" />
+                </DeviceInstance>
+                <DeviceInstance Id="P-0293-0_DI-2" Name="" ProductRefId="M-0064_H-MTN6513.2D1202-1-O000A_P-MTN6513.2D1202" Hardware2ProgramRefId="M-0064_H-MTN6513.2D1202-1-O000A_HP" Comment="" Description="PSU" IsActivityCalculated="true" LastModified="2026-04-02T08:28:42.7361552Z" Puid="11" />
+                <DeviceInstance Id="P-0293-0_DI-3" Address="0" Name="" ProductRefId="M-0064_H-MTN680329-1-O00C5_P-MTN680329" Hardware2ProgramRefId="M-0064_H-MTN680329-1-O00C5_HP-7125-10-823A-O00C5" Comment="" Description="IP router" ApplicationProgramLoaded="true" CommunicationPartLoaded="true" IndividualAddressLoaded="true" MediumConfigLoaded="true" ParametersLoaded="true" IsActivityCalculated="true" LastModified="2026-04-02T08:29:40.2738365Z" LastDownload="2026-04-03T14:13:01.5344341Z" LastUsedAPDULength="15" ReadMaxAPDULength="15" ReadMaxRoutingAPDULength="55" Puid="12">
+                  <IPConfig MACAddress="00:24:6D:01:02:C3" />
+                </DeviceInstance>
+              </Segment>
+            </Line>
+          </Area>
+        </Topology>
+        <Locations>
+          <Space Type="Building" DefaultLine="P-0293-0_L-3" Id="P-0293-0_BP-1" Name="Bruno 1" Puid="9">
+            <Space Type="Room" Usage="tag:hallway" Id="P-0293-0_BP-2" Name="Corridor" Puid="13">
+              <Space Type="DistributionBoard" Id="P-0293-0_BP-3" Name="Cabinet 1" Puid="14">
+                <DeviceInstanceRef RefId="P-0293-0_DI-1" />
+                <DeviceInstanceRef RefId="P-0293-0_DI-2" />
+                <DeviceInstanceRef RefId="P-0293-0_DI-3" />
+              </Space>
+            </Space>
+          </Space>
+        </Locations>
+        <GroupAddresses>
+          <GroupRanges>
+            <GroupRange Id="P-0293-0_GR-1" RangeStart="1" RangeEnd="2047" Name="Central" Puid="15" />
+            <GroupRange Id="P-0293-0_GR-2" RangeStart="2048" RangeEnd="4095" Name="Entrance" Puid="16">
+              <GroupRange Id="P-0293-0_GR-6" RangeStart="2048" RangeEnd="2303" Name="Lights" Puid="20">
+                <GroupAddress Id="P-0293-0_GA-1" Address="2048" Name="Entrance light Switch" DatapointType="DPST-1-1" Puid="26" />
+                <GroupAddress Id="P-0293-0_GA-2" Address="2049" Name="Entrance light Status" DatapointType="DPST-1-1" Puid="27" />
+              </GroupRange>
+            </GroupRange>
+            <GroupRange Id="P-0293-0_GR-3" RangeStart="4096" RangeEnd="6143" Name="Kitchen" Puid="17">
+              <GroupRange Id="P-0293-0_GR-7" RangeStart="4096" RangeEnd="4351" Name="Lights" Puid="21">
+                <GroupAddress Id="P-0293-0_GA-3" Address="4096" Name="Kitchen light Switch" DatapointType="DPST-1-1" Puid="28" />
+                <GroupAddress Id="P-0293-0_GA-4" Address="4097" Name="Kitchen light Status" DatapointType="DPST-1-1" Puid="29" />
+              </GroupRange>
+              <GroupRange Id="P-0293-0_GR-8" RangeStart="4352" RangeEnd="4607" Name="Blinds" Puid="22">
+                <GroupAddress Id="P-0293-0_GA-5" Address="4352" Name="Kitchen Roller Shutter Move" DatapointType="DPST-1-8" Puid="30" />
+                <GroupAddress Id="P-0293-0_GA-6" Address="4353" Name="Kitchen Roller Shutter Move StopStep" DatapointType="DPST-1-7" Puid="31" />
+                <GroupAddress Id="P-0293-0_GA-7" Address="4354" Name="Kitchen Roller Shutter Move HeightSet" DatapointType="DPST-5-1" Puid="32" />
+                <GroupAddress Id="P-0293-0_GA-9" Address="4356" Name="Kitchen Roller Shutter Move HeightValue" DatapointType="DPST-5-1" Puid="34" />
+                <GroupAddress Id="P-0293-0_GA-11" Address="4358" Name="Kitchen Roller Shutter Move Run" DatapointType="DPST-1-10" Puid="36" />
+                <GroupAddress Id="P-0293-0_GA-12" Address="4359" Name="Kitchen Roller Shutter Move Dir" DatapointType="DPST-1-8" Puid="37" />
+              </GroupRange>
+            </GroupRange>
+            <GroupRange Id="P-0293-0_GR-4" RangeStart="6144" RangeEnd="8191" Name="Living room" Puid="18">
+              <GroupRange Id="P-0293-0_GR-10" RangeStart="6400" RangeEnd="6655" Name="Blinds" Puid="24">
+                <GroupAddress Id="P-0293-0_GA-15" Address="6400" Name="Living room Venetian Blinds Move" DatapointType="DPST-1-8" Puid="40" />
+                <GroupAddress Id="P-0293-0_GA-16" Address="6401" Name="Living room Venetian Blinds StopStep" DatapointType="DPST-1-7" Puid="41" />
+                <GroupAddress Id="P-0293-0_GA-17" Address="6402" Name="Living room Venetian Blinds HeightSet" DatapointType="DPST-5-1" Puid="42" />
+                <GroupAddress Id="P-0293-0_GA-18" Address="6403" Name="Living room Venetian Blinds SlatSet" DatapointType="DPST-5-1" Puid="43" />
+                <GroupAddress Id="P-0293-0_GA-19" Address="6404" Name="Living room Venetian Blinds HeightValue" DatapointType="DPST-5-1" Puid="44" />
+                <GroupAddress Id="P-0293-0_GA-20" Address="6405" Name="Living room Venetian Blinds SlatValue" DatapointType="DPST-5-1" Puid="45" />
+                <GroupAddress Id="P-0293-0_GA-21" Address="6406" Name="Living room Venetian Blinds Run" DatapointType="DPST-1-10" Puid="46" />
+                <GroupAddress Id="P-0293-0_GA-22" Address="6407" Name="Living room Venetian Blinds Dir" DatapointType="DPST-1-8" Puid="47" />
+              </GroupRange>
+            </GroupRange>
+            <GroupRange Id="P-0293-0_GR-5" RangeStart="8192" RangeEnd="10239" Name="Bathroom" Puid="19">
+              <GroupRange Id="P-0293-0_GR-11" RangeStart="8704" RangeEnd="8959" Name="Ventialtion" Puid="25">
+                <GroupAddress Id="P-0293-0_GA-25" Address="8704" Name="Bathroom Fan Switch" DatapointType="DPST-1-1" Puid="50" />
+                <GroupAddress Id="P-0293-0_GA-26" Address="8705" Name="Bathroom Fan Staircase" DatapointType="DPST-1-10" Puid="51" />
+                <GroupAddress Id="P-0293-0_GA-27" Address="8706" Name="Bathroom Fan Status" DatapointType="DPST-1-1" Puid="52" />
+              </GroupRange>
+            </GroupRange>
+            <GroupRange Id="P-0293-0_GR-12" RangeStart="10240" RangeEnd="12287" Name="Test" Puid="53">
+              <GroupRange Id="P-0293-0_GR-13" RangeStart="10240" RangeEnd="10495" Name="Lights" Puid="54">
+                <GroupAddress Id="P-0293-0_GA-28" Address="10240" Name="Test Light Switch" DatapointType="DPST-1-1" Puid="55" />
+                <GroupAddress Id="P-0293-0_GA-29" Address="10241" Name="Test Light Status" DatapointType="DPST-1-1" Puid="56" />
+              </GroupRange>
+            </GroupRange>
+          </GroupRanges>
+        </GroupAddresses>
+      </Installation>
+    </Installations>
+  </Project>
+</KNX>

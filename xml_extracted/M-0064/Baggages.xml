@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<KNX xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" CreatedBy="ETS6" ToolVersion="6.4.8718.0" xmlns="http://knx.org/xml/project/23">
+  <ManufacturerData>
+    <Manufacturer RefId="M-0064">
+      <Baggages>
+        <Baggage TargetPath="5810" Name="SwSec_Master_1_Slave.png" Id="M-0064_BG-5810-SwSec.5FMaster.5F1.5FSlave.2Epng">
+          <FileInfo TimeInfo="2025-07-07T06:33:54.2333812Z" />
+        </Baggage>
+        <Baggage TargetPath="5810" Name="SwSec_Master_2_Slaves.png" Id="M-0064_BG-5810-SwSec.5FMaster.5F2.5FSlaves.2Epng">
+          <FileInfo TimeInfo="2025-07-07T06:33:54.2333812Z" />
+        </Baggage>
+        <Baggage TargetPath="5810" Name="SwSec_Master.png" Id="M-0064_BG-5810-SwSec.5FMaster.2Epng">
+          <FileInfo TimeInfo="2025-07-07T06:33:54.2333812Z" />
+        </Baggage>
+        <Baggage TargetPath="5810" Name="icons_5810.zip" Id="M-0064_BG-5810-icons.5F5810.2Ezip">
+          <FileInfo TimeInfo="2025-07-07T06:33:54.2333812Z" />
+        </Baggage>
+      </Baggages>
+    </Manufacturer>
+  </ManufacturerData>
+</KNX>

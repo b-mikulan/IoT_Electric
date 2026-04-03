@@ -1,0 +1,2453 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<KNX xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" CreatedBy="ETS6" ToolVersion="6.4.8718.0" xmlns="http://knx.org/xml/project/23">
+  <ManufacturerData>
+    <Manufacturer RefId="M-0064">
+      <ApplicationPrograms>
+        <ApplicationProgram Id="M-0064_A-7125-10-823A-O00C5" ApplicationNumber="28965" ApplicationVersion="16" ProgramType="ApplicationProgram" MaskVersion="MV-091A" Name="KNX / IP-Router 7125/1.0" LoadProcedureStyle="DefaultProcedure" PeiType="0" DefaultLanguage="en-US" DynamicTableManagement="false" Linkable="false" OriginalManufacturer="M-00C5" PreEts4Style="true" ConvertedFromPreEts4Data="true" IPConfig="Custom" Hash="gjG3ZZ9Zp/KNolbGL6CfOg==">
+          <Static>
+            <Code>
+              <AbsoluteSegment Id="M-0064_A-7125-10-823A-O00C5_AS-0100" Address="256" Size="256" />
+            </Code>
+            <ParameterTypes>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-Param.5Fpage" Name="Param_page">
+                <TypeNone />
+              </ParameterType>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment" Name="IpAssignment">
+                <TypeRestriction Base="Value" SizeInBit="8">
+                  <Enumeration Text="manual" Value="1" Id="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-1" DisplayOrder="0" />
+                  <Enumeration Text="automatic (DHCP)" Value="4" Id="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-4" DisplayOrder="2" />
+                </TypeRestriction>
+              </ParameterType>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Name="IpAddrByte">
+                <TypeNumber SizeInBit="8" Type="unsignedInt" minInclusive="0" maxInclusive="255" />
+              </ParameterType>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-Text" Name="Text">
+                <TypeNone />
+              </ParameterType>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-String30" Name="String30">
+                <TypeText SizeInBit="240" />
+              </ParameterType>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-Bool" Name="Bool">
+                <TypeRestriction Base="Value" SizeInBit="1">
+                  <Enumeration Text="disable" Value="0" Id="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-0" DisplayOrder="0" />
+                  <Enumeration Text="enable" Value="1" Id="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-1" DisplayOrder="1" />
+                </TypeRestriction>
+              </ParameterType>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter" Name="RoutingWithFilter">
+                <TypeRestriction Base="Value" SizeInBit="2">
+                  <Enumeration Text="block" Value="2" Id="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-2" DisplayOrder="0" />
+                  <Enumeration Text="route" Value="1" Id="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-1" DisplayOrder="1" />
+                  <Enumeration Text="filter" Value="3" Id="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-3" DisplayOrder="2" />
+                </TypeRestriction>
+              </ParameterType>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter" Name="RoutingWithoutFilter">
+                <TypeRestriction Base="Value" SizeInBit="2">
+                  <Enumeration Text="block" Value="2" Id="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-2" DisplayOrder="0" />
+                  <Enumeration Text="route" Value="1" Id="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-1" DisplayOrder="1" />
+                </TypeRestriction>
+              </ParameterType>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge" Name="GrpAcknowledge">
+                <TypeRestriction Base="Value" SizeInBit="1">
+                  <Enumeration Text="always" Value="0" Id="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-0" DisplayOrder="0" />
+                  <Enumeration Text="only if routed" Value="1" Id="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-1" DisplayOrder="1" />
+                </TypeRestriction>
+              </ParameterType>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock" Name="BroadcastLock">
+                <TypeRestriction Base="Value" SizeInBit="1">
+                  <Enumeration Text="block" Value="1" Id="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-1" DisplayOrder="0" />
+                  <Enumeration Text="route" Value="0" Id="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-0" DisplayOrder="1" />
+                </TypeRestriction>
+              </ParameterType>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge" Name="PhysAcknowledge">
+                <TypeRestriction Base="Value" SizeInBit="2">
+                  <Enumeration Text="only if routed" Value="1" Id="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-1" DisplayOrder="0" />
+                  <Enumeration Text="always" Value="2" Id="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-2" DisplayOrder="1" />
+                  <Enumeration Text="Answer with NACK" Value="3" Id="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-3" DisplayOrder="2" />
+                </TypeRestriction>
+              </ParameterType>
+              <ParameterType Id="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31" Name="GrpTel16To31">
+                <TypeRestriction Base="Value" SizeInBit="1">
+                  <Enumeration Text="block" Value="0" Id="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-0" DisplayOrder="0" />
+                  <Enumeration Text="route (next page)" Value="1" Id="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-1" DisplayOrder="1" />
+                </TypeRestriction>
+              </ParameterType>
+            </ParameterTypes>
+            <Parameters>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-1" Name="General" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Param.5Fpage" Text="General" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-4" Name="IpConfig2" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Param.5Fpage" Text="IP-Configuration 2" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-10" Name="IpConfig1" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Param.5Fpage" Text="IP-Configuration 1" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-21" Name="RoutingBusIp" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Param.5Fpage" Text="Routing (KNX -&gt; IP)" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-22" Name="RoutingIpBus" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Param.5Fpage" Text="Routing (IP -&gt; KNX)" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-44" Name="GrpTel16To31" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Param.5Fpage" Text="Group telegrams 16 to 31 (KNX -&gt; IP)" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-54" Name="GrpTel16To31" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Param.5Fpage" Text="Group telegrams 16 to 31 (IP -&gt; KNX)" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-9" Name="IpSubnetText" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Text" Text="IP-Subnet" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-15" Name="IpAddrText" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Text" Text="IP-Address" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-16" Name="IpGatewayText" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Text" Text="IP-Gateway address" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-35" Name="IpRoutMultcastAddrText" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Text" Text="IP Routing Multicast addresse" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-63" Name="NoteNack" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Text" Text="Attention: If &quot;Answer with NACK&quot;, &#xD;&#xA;parameterisation must be by IP" Value="" />
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-41" Name="UnparametrisedInterface" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Support of unparameterised interfaces" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="32" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-40" Name="BusVoltFail" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Monitoring of bus voltage" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="33" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-3" Name="UserFriendlyName" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-String30" Text="Device name" Value="KNX / IP-Router REG-K">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="36" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-2" Name="IpAddrAssignment" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment" Text="IP-Address Assignment" Value="4">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="66" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-39" Name="IpRoutAddrByte1" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 1" Value="224">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="67" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-38" Name="IpRoutAddrByte2" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 2" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="68" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-37" Name="IpRoutAddrByte3" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 3" Value="23">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="69" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-36" Name="IpRoutAddrByte4" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 4" Value="12">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="70" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-14" Name="IpAddrByte1" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 1" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="71" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-13" Name="IpAddrByte2" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 2" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="72" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-12" Name="IpAddrByte3" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 3" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="73" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-11" Name="IpAddrByte4" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 4" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="74" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-8" Name="IpSubnetByte1" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 1" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="75" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-7" Name="IpSubnetByte2" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 2" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="76" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-6" Name="IpSubnetByte3" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 3" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="77" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-5" Name="IpSubnetByte4" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 4" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="78" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-17" Name="IpGatewayByte1" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 1" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="79" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-18" Name="IpGatewayByte2" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 2" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="80" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-19" Name="IpGatewayByte3" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 3" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="81" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-20" Name="IpGatewayByte4" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-IpAddrByte" Text="Byte 4" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="82" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-42" Name="AckOfPhysTelSubMain" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge" Text="Acknowledge (ACK) of individual &#xD;&#xA;addressed telegrams" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="83" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-27" Name="AckOfGrpTelSubMain" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge" Text="Acknowledge (ACK) of group telegrams" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="83" BitOffset="2" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-26" Name="BroadcastTelSubMain" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock" Text="Broadcast telegrams" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="83" BitOffset="4" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-25" Name="PhysTelSubMain" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter" Text="Individual addressed telegrams" Value="3">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="83" BitOffset="6" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-24" Name="GrpTelSubMain_14_15" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter" Text="Group telegrams (main groups 14 and 15)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="84" BitOffset="4" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-23" Name="GrpTelSubMain_0_13" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter" Text="Group telegrams (main groups 0 to 13)" Value="3">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="84" BitOffset="6" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-34" Name="RepetitionBroadcastTelMainSub" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Repetition of broadcast telegrams" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="85" BitOffset="3" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-31" Name="BroadcastTelMainSub" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock" Text="Broadcast telegrams" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="85" BitOffset="4" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-33" Name="RepetitionPhysTelMainSub" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Repetition of &#xD;&#xA;individual addressed telegrams" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="85" BitOffset="5" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-30" Name="PhysTelMainSub" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter" Text="Individual addressed telegrams" Value="3">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="85" BitOffset="6" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-32" Name="RepetitionGrpTelMainSub" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Repetition of group telegrams" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="86" BitOffset="3" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-29" Name="GrpTelMainSub_14_15" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter" Text="Group telegrams (main groups 14 and 15)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="86" BitOffset="4" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-28" Name="GrpTelMainSub_0_13" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter" Text="Group telegrams (main groups 0 to 13)" Value="3">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="86" BitOffset="6" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-45" Name="GrpTelSubMain_30_31" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 30 and 31)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="87" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-46" Name="GrpTelSubMain_28_29" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 28 and 29)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="87" BitOffset="1" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-47" Name="GrpTelSubMain_26_27" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 26 and 27)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="87" BitOffset="2" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-48" Name="GrpTelSubMain_24_25" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 24 and 25)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="87" BitOffset="3" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-49" Name="GrpTelSubMain_22_23" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 22 and 23)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="87" BitOffset="4" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-50" Name="GrpTelSubMain_20_21" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 20 and 21)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="87" BitOffset="5" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-51" Name="GrpTelSubMain_18_19" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 18 and 19)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="87" BitOffset="6" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-52" Name="GrpTelSubMain_16_17" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 16 and 17)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="87" BitOffset="7" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-55" Name="GrpTelMainSub_30_31" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 30 and 31)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="88" BitOffset="0" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-56" Name="GrpTelMainSub_28_29" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 28 and 29)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="88" BitOffset="1" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-57" Name="GrpTelMainSub_26_27" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 26 and 27)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="88" BitOffset="2" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-58" Name="GrpTelMainSub_24_25" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 24 and 25)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="88" BitOffset="3" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-59" Name="GrpTelMainSub_22_23" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 22 and 23)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="88" BitOffset="4" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-60" Name="GrpTelMainSub_20_21" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 20 and 21)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="88" BitOffset="5" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-61" Name="GrpTelMainSub_18_19" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 18 and 19)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="88" BitOffset="6" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-62" Name="GrpTelMainSub_16_17" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-Bool" Text="Group telegrams (main group 16 and 17)" Value="1">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="88" BitOffset="7" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-43" Name="GrpTelSubMain_16_31" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31" Text="Group telegrams (main groups 16 to 31)" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="89" BitOffset="7" />
+              </Parameter>
+              <Parameter Id="M-0064_A-7125-10-823A-O00C5_P-53" Name="GrpTelMainSub_16_31" ParameterType="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31" Text="Group telegrams (main groups 16 to 31)" Value="0">
+                <Memory CodeSegment="M-0064_A-7125-10-823A-O00C5_AS-0100" Offset="90" BitOffset="7" />
+              </Parameter>
+            </Parameters>
+            <ParameterRefs>
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-1_R-1" RefId="M-0064_A-7125-10-823A-O00C5_P-1" Tag="1" DisplayOrder="1000" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-3_R-3" RefId="M-0064_A-7125-10-823A-O00C5_P-3" Tag="3" DisplayOrder="1010" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-41_R-41" RefId="M-0064_A-7125-10-823A-O00C5_P-41" Tag="41" DisplayOrder="1020" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-40_R-40" RefId="M-0064_A-7125-10-823A-O00C5_P-40" Tag="40" DisplayOrder="1030" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-2_R-2" RefId="M-0064_A-7125-10-823A-O00C5_P-2" Tag="2" DisplayOrder="1040" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-10_R-10" RefId="M-0064_A-7125-10-823A-O00C5_P-10" Tag="10" DisplayOrder="1100" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-35_R-35" RefId="M-0064_A-7125-10-823A-O00C5_P-35" Tag="35" DisplayOrder="1110" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-39_R-39" RefId="M-0064_A-7125-10-823A-O00C5_P-39" Tag="39" DisplayOrder="1120" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-38_R-38" RefId="M-0064_A-7125-10-823A-O00C5_P-38" Tag="38" DisplayOrder="1130" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-37_R-37" RefId="M-0064_A-7125-10-823A-O00C5_P-37" Tag="37" DisplayOrder="1140" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-36_R-36" RefId="M-0064_A-7125-10-823A-O00C5_P-36" Tag="36" DisplayOrder="1150" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-15_R-15" RefId="M-0064_A-7125-10-823A-O00C5_P-15" Tag="15" DisplayOrder="1160" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-14_R-14" RefId="M-0064_A-7125-10-823A-O00C5_P-14" Tag="14" DisplayOrder="1170" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-13_R-13" RefId="M-0064_A-7125-10-823A-O00C5_P-13" Tag="13" DisplayOrder="1180" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-12_R-12" RefId="M-0064_A-7125-10-823A-O00C5_P-12" Tag="12" DisplayOrder="1190" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-11_R-11" RefId="M-0064_A-7125-10-823A-O00C5_P-11" Tag="11" DisplayOrder="1195" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-4_R-4" RefId="M-0064_A-7125-10-823A-O00C5_P-4" Tag="4" DisplayOrder="1200" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-9_R-9" RefId="M-0064_A-7125-10-823A-O00C5_P-9" Tag="9" DisplayOrder="1210" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-8_R-8" RefId="M-0064_A-7125-10-823A-O00C5_P-8" Tag="8" DisplayOrder="1220" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-7_R-7" RefId="M-0064_A-7125-10-823A-O00C5_P-7" Tag="7" DisplayOrder="1230" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-6_R-6" RefId="M-0064_A-7125-10-823A-O00C5_P-6" Tag="6" DisplayOrder="1240" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-5_R-5" RefId="M-0064_A-7125-10-823A-O00C5_P-5" Tag="5" DisplayOrder="1250" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-16_R-16" RefId="M-0064_A-7125-10-823A-O00C5_P-16" Tag="16" DisplayOrder="1260" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-17_R-17" RefId="M-0064_A-7125-10-823A-O00C5_P-17" Tag="17" DisplayOrder="1270" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-18_R-18" RefId="M-0064_A-7125-10-823A-O00C5_P-18" Tag="18" DisplayOrder="1280" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-19_R-19" RefId="M-0064_A-7125-10-823A-O00C5_P-19" Tag="19" DisplayOrder="1290" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-20_R-20" RefId="M-0064_A-7125-10-823A-O00C5_P-20" Tag="20" DisplayOrder="1295" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-21_R-21" RefId="M-0064_A-7125-10-823A-O00C5_P-21" Tag="21" DisplayOrder="1300" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-23_R-23" RefId="M-0064_A-7125-10-823A-O00C5_P-23" Tag="23" DisplayOrder="1310" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-24_R-24" RefId="M-0064_A-7125-10-823A-O00C5_P-24" Tag="24" DisplayOrder="1320" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-43_R-43" RefId="M-0064_A-7125-10-823A-O00C5_P-43" Tag="43" DisplayOrder="1330" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-25_R-25" RefId="M-0064_A-7125-10-823A-O00C5_P-25" Tag="25" DisplayOrder="1340" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-26_R-26" RefId="M-0064_A-7125-10-823A-O00C5_P-26" Tag="26" DisplayOrder="1350" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-27_R-27" RefId="M-0064_A-7125-10-823A-O00C5_P-27" Tag="27" DisplayOrder="1360" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-42_R-42" RefId="M-0064_A-7125-10-823A-O00C5_P-42" Tag="42" DisplayOrder="1370" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-63_R-63" RefId="M-0064_A-7125-10-823A-O00C5_P-63" Tag="63" DisplayOrder="1380" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-44_R-44" RefId="M-0064_A-7125-10-823A-O00C5_P-44" Tag="44" DisplayOrder="1400" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-52_R-52" RefId="M-0064_A-7125-10-823A-O00C5_P-52" Tag="52" DisplayOrder="1410" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-51_R-51" RefId="M-0064_A-7125-10-823A-O00C5_P-51" Tag="51" DisplayOrder="1420" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-50_R-50" RefId="M-0064_A-7125-10-823A-O00C5_P-50" Tag="50" DisplayOrder="1430" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-49_R-49" RefId="M-0064_A-7125-10-823A-O00C5_P-49" Tag="49" DisplayOrder="1440" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-48_R-48" RefId="M-0064_A-7125-10-823A-O00C5_P-48" Tag="48" DisplayOrder="1450" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-47_R-47" RefId="M-0064_A-7125-10-823A-O00C5_P-47" Tag="47" DisplayOrder="1460" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-46_R-46" RefId="M-0064_A-7125-10-823A-O00C5_P-46" Tag="46" DisplayOrder="1470" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-45_R-45" RefId="M-0064_A-7125-10-823A-O00C5_P-45" Tag="45" DisplayOrder="1480" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-22_R-22" RefId="M-0064_A-7125-10-823A-O00C5_P-22" Tag="22" DisplayOrder="1500" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-28_R-28" RefId="M-0064_A-7125-10-823A-O00C5_P-28" Tag="28" DisplayOrder="1510" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-29_R-29" RefId="M-0064_A-7125-10-823A-O00C5_P-29" Tag="29" DisplayOrder="1520" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-53_R-53" RefId="M-0064_A-7125-10-823A-O00C5_P-53" Tag="53" DisplayOrder="1530" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-30_R-30" RefId="M-0064_A-7125-10-823A-O00C5_P-30" Tag="30" DisplayOrder="1540" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-31_R-31" RefId="M-0064_A-7125-10-823A-O00C5_P-31" Tag="31" DisplayOrder="1550" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-32_R-32" RefId="M-0064_A-7125-10-823A-O00C5_P-32" Tag="32" DisplayOrder="1560" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-33_R-33" RefId="M-0064_A-7125-10-823A-O00C5_P-33" Tag="33" DisplayOrder="1570" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-34_R-34" RefId="M-0064_A-7125-10-823A-O00C5_P-34" Tag="34" DisplayOrder="1580" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-54_R-54" RefId="M-0064_A-7125-10-823A-O00C5_P-54" Tag="54" DisplayOrder="1600" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-62_R-62" RefId="M-0064_A-7125-10-823A-O00C5_P-62" Tag="62" DisplayOrder="1610" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-61_R-61" RefId="M-0064_A-7125-10-823A-O00C5_P-61" Tag="61" DisplayOrder="1620" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-60_R-60" RefId="M-0064_A-7125-10-823A-O00C5_P-60" Tag="60" DisplayOrder="1630" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-59_R-59" RefId="M-0064_A-7125-10-823A-O00C5_P-59" Tag="59" DisplayOrder="1640" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-58_R-58" RefId="M-0064_A-7125-10-823A-O00C5_P-58" Tag="58" DisplayOrder="1650" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-57_R-57" RefId="M-0064_A-7125-10-823A-O00C5_P-57" Tag="57" DisplayOrder="1660" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-56_R-56" RefId="M-0064_A-7125-10-823A-O00C5_P-56" Tag="56" DisplayOrder="1670" />
+              <ParameterRef Id="M-0064_A-7125-10-823A-O00C5_P-55_R-55" RefId="M-0064_A-7125-10-823A-O00C5_P-55" Tag="55" DisplayOrder="1680" />
+            </ParameterRefs>
+            <Options DownloadInvisibleParameters="Background" />
+          </Static>
+          <Dynamic>
+            <Channel Name="Generic" Text="" Number="0" Id="M-0064_A-7125-10-823A-O00C5_CH-0">
+              <ParameterBlock Id="M-0064_A-7125-10-823A-O00C5_PB-1" Name="General" ParamRefId="M-0064_A-7125-10-823A-O00C5_P-1_R-1">
+                <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-1_R-1">
+                  <when default="true">
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-3_R-3" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-41_R-41" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-40_R-40" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-2_R-2" />
+                  </when>
+                </choose>
+              </ParameterBlock>
+              <ParameterBlock Id="M-0064_A-7125-10-823A-O00C5_PB-10" Name="IpConfig1" ParamRefId="M-0064_A-7125-10-823A-O00C5_P-10_R-10">
+                <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-10_R-10">
+                  <when default="true">
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-35_R-35" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-39_R-39" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-38_R-38" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-37_R-37" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-36_R-36" />
+                  </when>
+                </choose>
+                <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-1_R-1">
+                  <when default="true">
+                    <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-2_R-2">
+                      <when test="1">
+                        <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-15_R-15" />
+                        <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-14_R-14" />
+                        <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-13_R-13" />
+                        <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-12_R-12" />
+                        <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-11_R-11" />
+                      </when>
+                    </choose>
+                  </when>
+                </choose>
+              </ParameterBlock>
+              <ParameterBlock Id="M-0064_A-7125-10-823A-O00C5_PB-21" Name="RoutingBusIp" ParamRefId="M-0064_A-7125-10-823A-O00C5_P-21_R-21">
+                <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-21_R-21">
+                  <when default="true">
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-23_R-23" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-24_R-24" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-43_R-43" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-25_R-25" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-26_R-26" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-27_R-27" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-42_R-42" />
+                    <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-42_R-42">
+                      <when test="3">
+                        <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-63_R-63" />
+                      </when>
+                    </choose>
+                  </when>
+                </choose>
+              </ParameterBlock>
+              <ParameterBlock Id="M-0064_A-7125-10-823A-O00C5_PB-22" Name="RoutingIpBus" ParamRefId="M-0064_A-7125-10-823A-O00C5_P-22_R-22">
+                <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-22_R-22">
+                  <when default="true">
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-28_R-28" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-29_R-29" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-53_R-53" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-30_R-30" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-31_R-31" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-32_R-32" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-33_R-33" />
+                    <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-34_R-34" />
+                  </when>
+                </choose>
+              </ParameterBlock>
+              <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-1_R-1">
+                <when default="true">
+                  <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-2_R-2">
+                    <when test="1">
+                      <ParameterBlock Id="M-0064_A-7125-10-823A-O00C5_PB-4" Name="IpConfig2" ParamRefId="M-0064_A-7125-10-823A-O00C5_P-4_R-4">
+                        <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-4_R-4">
+                          <when default="true">
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-9_R-9" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-8_R-8" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-7_R-7" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-6_R-6" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-5_R-5" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-16_R-16" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-17_R-17" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-18_R-18" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-19_R-19" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-20_R-20" />
+                          </when>
+                        </choose>
+                      </ParameterBlock>
+                    </when>
+                  </choose>
+                </when>
+              </choose>
+              <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-21_R-21">
+                <when default="true">
+                  <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-43_R-43">
+                    <when test="1">
+                      <ParameterBlock Id="M-0064_A-7125-10-823A-O00C5_PB-44" Name="GrpTel16To31" ParamRefId="M-0064_A-7125-10-823A-O00C5_P-44_R-44">
+                        <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-44_R-44">
+                          <when default="true">
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-52_R-52" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-51_R-51" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-50_R-50" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-49_R-49" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-48_R-48" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-47_R-47" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-46_R-46" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-45_R-45" />
+                          </when>
+                        </choose>
+                      </ParameterBlock>
+                    </when>
+                  </choose>
+                </when>
+              </choose>
+              <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-22_R-22">
+                <when default="true">
+                  <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-53_R-53">
+                    <when test="1">
+                      <ParameterBlock Id="M-0064_A-7125-10-823A-O00C5_PB-54" Name="GrpTel16To31" ParamRefId="M-0064_A-7125-10-823A-O00C5_P-54_R-54">
+                        <choose ParamRefId="M-0064_A-7125-10-823A-O00C5_P-54_R-54">
+                          <when default="true">
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-62_R-62" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-61_R-61" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-60_R-60" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-59_R-59" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-58_R-58" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-57_R-57" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-56_R-56" />
+                            <ParameterRefRef RefId="M-0064_A-7125-10-823A-O00C5_P-55_R-55" />
+                          </when>
+                        </choose>
+                      </ParameterBlock>
+                    </when>
+                  </choose>
+                </when>
+              </choose>
+            </Channel>
+          </Dynamic>
+        </ApplicationProgram>
+      </ApplicationPrograms>
+      <Languages>
+        <Language Identifier="it-IT">
+          <TranslationUnit RefId="M-0064_A-7125-10-823A-O00C5">
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-1">
+              <Translation AttributeName="Text" Text="Manuale" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-4">
+              <Translation AttributeName="Text" Text="Dinamico (DHCP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-0">
+              <Translation AttributeName="Text" Text="Disabilita" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-1">
+              <Translation AttributeName="Text" Text="Abilita" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-2">
+              <Translation AttributeName="Text" Text="Disabilita" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-1">
+              <Translation AttributeName="Text" Text="Inoltra" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-3">
+              <Translation AttributeName="Text" Text="Filtrare" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-2">
+              <Translation AttributeName="Text" Text="Disabilita" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-1">
+              <Translation AttributeName="Text" Text="Inoltra" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-0">
+              <Translation AttributeName="Text" Text="Sempre" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="Solo se instradato" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-1">
+              <Translation AttributeName="Text" Text="Disabilita" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-0">
+              <Translation AttributeName="Text" Text="Inoltra" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="Solo se instradato" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-2">
+              <Translation AttributeName="Text" Text="Sempre" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-3">
+              <Translation AttributeName="Text" Text="Risposta con NACK" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-0">
+              <Translation AttributeName="Text" Text="Disabilita" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-1">
+              <Translation AttributeName="Text" Text="Inoltra (vedi pagina seguente)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-1">
+              <Translation AttributeName="Text" Text="Generale" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-3">
+              <Translation AttributeName="Text" Text="Nome dispositivo" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-41">
+              <Translation AttributeName="Text" Text="Supporto interfacce non parametrizzate" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-40">
+              <Translation AttributeName="Text" Text="Controllo tensione bus" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-2">
+              <Translation AttributeName="Text" Text="Assegnazione indirizzo IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-10">
+              <Translation AttributeName="Text" Text="Configurazione IP 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-35">
+              <Translation AttributeName="Text" Text="Indirizzo IP Routing Multicast" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-39">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-38">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-37">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-36">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-15">
+              <Translation AttributeName="Text" Text="Indirizzo IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-14">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-13">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-12">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-11">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-4">
+              <Translation AttributeName="Text" Text="Configurazione IP 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-9">
+              <Translation AttributeName="Text" Text="Sotto rete IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-8">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-7">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-6">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-5">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-16">
+              <Translation AttributeName="Text" Text="Indirizzo gateway IP!" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-17">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-18">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-19">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-20">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-21">
+              <Translation AttributeName="Text" Text="Inoltro (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-23">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ.s 0 a 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-24">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 14 e 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-43">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 16 to 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-25">
+              <Translation AttributeName="Text" Text="Telegrammi indirizzamento" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-26">
+              <Translation AttributeName="Text" Text="Telegrammi broadcast" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-27">
+              <Translation AttributeName="Text" Text="Conferma (ACK)di indirizzi di gruppo" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-42">
+              <Translation AttributeName="Text" Text="Conferma (ACK) di telegrammi&#xD;&#xA;di indirizzamento fisico" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-63">
+              <Translation AttributeName="Text" Text="Attenzione: in caso di &quot;Risposta con &#xD;&#xA;NACK&quot;, i parametri devono essere su IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-44">
+              <Translation AttributeName="Text" Text="Ind. gruppo 16 a 31 (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-52">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 16 e 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-51">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 18 e 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-50">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 20 e 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-49">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 22 e 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-48">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 24 e 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-47">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 26 e 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-46">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 28 e 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-45">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 30 e 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-22">
+              <Translation AttributeName="Text" Text="Inoltro (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-28">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ.s 0 a 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-29">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 14 e 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-53">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 16 to 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-30">
+              <Translation AttributeName="Text" Text="Telegrammi indirizzamento" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-31">
+              <Translation AttributeName="Text" Text="Telegrammi broadcast" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-32">
+              <Translation AttributeName="Text" Text="Ripetizioni telegrammi di gruppo" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-33">
+              <Translation AttributeName="Text" Text="Ripetizioni&#xD;&#xA;telegrammi indirizzati fisicamente" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-34">
+              <Translation AttributeName="Text" Text="Ripetizioni telegrammi broadcast" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-54">
+              <Translation AttributeName="Text" Text="Ind. gruppo 16 a 31 (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-62">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 16 e 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-61">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 18 e 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-60">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 20 e 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-59">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 22 e 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-58">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 24 e 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-57">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 26 e 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-56">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 28 e 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-55">
+              <Translation AttributeName="Text" Text="Ind. gruppo (gr. princ. 30 e 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5">
+              <Translation AttributeName="Name" Text="KNX / IP-Router 7125/1.0" />
+            </TranslationElement>
+          </TranslationUnit>
+        </Language>
+        <Language Identifier="en-US">
+          <TranslationUnit RefId="M-0064_A-7125-10-823A-O00C5">
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-1">
+              <Translation AttributeName="Text" Text="manual" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-4">
+              <Translation AttributeName="Text" Text="automatic (DHCP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-0">
+              <Translation AttributeName="Text" Text="disable" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-1">
+              <Translation AttributeName="Text" Text="enable" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-2">
+              <Translation AttributeName="Text" Text="block" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-1">
+              <Translation AttributeName="Text" Text="route" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-3">
+              <Translation AttributeName="Text" Text="filter" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-2">
+              <Translation AttributeName="Text" Text="block" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-1">
+              <Translation AttributeName="Text" Text="route" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-0">
+              <Translation AttributeName="Text" Text="always" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="only if routed" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-1">
+              <Translation AttributeName="Text" Text="block" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-0">
+              <Translation AttributeName="Text" Text="route" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="only if routed" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-2">
+              <Translation AttributeName="Text" Text="always" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-3">
+              <Translation AttributeName="Text" Text="Answer with NACK" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-0">
+              <Translation AttributeName="Text" Text="block" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-1">
+              <Translation AttributeName="Text" Text="route (next page)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-1">
+              <Translation AttributeName="Text" Text="General" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-3">
+              <Translation AttributeName="Text" Text="Device name" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-41">
+              <Translation AttributeName="Text" Text="Support of unparameterised interfaces" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-40">
+              <Translation AttributeName="Text" Text="Monitoring of bus voltage" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-2">
+              <Translation AttributeName="Text" Text="IP-Address Assignment" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-10">
+              <Translation AttributeName="Text" Text="IP-Configuration 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-35">
+              <Translation AttributeName="Text" Text="IP Routing Multicast addresse" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-39">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-38">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-37">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-36">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-15">
+              <Translation AttributeName="Text" Text="IP-Address" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-14">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-13">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-12">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-11">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-4">
+              <Translation AttributeName="Text" Text="IP-Configuration 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-9">
+              <Translation AttributeName="Text" Text="IP-Subnet" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-8">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-7">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-6">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-5">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-16">
+              <Translation AttributeName="Text" Text="IP-Gateway address" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-17">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-18">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-19">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-20">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-21">
+              <Translation AttributeName="Text" Text="Routing (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-23">
+              <Translation AttributeName="Text" Text="Group telegrams (main groups 0 to 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-24">
+              <Translation AttributeName="Text" Text="Group telegrams (main groups 14 and 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-43">
+              <Translation AttributeName="Text" Text="Group telegrams (main groups 16 to 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-25">
+              <Translation AttributeName="Text" Text="Individual addressed telegrams" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-26">
+              <Translation AttributeName="Text" Text="Broadcast telegrams" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-27">
+              <Translation AttributeName="Text" Text="Acknowledge (ACK) of group telegrams" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-42">
+              <Translation AttributeName="Text" Text="Acknowledge (ACK) of individual &#xD;&#xA;addressed telegrams" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-63">
+              <Translation AttributeName="Text" Text="Attention: If &quot;Answer with NACK&quot;, &#xD;&#xA;parameterisation must be by IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-44">
+              <Translation AttributeName="Text" Text="Group telegrams 16 to 31 (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-52">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 16 and 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-51">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 18 and 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-50">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 20 and 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-49">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 22 and 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-48">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 24 and 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-47">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 26 and 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-46">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 28 and 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-45">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 30 and 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-22">
+              <Translation AttributeName="Text" Text="Routing (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-28">
+              <Translation AttributeName="Text" Text="Group telegrams (main groups 0 to 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-29">
+              <Translation AttributeName="Text" Text="Group telegrams (main groups 14 and 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-53">
+              <Translation AttributeName="Text" Text="Group telegrams (main groups 16 to 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-30">
+              <Translation AttributeName="Text" Text="Individual addressed telegrams" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-31">
+              <Translation AttributeName="Text" Text="Broadcast telegrams" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-32">
+              <Translation AttributeName="Text" Text="Repetition of group telegrams" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-33">
+              <Translation AttributeName="Text" Text="Repetition of &#xD;&#xA;individual addressed telegrams" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-34">
+              <Translation AttributeName="Text" Text="Repetition of broadcast telegrams" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-54">
+              <Translation AttributeName="Text" Text="Group telegrams 16 to 31 (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-62">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 16 and 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-61">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 18 and 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-60">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 20 and 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-59">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 22 and 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-58">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 24 and 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-57">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 26 and 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-56">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 28 and 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-55">
+              <Translation AttributeName="Text" Text="Group telegrams (main group 30 and 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5">
+              <Translation AttributeName="Name" Text="KNX / IP-Router 7125/1.0" />
+            </TranslationElement>
+          </TranslationUnit>
+        </Language>
+        <Language Identifier="es-ES">
+          <TranslationUnit RefId="M-0064_A-7125-10-823A-O00C5">
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-1">
+              <Translation AttributeName="Text" Text="manual" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-4">
+              <Translation AttributeName="Text" Text="automático (DHCP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-0">
+              <Translation AttributeName="Text" Text="bloquear" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-1">
+              <Translation AttributeName="Text" Text="permitir" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-2">
+              <Translation AttributeName="Text" Text="bloquear" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-1">
+              <Translation AttributeName="Text" Text="transmitir" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-3">
+              <Translation AttributeName="Text" Text="filtrar" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-2">
+              <Translation AttributeName="Text" Text="bloquear" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-1">
+              <Translation AttributeName="Text" Text="transmitir" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-0">
+              <Translation AttributeName="Text" Text="siempre" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="sólo ante transmisión" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-1">
+              <Translation AttributeName="Text" Text="bloquear" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-0">
+              <Translation AttributeName="Text" Text="transmitir" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="sólo ante transmisión" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-2">
+              <Translation AttributeName="Text" Text="siempre" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-3">
+              <Translation AttributeName="Text" Text="Respuesta con NACK" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-0">
+              <Translation AttributeName="Text" Text="bloquear" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-1">
+              <Translation AttributeName="Text" Text="transferir (véase página siguiente)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-1">
+              <Translation AttributeName="Text" Text="General" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-3">
+              <Translation AttributeName="Text" Text="Nombre de la unidad" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-41">
+              <Translation AttributeName="Text" Text="Soporta interfaces no&#xD;&#xA;parametrizadas" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-40">
+              <Translation AttributeName="Text" Text="Monitorización de&#xD;&#xA;caída de tensión en el bus" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-2">
+              <Translation AttributeName="Text" Text="Asignación de dirección IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-10">
+              <Translation AttributeName="Text" Text="Configuración IP-1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-35">
+              <Translation AttributeName="Text" Text="Dirección IP Routing Multicast" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-39">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-38">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-37">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-36">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-15">
+              <Translation AttributeName="Text" Text="Dirección IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-14">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-13">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-12">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-11">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-4">
+              <Translation AttributeName="Text" Text="Configuración IP-2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-9">
+              <Translation AttributeName="Text" Text="Máscara de subred" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-8">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-7">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-6">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-5">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-16">
+              <Translation AttributeName="Text" Text="Puerta de enlace" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-17">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-18">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-19">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-20">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-21">
+              <Translation AttributeName="Text" Text="Routing (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-23">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales del 0 al 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-24">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 14 y 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-43">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales del 16 al 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-25">
+              <Translation AttributeName="Text" Text="Telegramas con dirección&#xD;&#xA;física" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-26">
+              <Translation AttributeName="Text" Text="Telegramas a todos los terminales" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-27">
+              <Translation AttributeName="Text" Text="Confirmación (ACK) de telegramas&#xD;&#xA;de grupo" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-42">
+              <Translation AttributeName="Text" Text="Confirmación (ACK) de telegramas&#xD;&#xA;con dirección física" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-63">
+              <Translation AttributeName="Text" Text="Atención: en &quot;Respuesta c. NACK&quot; la&#xD;&#xA;parametrización se realizará mediante IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-44">
+              <Translation AttributeName="Text" Text="Telegramas de grupo, 16 al 31 (KNX-&gt;IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-52">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 16 y 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-51">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 18 y 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-50">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 20 y 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-49">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 22 y 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-48">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 24 y 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-47">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 26 y 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-46">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 28 y 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-45">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 30 y 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-22">
+              <Translation AttributeName="Text" Text="Routing (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-28">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales del 0 al 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-29">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 14 y 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-53">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales del 16 al 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-30">
+              <Translation AttributeName="Text" Text="Telegramas con dirección&#xD;&#xA;física" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-31">
+              <Translation AttributeName="Text" Text="Telegramas a todos los terminales" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-32">
+              <Translation AttributeName="Text" Text="Envío repetido de&#xD;&#xA;telegramas de grupo" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-33">
+              <Translation AttributeName="Text" Text="Envío repetido de&#xD;&#xA;telegramas con dirección física" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-34">
+              <Translation AttributeName="Text" Text="Envío repetido de&#xD;&#xA;telegramas a todos los terminales" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-54">
+              <Translation AttributeName="Text" Text="Telegramas de grupo,16 al 31 (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-62">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 16 y 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-61">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 18 y 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-60">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 20 y 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-59">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 22 y 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-58">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 24 y 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-57">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 26 y 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-56">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 28 y 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-55">
+              <Translation AttributeName="Text" Text="Telegramas de grupo&#xD;&#xA;(grupos principales 30 y 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5">
+              <Translation AttributeName="Name" Text="KNX / Router IP  7125/1.0" />
+            </TranslationElement>
+          </TranslationUnit>
+        </Language>
+        <Language Identifier="sv-SE">
+          <TranslationUnit RefId="M-0064_A-7125-10-823A-O00C5">
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-1">
+              <Translation AttributeName="Text" Text="manuell" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-4">
+              <Translation AttributeName="Text" Text="automatisk (DHCP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-0">
+              <Translation AttributeName="Text" Text="spärrad" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-1">
+              <Translation AttributeName="Text" Text="frigiven" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-2">
+              <Translation AttributeName="Text" Text="spärra" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-1">
+              <Translation AttributeName="Text" Text="vidarebefordra" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-3">
+              <Translation AttributeName="Text" Text="filtrera" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-2">
+              <Translation AttributeName="Text" Text="spärra" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-1">
+              <Translation AttributeName="Text" Text="vidarebefordra" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-0">
+              <Translation AttributeName="Text" Text="alltid" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="endast vid vidarebefordran" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-1">
+              <Translation AttributeName="Text" Text="spärra" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-0">
+              <Translation AttributeName="Text" Text="vidarebefordra" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="endast vid vidarebefordran" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-2">
+              <Translation AttributeName="Text" Text="alltid" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-3">
+              <Translation AttributeName="Text" Text="svara med NACK" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-0">
+              <Translation AttributeName="Text" Text="spärra" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-1">
+              <Translation AttributeName="Text" Text="vidarebefordra (se nästa sida)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-1">
+              <Translation AttributeName="Text" Text="Allmänt" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-3">
+              <Translation AttributeName="Text" Text="Apparatnamn" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-41">
+              <Translation AttributeName="Text" Text="Stöd för oparametrerat gränssnitt" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-40">
+              <Translation AttributeName="Text" Text="Övervakning av busspänningsbortfall" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-2">
+              <Translation AttributeName="Text" Text="IP-adresstilldelning" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-10">
+              <Translation AttributeName="Text" Text="IP-konfiguration 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-35">
+              <Translation AttributeName="Text" Text="IP-routing multicast-adress" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-39">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-38">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-37">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-36">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-15">
+              <Translation AttributeName="Text" Text="IP-adress" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-14">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-13">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-12">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-11">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-4">
+              <Translation AttributeName="Text" Text="IP-konfiguration 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-9">
+              <Translation AttributeName="Text" Text="IP-subnät" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-8">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-7">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-6">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-5">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-16">
+              <Translation AttributeName="Text" Text="IP-gateway-adress" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-17">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-18">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-19">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-20">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-21">
+              <Translation AttributeName="Text" Text="Routing (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-23">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 0 till 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-24">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 14 och 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-43">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 16 till 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-25">
+              <Translation AttributeName="Text" Text="Individuellt adresserade telegram" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-26">
+              <Translation AttributeName="Text" Text="Broadcast-telegram" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-27">
+              <Translation AttributeName="Text" Text="Bekräftelse (ACK) av grupptelegram" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-42">
+              <Translation AttributeName="Text" Text="Bekräftelse (ACK) av individuellt&#xD;&#xA;adresserade telegram" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-63">
+              <Translation AttributeName="Text" Text="OBS: Vid &quot;Svara med NACK&quot; måste&#xD;&#xA;parametreringen utföras via IP !" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-44">
+              <Translation AttributeName="Text" Text="Grupptel. 16 till 31 (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-52">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 16 och 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-51">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 18 och 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-50">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 20 och 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-49">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 22 och 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-48">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 24 och 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-47">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 26 och 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-46">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 28 och 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-45">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 30 och 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-22">
+              <Translation AttributeName="Text" Text="Routing (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-28">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 0 till 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-29">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 14 och 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-53">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 16 till 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-30">
+              <Translation AttributeName="Text" Text="Individuellt adresserade telegram" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-31">
+              <Translation AttributeName="Text" Text="Broadcast-telegram" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-32">
+              <Translation AttributeName="Text" Text="Sändningsrepetition av&#xD;&#xA;grupptelegram" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-33">
+              <Translation AttributeName="Text" Text="Sändningsrepetition av&#xD;&#xA;individuellt adresserade telegram" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-34">
+              <Translation AttributeName="Text" Text="Sändningsrepetition av&#xD;&#xA;Broadcast-telegram" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-54">
+              <Translation AttributeName="Text" Text="Grupptel. 16 till 31 (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-62">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 16 och 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-61">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 18 och 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-60">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 20 och 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-59">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 22 och 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-58">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 24 och 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-57">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 26 och 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-56">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 28 och 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-55">
+              <Translation AttributeName="Text" Text="Grupptelegram&#xD;&#xA;(Huvudgrupp 30 och 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5">
+              <Translation AttributeName="Name" Text="KNX / IP-router 7125/1.0" />
+            </TranslationElement>
+          </TranslationUnit>
+        </Language>
+        <Language Identifier="de-DE">
+          <TranslationUnit RefId="M-0064_A-7125-10-823A-O00C5">
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-1">
+              <Translation AttributeName="Text" Text="manuell" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-4">
+              <Translation AttributeName="Text" Text="automatisch (DHCP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-0">
+              <Translation AttributeName="Text" Text="sperren" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-1">
+              <Translation AttributeName="Text" Text="freigeben" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-2">
+              <Translation AttributeName="Text" Text="sperren" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-1">
+              <Translation AttributeName="Text" Text="weiterleiten" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-3">
+              <Translation AttributeName="Text" Text="filtern" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-2">
+              <Translation AttributeName="Text" Text="sperren" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-1">
+              <Translation AttributeName="Text" Text="weiterleiten" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-0">
+              <Translation AttributeName="Text" Text="immer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="nur bei Weiterleitung" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-1">
+              <Translation AttributeName="Text" Text="sperren" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-0">
+              <Translation AttributeName="Text" Text="weiterleiten" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="nur bei Weiterleitung" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-2">
+              <Translation AttributeName="Text" Text="immer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-3">
+              <Translation AttributeName="Text" Text="Antwort mit NACK" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-0">
+              <Translation AttributeName="Text" Text="sperren" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-1">
+              <Translation AttributeName="Text" Text="weiterleiten (siehe nächste Seite)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-1">
+              <Translation AttributeName="Text" Text="Allgemein" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-3">
+              <Translation AttributeName="Text" Text="Gerätename" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-41">
+              <Translation AttributeName="Text" Text="Unterstützung unparametrierter&#xD;&#xA;Schnittstellen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-40">
+              <Translation AttributeName="Text" Text="Überwachung auf Busspannungsausfall" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-2">
+              <Translation AttributeName="Text" Text="IP-Adresszuweisung" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-10">
+              <Translation AttributeName="Text" Text="IP-Konfiguration 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-35">
+              <Translation AttributeName="Text" Text="IP Routing Multicast Adresse" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-39">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-38">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-37">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-36">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-15">
+              <Translation AttributeName="Text" Text="IP-Adresse" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-14">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-13">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-12">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-11">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-4">
+              <Translation AttributeName="Text" Text="IP-Konfiguration 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-9">
+              <Translation AttributeName="Text" Text="IP-Subnetz" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-8">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-7">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-6">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-5">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-16">
+              <Translation AttributeName="Text" Text="IP-Gateway-Adresse" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-17">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-18">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-19">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-20">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-21">
+              <Translation AttributeName="Text" Text="Routing (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-23">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppen 0 bis 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-24">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppen 14 und 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-43">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppen 16 bis 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-25">
+              <Translation AttributeName="Text" Text="Physikalisch adressierte&#xD;&#xA;Telegramme" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-26">
+              <Translation AttributeName="Text" Text="Broadcast Telegramme" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-27">
+              <Translation AttributeName="Text" Text="Bestätigung (ACK) von&#xD;&#xA;Gruppentelegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-42">
+              <Translation AttributeName="Text" Text="Bestätigung (ACK) von physikalisch&#xD;&#xA;adressierten Telegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-63">
+              <Translation AttributeName="Text" Text="Achtung: Bei &quot;Antwort mit NACK&quot; muss&#xD;&#xA;die Parametrierung über IP erfolgen!" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-44">
+              <Translation AttributeName="Text" Text="Gruppentel. 16 bis 31 (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-52">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 16 und 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-51">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 18 und 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-50">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 20 und 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-49">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 22 und 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-48">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 24 und 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-47">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 26 und 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-46">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 28 und 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-45">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 30 und 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-22">
+              <Translation AttributeName="Text" Text="Routing (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-28">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppen 0 bis 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-29">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppen 14 und 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-53">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppen 16 bis 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-30">
+              <Translation AttributeName="Text" Text="Physikalisch adressierte&#xD;&#xA;Telegramme" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-31">
+              <Translation AttributeName="Text" Text="Broadcast Telegramme" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-32">
+              <Translation AttributeName="Text" Text="Wiederholungssenden von&#xD;&#xA;Gruppentelegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-33">
+              <Translation AttributeName="Text" Text="Wiederholungssenden von&#xD;&#xA;physikalisch adressierten Telegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-34">
+              <Translation AttributeName="Text" Text="Wiederholungssenden von&#xD;&#xA;Broadcast-Telegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-54">
+              <Translation AttributeName="Text" Text="Gruppentel. 16 bis 31 (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-62">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 16 und 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-61">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 18 und 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-60">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 20 und 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-59">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 22 und 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-58">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 24 und 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-57">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 26 und 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-56">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 28 und 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-55">
+              <Translation AttributeName="Text" Text="Gruppentelegramme&#xD;&#xA;(Hauptgruppe 30 und 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5">
+              <Translation AttributeName="Name" Text="KNX / IP-Router 7125/1.0" />
+            </TranslationElement>
+          </TranslationUnit>
+        </Language>
+        <Language Identifier="fr-FR">
+          <TranslationUnit RefId="M-0064_A-7125-10-823A-O00C5">
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-1">
+              <Translation AttributeName="Text" Text="manuel" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-4">
+              <Translation AttributeName="Text" Text="automatique (DHCP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-0">
+              <Translation AttributeName="Text" Text="Verrouillé" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-1">
+              <Translation AttributeName="Text" Text="Autoriser" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-2">
+              <Translation AttributeName="Text" Text="Verrouillé" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-1">
+              <Translation AttributeName="Text" Text="Transmettre" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-3">
+              <Translation AttributeName="Text" Text="Filtrer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-2">
+              <Translation AttributeName="Text" Text="Verrouillé" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-1">
+              <Translation AttributeName="Text" Text="Transmettre" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-0">
+              <Translation AttributeName="Text" Text="toujours" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="uniq. en cas de transm." />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-1">
+              <Translation AttributeName="Text" Text="Verrouillé" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-0">
+              <Translation AttributeName="Text" Text="Transmettre" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="uniq. en cas de transm." />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-2">
+              <Translation AttributeName="Text" Text="toujours" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-3">
+              <Translation AttributeName="Text" Text="Réponse NACK" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-0">
+              <Translation AttributeName="Text" Text="Verrouillé" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-1">
+              <Translation AttributeName="Text" Text="transmettre (voir page suivante)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-1">
+              <Translation AttributeName="Text" Text="Général" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-3">
+              <Translation AttributeName="Text" Text="Nom de l'appareil" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-41">
+              <Translation AttributeName="Text" Text="Support d'interfaces&#xD;&#xA;non paramétrées" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-40">
+              <Translation AttributeName="Text" Text="Surveillance coupure tens. bus" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-2">
+              <Translation AttributeName="Text" Text="Assignation d'adresse IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-10">
+              <Translation AttributeName="Text" Text="Configuration IP 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-35">
+              <Translation AttributeName="Text" Text="Adresse de routage IP multicast" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-39">
+              <Translation AttributeName="Text" Text="Octet 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-38">
+              <Translation AttributeName="Text" Text="Octet 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-37">
+              <Translation AttributeName="Text" Text="Octet 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-36">
+              <Translation AttributeName="Text" Text="Octet 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-15">
+              <Translation AttributeName="Text" Text="Adresse IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-14">
+              <Translation AttributeName="Text" Text="Octet 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-13">
+              <Translation AttributeName="Text" Text="Octet 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-12">
+              <Translation AttributeName="Text" Text="Octet 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-11">
+              <Translation AttributeName="Text" Text="Octet 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-4">
+              <Translation AttributeName="Text" Text="Configuration IP 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-9">
+              <Translation AttributeName="Text" Text="Sous-réseau IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-8">
+              <Translation AttributeName="Text" Text="Octet 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-7">
+              <Translation AttributeName="Text" Text="Octet 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-6">
+              <Translation AttributeName="Text" Text="Octet 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-5">
+              <Translation AttributeName="Text" Text="Octet 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-16">
+              <Translation AttributeName="Text" Text="Adresse IP passerelle" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-17">
+              <Translation AttributeName="Text" Text="Octet 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-18">
+              <Translation AttributeName="Text" Text="Octet 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-19">
+              <Translation AttributeName="Text" Text="Octet 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-20">
+              <Translation AttributeName="Text" Text="Octet 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-21">
+              <Translation AttributeName="Text" Text="Routage (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-23">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 0 à 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-24">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 14/15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-43">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 16 à 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-25">
+              <Translation AttributeName="Text" Text="Télégrammes&#xD;&#xA;à l'adresse physique" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-26">
+              <Translation AttributeName="Text" Text="Télégrammes de diffusion général &#xD;&#xA;(Broadcast)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-27">
+              <Translation AttributeName="Text" Text="Confirmation (ACK) de&#xD;&#xA;télégrammes de groupe" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-42">
+              <Translation AttributeName="Text" Text="Confirmation (ACK) de télégrammes&#xD;&#xA;de l'adresse physique" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-63">
+              <Translation AttributeName="Text" Text="Attention : En cas de &quot;réponse NACK&quot;,&#xD;&#xA;effectuer paramétrage via IP !" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-44">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe 16 à 31 &#xD;&#xA;(KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-52">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 16/17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-51">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 18/19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-50">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 20/21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-49">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 22/23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-48">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 24/25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-47">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 26/27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-46">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 28/29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-45">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 30/31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-22">
+              <Translation AttributeName="Text" Text="Routage (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-28">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 0 à 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-29">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 14/15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-53">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 16 à 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-30">
+              <Translation AttributeName="Text" Text="Télégrammes&#xD;&#xA;à l'adresse physique" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-31">
+              <Translation AttributeName="Text" Text="Télégrammes de diffusion général &#xD;&#xA;(Broadcast)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-32">
+              <Translation AttributeName="Text" Text="Envoi répété de&#xD;&#xA;télégrammes de groupe" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-33">
+              <Translation AttributeName="Text" Text="Envoi répété de&#xD;&#xA;télégrammes à l'adresse physique" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-34">
+              <Translation AttributeName="Text" Text="Envoi répété de télégrammes&#xD;&#xA;à diffusion générale (Broadcast)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-54">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe 16 à 31 &#xD;&#xA;(IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-62">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 16/17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-61">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 18/19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-60">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 20/21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-59">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 22/23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-58">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 24/25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-57">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 26/27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-56">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 28/29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-55">
+              <Translation AttributeName="Text" Text="Télégrammes de groupe&#xD;&#xA;(groupe principal 30/31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5">
+              <Translation AttributeName="Name" Text="KNX / Routeur-IP 7125/1.0" />
+            </TranslationElement>
+          </TranslationUnit>
+        </Language>
+        <Language Identifier="da-DK">
+          <TranslationUnit RefId="M-0064_A-7125-10-823A-O00C5">
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-1">
+              <Translation AttributeName="Text" Text="Manuel" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-4">
+              <Translation AttributeName="Text" Text="Automatisk (DHCP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-0">
+              <Translation AttributeName="Text" Text="Deaktiveret" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-1">
+              <Translation AttributeName="Text" Text="Aktiver" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-2">
+              <Translation AttributeName="Text" Text="Deaktiveret" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-1">
+              <Translation AttributeName="Text" Text="Route" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-3">
+              <Translation AttributeName="Text" Text="Filter" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-2">
+              <Translation AttributeName="Text" Text="Deaktiveret" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-1">
+              <Translation AttributeName="Text" Text="Route" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-0">
+              <Translation AttributeName="Text" Text="Altid" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="Kun ved routing" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-1">
+              <Translation AttributeName="Text" Text="Deaktiveret" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-0">
+              <Translation AttributeName="Text" Text="Route" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="Kun ved routing" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-2">
+              <Translation AttributeName="Text" Text="Altid" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-3">
+              <Translation AttributeName="Text" Text="Svar med NACK" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-0">
+              <Translation AttributeName="Text" Text="Deaktiveret" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-1">
+              <Translation AttributeName="Text" Text="Route (næste side)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-1">
+              <Translation AttributeName="Text" Text="Generelt" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-3">
+              <Translation AttributeName="Text" Text="Navn på enhed" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-41">
+              <Translation AttributeName="Text" Text="Support til ikke parametreret interfaces" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-40">
+              <Translation AttributeName="Text" Text="Overvågning af busspændings fejl" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-2">
+              <Translation AttributeName="Text" Text="IP adresse tildeling" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-10">
+              <Translation AttributeName="Text" Text="IP Konfiguration 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-35">
+              <Translation AttributeName="Text" Text="IP Routing multicast adresse" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-39">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-38">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-37">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-36">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-15">
+              <Translation AttributeName="Text" Text="IP adresser" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-14">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-13">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-12">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-11">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-4">
+              <Translation AttributeName="Text" Text="IP Konfiguration 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-9">
+              <Translation AttributeName="Text" Text="IP Subnet" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-8">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-7">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-6">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-5">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-16">
+              <Translation AttributeName="Text" Text="IP Gateway adresse" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-17">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-18">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-19">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-20">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-21">
+              <Translation AttributeName="Text" Text="Routing (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-23">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgrupper  0 til 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-24">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgrupper 14 og 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-43">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgrupper 16 til 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-25">
+              <Translation AttributeName="Text" Text="Fysisk Adresse telegrammer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-26">
+              <Translation AttributeName="Text" Text="Broadcast telegrammer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-27">
+              <Translation AttributeName="Text" Text="Acknowledge (ACK) af gruppe telegrammer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-42">
+              <Translation AttributeName="Text" Text="Acknowledge (ACK) af fysisk&#xD;&#xA;adresseret telegrammer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-63">
+              <Translation AttributeName="Text" Text="OBS !: Hvis &quot;Svar med NACK&quot;,&#xD;&#xA;parameterisering skal være med IP" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-44">
+              <Translation AttributeName="Text" Text="Gruppe telegrammer  16 to 31 (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-52">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 16 og 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-51">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 18 og 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-50">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 20 og 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-49">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 22 og 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-48">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 24 og 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-47">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 26 og 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-46">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 28 og 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-45">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 30 og 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-22">
+              <Translation AttributeName="Text" Text="Routing (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-28">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgrupper  0 til 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-29">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgrupper 14 og 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-53">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgrupper 16 til 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-30">
+              <Translation AttributeName="Text" Text="Fysisk Adresse telegrammer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-31">
+              <Translation AttributeName="Text" Text="Broadcast telegrammer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-32">
+              <Translation AttributeName="Text" Text="Gentagelse af gruppe telegrammer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-33">
+              <Translation AttributeName="Text" Text="Gentagelse af &#xD;&#xA;Fysisk adresse telegrammer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-34">
+              <Translation AttributeName="Text" Text="Gentagelse af broadcast telegrammer" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-54">
+              <Translation AttributeName="Text" Text="Gruppe telegrammer 16 til 31 (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-62">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 16 og 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-61">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 18 og 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-60">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 20 og 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-59">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 22 og 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-58">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 24 og 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-57">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 26 og 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-56">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 28 og 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-55">
+              <Translation AttributeName="Text" Text="Gruppe telegram (hovedgruppe 30 og 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5">
+              <Translation AttributeName="Name" Text="KNX / IP-Router 7125/1.0" />
+            </TranslationElement>
+          </TranslationUnit>
+        </Language>
+        <Language Identifier="nl-NL">
+          <TranslationUnit RefId="M-0064_A-7125-10-823A-O00C5">
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-1">
+              <Translation AttributeName="Text" Text="handmatig" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-IpAssignment_EN-4">
+              <Translation AttributeName="Text" Text="automatisch (DHCP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-0">
+              <Translation AttributeName="Text" Text="Sperren" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-Bool_EN-1">
+              <Translation AttributeName="Text" Text="vrijgeven" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-2">
+              <Translation AttributeName="Text" Text="Sperren" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-1">
+              <Translation AttributeName="Text" Text="doorsturen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithFilter_EN-3">
+              <Translation AttributeName="Text" Text="filteren" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-2">
+              <Translation AttributeName="Text" Text="Sperren" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-RoutingWithoutFilter_EN-1">
+              <Translation AttributeName="Text" Text="doorsturen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-0">
+              <Translation AttributeName="Text" Text="altijd" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="alleen bij doorsturen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-1">
+              <Translation AttributeName="Text" Text="Sperren" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-BroadcastLock_EN-0">
+              <Translation AttributeName="Text" Text="doorsturen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-1">
+              <Translation AttributeName="Text" Text="alleen bij doorsturen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-2">
+              <Translation AttributeName="Text" Text="altijd" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-PhysAcknowledge_EN-3">
+              <Translation AttributeName="Text" Text="Antwoord met NACK" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-0">
+              <Translation AttributeName="Text" Text="Sperren" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_PT-GrpTel16To31_EN-1">
+              <Translation AttributeName="Text" Text="doorsturen (zie volgende pag.)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-1">
+              <Translation AttributeName="Text" Text="Algemeen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-3">
+              <Translation AttributeName="Text" Text="Apparaatnaam" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-41">
+              <Translation AttributeName="Text" Text="Ondersteuning ongeparametreerde&#xD;&#xA;interfaces" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-40">
+              <Translation AttributeName="Text" Text="Bewaking op busspanningsuitval" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-2">
+              <Translation AttributeName="Text" Text="IP-adrestoewijzing" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-10">
+              <Translation AttributeName="Text" Text="IP-configuratie 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-35">
+              <Translation AttributeName="Text" Text="IP routing multicast-adres" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-39">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-38">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-37">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-36">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-15">
+              <Translation AttributeName="Text" Text="IP-adres" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-14">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-13">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-12">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-11">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-4">
+              <Translation AttributeName="Text" Text="IP-configuratie 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-9">
+              <Translation AttributeName="Text" Text="IP-subnet" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-8">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-7">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-6">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-5">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-16">
+              <Translation AttributeName="Text" Text="IP-gateway-adres" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-17">
+              <Translation AttributeName="Text" Text="Byte 1" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-18">
+              <Translation AttributeName="Text" Text="Byte 2" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-19">
+              <Translation AttributeName="Text" Text="Byte 3" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-20">
+              <Translation AttributeName="Text" Text="Byte 4" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-21">
+              <Translation AttributeName="Text" Text="Routing (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-23">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroepen 0 t/m 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-24">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroepen 14 en 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-43">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroepen 16 t/m 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-25">
+              <Translation AttributeName="Text" Text="Fysicalisch geadresseerde&#xD;&#xA;telegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-26">
+              <Translation AttributeName="Text" Text="Broadcast-telegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-27">
+              <Translation AttributeName="Text" Text="Bevestiging (ACK) van&#xD;&#xA;groepstelegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-42">
+              <Translation AttributeName="Text" Text="Bevestiging (ACK) van fysicalisch&#xD;&#xA;geadresseerde telegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-63">
+              <Translation AttributeName="Text" Text="Opgelet: Bij &quot;Antwoord met NACK&quot; moet&#xD;&#xA;de parametrering via IP volgen!" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-44">
+              <Translation AttributeName="Text" Text="Groepstel. 16 t/m 31 (KNX -&gt; IP)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-52">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 16 en 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-51">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 18 en 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-50">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 20 en 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-49">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 22 en 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-48">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 24 en 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-47">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 26 en 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-46">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 28 en 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-45">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 30 en 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-22">
+              <Translation AttributeName="Text" Text="Routing (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-28">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroepen 0 t/m 13)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-29">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroepen 14 en 15)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-53">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroepen 16 t/m 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-30">
+              <Translation AttributeName="Text" Text="Fysicalisch geadresseerde&#xD;&#xA;telegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-31">
+              <Translation AttributeName="Text" Text="Broadcast-telegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-32">
+              <Translation AttributeName="Text" Text="Opnieuw zenden van&#xD;&#xA;groepstelegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-33">
+              <Translation AttributeName="Text" Text="Opnieuw zenden van&#xD;&#xA;fysicalisch geadresseerde telegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-34">
+              <Translation AttributeName="Text" Text="Opnieuw zenden van&#xD;&#xA;broadcast-telegrammen" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-54">
+              <Translation AttributeName="Text" Text="Groepstel. 16 t/m 31 (IP -&gt; KNX)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-62">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 16 en 17)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-61">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 18 en 19)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-60">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 20 en 21)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-59">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 22 en 23)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-58">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 24 en 25)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-57">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 26 en 27)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-56">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 28 en 29)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5_P-55">
+              <Translation AttributeName="Text" Text="Groepstelegrammen&#xD;&#xA;(hoofdgroep 30 en 31)" />
+            </TranslationElement>
+            <TranslationElement RefId="M-0064_A-7125-10-823A-O00C5">
+              <Translation AttributeName="Name" Text="KNX / IP-router 7125/1.0" />
+            </TranslationElement>
+          </TranslationUnit>
+        </Language>
+      </Languages>
+    </Manufacturer>
+  </ManufacturerData>
+</KNX>

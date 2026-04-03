@@ -1,0 +1,27 @@
+{
+  ".validation": "file",
+  "knx_master.xml": "file",
+  "M-0064.signature": "file",
+  "P-0293.certificate": "file",
+  "P-0293.info": "file",
+  "P-0293.signature": "file",
+  "M-0064": {
+    "Baggages.xml": "file",
+    "Catalog.xml": "file",
+    "Hardware.xml": "file",
+    "M-0064_A-5810-10-901E.xml": "file",
+    "M-0064_A-7125-10-823A-O00C5.xml": "file",
+    "Baggages": {
+      "5810": {
+        "icons_5810.zip": "file",
+        "SwSec_Master.png": "file",
+        "SwSec_Master_1_Slave.png": "file",
+        "SwSec_Master_2_Slaves.png": "file"
+      }
+    }
+  },
+  "P-0293": {
+    "0.xml": "file",
+    "project.xml": "file"
+  }
+}

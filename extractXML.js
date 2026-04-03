@@ -4,7 +4,7 @@ const AdmZip = require("adm-zip");
 const fs = require("fs");
 const path = require("path");
 
-const INPUT_FILE = "project.knxproj";
+const INPUT_FILE = "Bruno 1.knxproj";
 const OUTPUT_FILE = "structure.json";
 
 // Build tree structure from zip entries
