@@ -11,11 +11,15 @@ function ensureDirectory(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
+
+// pomocna funkicija koja vrati provjeri ako je array
 function asArray(v) {
   if (v == null) return [];
   return Array.isArray(v) ? v : [v];
 }
 
+
+// pomoćna funkcija za obilazak XML čvorova
 function walk(node, visitor) {
   if (!node || typeof node !== "object") return;
   visitor(node);
@@ -26,6 +30,8 @@ function walk(node, visitor) {
   }
 }
 
+
+// prebaci sve XML datoteke iz zipa u output direktorij
 function extractXmlFiles(zip, outputDir) {
   let extractedCount = 0;
   zip.getEntries().forEach(entry => {
@@ -40,6 +46,8 @@ function extractXmlFiles(zip, outputDir) {
   return extractedCount;
 }
 
+
+// trazi odredani file unutar direktorija
 function findFileRecursive(dir, fileName) {
   const items = fs.readdirSync(dir, { withFileTypes: true });
   for (const item of items) {
@@ -54,11 +62,18 @@ function findFileRecursive(dir, fileName) {
   return null;
 }
 
+
+// pročitaj XML datoteku i parsiraj je u JS objekt
 function readXml(filePath, parser) {
   const xml = fs.readFileSync(filePath, "utf8");
   return parser.parse(xml);
 }
 
+
+// kreaira mapu za povezivanje Hardware2Program ID-eva s ApplicationProgram ID-eva
+// (u project xml su samo reference na hardware2program, a app programi su zasebni xml-ovi, 
+// tako da treba napraviti mapu da se zna koji app program pripada kojem hardware2programu)
+// 0.xml -> device instance -> hardware2program ref id -> app program id -> parametri
 function buildHardware2ProgramMap(hardwareXmlObj) {
   const map = new Map();
   const hardwares =
