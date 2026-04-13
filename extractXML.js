@@ -3,9 +3,12 @@ const fs = require("fs");
 const path = require("path");
 const { XMLParser } = require("fast-xml-parser");
 
-const INPUT_FILE = path.join(__dirname, "Bruno 1.knxproj");
-const OUTPUT_DIR = path.join(__dirname, "xml_extracted");
-const OUTPUT_JSON = path.join(__dirname, "device_settings.json");
+const args = process.argv.slice(2);
+const INPUT_FILE = args[0] || path.join(__dirname, "Bruno 1.knxproj");
+const INPUT_BASE = path.parse(INPUT_FILE).name;
+const OUTPUT_PARENT_DIR = args[1] || path.join(__dirname, "output");
+const OUTPUT_DIR = path.join(OUTPUT_PARENT_DIR, `${INPUT_BASE}_extracted`);
+const OUTPUT_JSON = path.join(OUTPUT_PARENT_DIR, `${INPUT_BASE}_settings.json`);
 
 function ensureDirectory(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
