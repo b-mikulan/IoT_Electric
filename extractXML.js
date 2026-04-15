@@ -15,7 +15,7 @@ function ensureDirectory(dirPath) {
 }
 
 
-// pomocna funkicija koja vrati provjeri ako je array
+// pomocna funkicija koja pretvori u array ako vec nije (treba zbog xml parsera)
 function asArray(v) {
   if (v == null) return [];
   return Array.isArray(v) ? v : [v];
@@ -95,6 +95,51 @@ function buildHardware2ProgramMap(hardwareXmlObj) {
   return map;
 }
 
+
+// iz Hardware.xml napravi mapu ProductRefId -> metadata uređaja (tip, serija...)
+function buildProductMetadataMap(hardwareXmlObj) {
+  const map = new Map();
+  const hardwares =
+    asArray(
+      hardwareXmlObj?.KNX?.ManufacturerData?.Manufacturer?.Hardware?.Hardware
+    );
+
+  for (const hw of hardwares) {
+    const products = asArray(hw?.Products?.Product);
+    for (const product of products) {
+      const productRefId = product?.["@_Id"];
+      if (!productRefId) continue;
+
+      map.set(productRefId, {
+        productRefId,
+        deviceType: product?.["@_Text"] || hw?.["@_Name"] || null,
+        orderNumber: product?.["@_OrderNumber"] || null,
+        hardwareName: hw?.["@_Name"] || null,
+        hardwareSerialNumber: hw?.["@_SerialNumber"] || null
+      });
+    }
+  }
+
+  return map;
+}
+
+
+// funkcija za kreiranje ključa u JSON outputu: 
+// pokušava naći smislen naziv parametra koristeći dostupne informacije, 
+// a ako ništa nije dostupno, koristi instanceRefId ili "UnknownSetting"
+function buildSettingKey(instanceRefId, pRef, param) {
+  return (
+    param?.text ||
+    param?.name ||
+    pRef?.name ||
+    instanceRefId ||
+    "UnknownSetting"
+  );
+}
+
+
+// za svaki app program xml, kreira dva indeksa: jedan za parametre (parameterById) 
+// i jedan za reference na parametre (parameterRefById)
 function buildAppIndexes(appXmlObj) {
   const parameterById = new Map();
   const parameterRefById = new Map();
@@ -122,6 +167,10 @@ function buildAppIndexes(appXmlObj) {
   return { parameterById, parameterRefById };
 }
 
+
+// glavna funkcija koja povezuje sve dijelove: prvo parsira project file da dobije device instance-ove,
+// zatim kreira mapu hardware2program -> app program, i onda za svaki device instance koji ima app program, 
+// parsira taj app program da dobije parametre i spoji ih s vrijednostima iz device instance-a
 function buildDeviceSettingsJson() {
   const parser = new XMLParser({
     ignoreAttributes: false,
@@ -154,12 +203,17 @@ function buildDeviceSettingsJson() {
     .filter(p => fs.statSync(p).isDirectory() && path.basename(p).startsWith("M-"));
 
   const hardware2ProgramToApp = new Map();
+  const productMetadataByRefId = new Map();
   for (const mFolder of manufacturerFolders) {
     const hwFile = path.join(mFolder, "Hardware.xml");
     if (!fs.existsSync(hwFile)) continue;
     const hwObj = readXml(hwFile, parser);
+
     const localMap = buildHardware2ProgramMap(hwObj);
     for (const [k, v] of localMap.entries()) hardware2ProgramToApp.set(k, v);
+
+    const localProductMap = buildProductMetadataMap(hwObj);
+    for (const [k, v] of localProductMap.entries()) productMetadataByRefId.set(k, v);
   }
 
   const appIndexesCache = new Map();
@@ -185,17 +239,29 @@ function buildDeviceSettingsJson() {
     const address = di?.["@_Address"] ?? null;
     const desc = di?.["@_Description"] ?? null;
     const h2pRefId = di?.["@_Hardware2ProgramRefId"] ?? null;
+    const productRefId = di?.["@_ProductRefId"] ?? null;
+    const serialNumber = di?.["@_SerialNumber"] ?? null;
 
     const appId = h2pRefId ? hardware2ProgramToApp.get(h2pRefId) || null : null;
     const pRefs = asArray(di?.ParameterInstanceRefs?.ParameterInstanceRef);
+    const productMeta = productRefId ? productMetadataByRefId.get(productRefId) || null : null;
 
     const device = {
-      deviceInstanceId: deviceId || null,
-      address,
-      description: desc,
-      hardware2ProgramRefId: h2pRefId,
-      applicationProgramId: appId,
-      settings: []
+      settings: {
+        deviceId: deviceId || null,
+        deviceType: productMeta?.deviceType || null,
+        serialNumber,
+        individualAddress: address,
+        description: desc,
+        productRefId,
+        orderNumber: productMeta?.orderNumber || null,
+        hardwareName: productMeta?.hardwareName || null,
+        hardwareCatalogSerial: productMeta?.hardwareSerialNumber || null,
+        hardware2ProgramRefId: h2pRefId,
+        applicationProgramId: appId
+      },
+      parameters: {},
+      changedParameters: []
     };
 
     if (appId && pRefs.length > 0) {
@@ -208,7 +274,14 @@ function buildDeviceSettingsJson() {
           const pRef = indexes.parameterRefById.get(instanceRefId);
           const param = pRef ? indexes.parameterById.get(pRef.refId) : null;
 
-          device.settings.push({
+          const baseKey = buildSettingKey(instanceRefId, pRef, param);
+          const key = Object.prototype.hasOwnProperty.call(device.parameters, baseKey)
+            ? `${baseKey} (${instanceRefId})`
+            : baseKey;
+
+          device.parameters[key] = value;
+
+          device.changedParameters.push({
             instanceRefId,
             value,
             parameterRefName: pRef?.name || null,
