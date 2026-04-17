@@ -129,8 +129,8 @@ function buildProductMetadataMap(hardwareXmlObj) {
 // a ako ništa nije dostupno, koristi instanceRefId ili "UnknownSetting"
 function buildSettingKey(instanceRefId, pRef, param) {
   return (
-    param?.text ||
     param?.name ||
+    param?.text ||
     pRef?.name ||
     instanceRefId ||
     "UnknownSetting"
@@ -145,6 +145,7 @@ function buildAppIndexes(appXmlObj) {
   const parameterRefById = new Map();
 
   walk(appXmlObj, node => {
+    // Find Parameter nodes: must have Id, Name, ParameterType, and Value
     if (node["@_Id"] && node["@_Name"] && node["@_ParameterType"] && node["@_Value"] !== undefined) {
       parameterById.set(node["@_Id"], {
         id: node["@_Id"],
@@ -155,7 +156,9 @@ function buildAppIndexes(appXmlObj) {
       });
     }
 
-    if (node["@_Id"] && node["@_RefId"] && node["@_Name"] && String(node["@_Id"]).includes("_R-")) {
+    // Find ParameterRef nodes: must have Id with _R- and RefId. Name is optional.
+    // ParameterRef is used to reference the actual Parameter definition via RefId
+    if (node["@_Id"] && node["@_RefId"] && String(node["@_Id"]).includes("_R-")) {
       parameterRefById.set(node["@_Id"], {
         id: node["@_Id"],
         refId: node["@_RefId"],
