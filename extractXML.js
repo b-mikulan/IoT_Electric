@@ -280,7 +280,7 @@ function buildDeviceSettingsJson() {
           const baseKey = buildSettingKey(instanceRefId, pRef, param);
           const key = Object.prototype.hasOwnProperty.call(device.parameters, baseKey)
             ? `${baseKey} (${instanceRefId})`
-            : baseKey;
+            : baseKey; // ako već postoji ključ s istim imenom, dodaj instanceRefId u zagradu da se razlikuju
 
           device.parameters[key] = value;
 
