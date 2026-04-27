@@ -138,11 +138,60 @@ function buildSettingKey(instanceRefId, pRef, param) {
 }
 
 
+function extractObjectSuffix(id) {
+  if (!id) return null;
+  const value = String(id);
+  const marker = "_O-";
+  const markerIndex = value.indexOf(marker);
+  if (markerIndex === -1) return value;
+  return value.slice(markerIndex + 1);
+}
+
+
+function splitLinkIds(linksRaw) {
+  if (!linksRaw) return [];
+  return String(linksRaw)
+    .split(/\s+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+
+function buildGroupAddressMap(projectObj) {
+  const map = new Map();
+
+  walk(projectObj, node => {
+    const id = node?.["@_Id"];
+    const address = node?.["@_Address"];
+    if (!id || address === undefined) return;
+
+    const idText = String(id);
+    const idx = idText.indexOf("_GA-");
+    if (idx === -1) return;
+
+    const gaToken = `GA-${idText.slice(idx + 4)}`;
+    map.set(gaToken, {
+      id: idText,
+      address: String(address),
+      name: node?.["@_Name"] || null,
+      datapointType: node?.["@_DatapointType"] || null,
+      description: node?.["@_Description"] || null
+    });
+  });
+
+  return map;
+}
+
+
 // za svaki app program xml, kreira dva indeksa: jedan za parametre (parameterById) 
 // i jedan za reference na parametre (parameterRefById)
 function buildAppIndexes(appXmlObj) {
   const parameterById = new Map();
   const parameterRefById = new Map();
+  const comObjectById = new Map();
+  const comObjectBySuffix = new Map();
+  const comObjectRefById = new Map();
+  const comObjectRefBySuffix = new Map();
 
   walk(appXmlObj, node => {
     // Find Parameter nodes: must have Id, Name, ParameterType, and Value
@@ -165,9 +214,55 @@ function buildAppIndexes(appXmlObj) {
         name: node["@_Name"] || null
       });
     }
+
+    // Find ComObject nodes by _O- id and store metadata used for GA linking enrichment.
+    if (node["@_Id"] && String(node["@_Id"]).includes("_O-")) {
+      const entry = {
+        id: node["@_Id"],
+        name: node["@_Name"] || null,
+        text: node["@_Text"] || null,
+        functionText: node["@_FunctionText"] || null,
+        datapointType: node["@_DatapointType"] || null,
+        objectSize: node["@_ObjectSize"] || null
+      };
+      comObjectById.set(entry.id, entry);
+
+      const suffix = extractObjectSuffix(entry.id);
+      if (suffix) comObjectBySuffix.set(suffix, entry);
+    }
+
+    // Find ComObjectRef nodes (id and ref both point to object ids).
+    if (
+      node["@_Id"] &&
+      node["@_RefId"] &&
+      String(node["@_Id"]).includes("_O-") &&
+      String(node["@_RefId"]).includes("_O-")
+    ) {
+      const entry = {
+        id: node["@_Id"],
+        refId: node["@_RefId"],
+        name: node["@_Name"] || null,
+        text: node["@_Text"] || null,
+        functionText: node["@_FunctionText"] || null,
+        datapointType: node["@_DatapointType"] || null,
+        objectSize: node["@_ObjectSize"] || null
+      };
+
+      comObjectRefById.set(entry.id, entry);
+
+      const suffix = extractObjectSuffix(entry.id);
+      if (suffix) comObjectRefBySuffix.set(suffix, entry);
+    }
   });
 
-  return { parameterById, parameterRefById };
+  return {
+    parameterById,
+    parameterRefById,
+    comObjectById,
+    comObjectBySuffix,
+    comObjectRefById,
+    comObjectRefBySuffix
+  };
 }
 
 
@@ -200,6 +295,7 @@ function buildDeviceSettingsJson() {
       .flatMap(area => asArray(area?.Line))
       .flatMap(line => asArray(line?.Segment))
       .flatMap(seg => asArray(seg?.DeviceInstance));
+  const groupAddressByToken = buildGroupAddressMap(projectObj);
 
   const manufacturerFolders = fs.readdirSync(OUTPUT_DIR)
     .map(name => path.join(OUTPUT_DIR, name))
@@ -247,6 +343,7 @@ function buildDeviceSettingsJson() {
 
     const appId = h2pRefId ? hardware2ProgramToApp.get(h2pRefId) || null : null;
     const pRefs = asArray(di?.ParameterInstanceRefs?.ParameterInstanceRef);
+    const comObjectRefs = asArray(di?.ComObjectInstanceRefs?.ComObjectInstanceRef);
     const productMeta = productRefId ? productMetadataByRefId.get(productRefId) || null : null;
 
     const device = {
@@ -264,7 +361,8 @@ function buildDeviceSettingsJson() {
         applicationProgramId: appId
       },
       parameters: {},
-      changedParameters: []
+      changedParameters: [],
+      groupLinks: []
     };
 
     if (appId && pRefs.length > 0) {
@@ -293,6 +391,86 @@ function buildDeviceSettingsJson() {
             parameterText: param?.text || null,
             defaultValue: param?.defaultValue || null,
             parameterType: param?.parameterType || null
+          });
+        }
+      }
+    }
+
+    if (comObjectRefs.length > 0) {
+      const indexes = appId ? getAppIndexes(appId) : null;
+
+      for (const cInst of comObjectRefs) {
+        const instanceRefId = cInst?.["@_RefId"] || null;
+        const channelId = cInst?.["@_ChannelId"] || null;
+        const description = cInst?.["@_Description"] || null;
+        const instanceDatapointType = cInst?.["@_DatapointType"] || null;
+        const links = splitLinkIds(cInst?.["@_Links"]);
+
+        let comRef = null;
+        let comObject = null;
+        if (indexes && instanceRefId) {
+          comRef =
+            indexes.comObjectRefBySuffix.get(instanceRefId) ||
+            indexes.comObjectRefById.get(instanceRefId) ||
+            null;
+
+          if (comRef?.refId) {
+            comObject =
+              indexes.comObjectById.get(comRef.refId) ||
+              indexes.comObjectBySuffix.get(extractObjectSuffix(comRef.refId)) ||
+              null;
+          }
+
+          if (!comObject) {
+            comObject =
+              indexes.comObjectBySuffix.get(instanceRefId) ||
+              indexes.comObjectById.get(instanceRefId) ||
+              null;
+          }
+        }
+
+        if (links.length === 0) {
+          device.groupLinks.push({
+            instanceRefId,
+            channelId,
+            description,
+            linkId: null,
+            groupAddressId: null,
+            groupAddressName: null,
+            groupAddressAddress: null,
+            groupAddressDatapointType: null,
+            comObjectRefId: comRef?.id || null,
+            comObjectId: comRef?.refId || comObject?.id || null,
+            comObjectName: comRef?.name || comObject?.name || null,
+            comObjectText: comRef?.text || comObject?.text || null,
+            comObjectFunctionText: comRef?.functionText || comObject?.functionText || null,
+            comObjectDatapointType:
+              comRef?.datapointType || comObject?.datapointType || instanceDatapointType || null,
+            comObjectSize: comRef?.objectSize || comObject?.objectSize || null
+          });
+          continue;
+        }
+
+        for (const linkId of links) {
+          const ga = groupAddressByToken.get(linkId) || null;
+
+          device.groupLinks.push({
+            instanceRefId,
+            channelId,
+            description,
+            linkId,
+            groupAddressId: ga?.id || null,
+            groupAddressName: ga?.name || null,
+            groupAddressAddress: ga?.address || null,
+            groupAddressDatapointType: ga?.datapointType || null,
+            comObjectRefId: comRef?.id || null,
+            comObjectId: comRef?.refId || comObject?.id || null,
+            comObjectName: comRef?.name || comObject?.name || null,
+            comObjectText: comRef?.text || comObject?.text || null,
+            comObjectFunctionText: comRef?.functionText || comObject?.functionText || null,
+            comObjectDatapointType:
+              comRef?.datapointType || comObject?.datapointType || instanceDatapointType || null,
+            comObjectSize: comRef?.objectSize || comObject?.objectSize || null
           });
         }
       }
