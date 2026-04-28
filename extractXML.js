@@ -157,6 +157,26 @@ function splitLinkIds(linksRaw) {
 }
 
 
+function formatGroupAddress3Level(groupAddress) {
+  if (groupAddress === null || groupAddress === undefined || groupAddress === "") return "";
+
+  const raw = String(groupAddress).trim();
+  if (!raw) return "";
+  if (raw.includes("/")) return raw;
+
+  const numericAddress = Number.parseInt(raw, 10);
+  if (!Number.isFinite(numericAddress) || numericAddress < 0 || numericAddress > 65535) {
+    return raw;
+  }
+
+  const main = (numericAddress >> 11) & 0x1f;
+  const middle = (numericAddress >> 8) & 0x07;
+  const sub = numericAddress & 0xff;
+
+  return `${main}/${middle}/${sub}`;
+}
+
+
 function buildGroupAddressMap(projectObj) {
   const map = new Map();
 
@@ -173,6 +193,7 @@ function buildGroupAddressMap(projectObj) {
     map.set(gaToken, {
       id: idText,
       address: String(address),
+      address3Level: formatGroupAddress3Level(address),
       name: node?.["@_Name"] || null,
       datapointType: node?.["@_DatapointType"] || null,
       description: node?.["@_Description"] || null
@@ -438,6 +459,7 @@ function buildDeviceSettingsJson() {
             groupAddressId: null,
             groupAddressName: null,
             groupAddressAddress: null,
+            groupAddressThreeLevelAddress: null,
             groupAddressDatapointType: null,
             comObjectRefId: comRef?.id || null,
             comObjectId: comRef?.refId || comObject?.id || null,
@@ -462,6 +484,7 @@ function buildDeviceSettingsJson() {
             groupAddressId: ga?.id || null,
             groupAddressName: ga?.name || null,
             groupAddressAddress: ga?.address || null,
+            groupAddressThreeLevelAddress: ga?.address3Level || null,
             groupAddressDatapointType: ga?.datapointType || null,
             comObjectRefId: comRef?.id || null,
             comObjectId: comRef?.refId || comObject?.id || null,
