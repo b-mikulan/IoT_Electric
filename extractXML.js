@@ -165,97 +165,6 @@ function extractComObjectBaseId(id) {
 }
 
 
-function normalizeChooseTest(testValue) {
-  if (testValue === null || testValue === undefined) return null;
-  return String(testValue).replace(/&gt;/g, ">").replace(/&lt;/g, "<").trim();
-}
-
-
-function matchesChooseTest(currentValue, testValue) {
-  const test = normalizeChooseTest(testValue);
-  if (!test) return false;
-
-  const currentText = currentValue === null || currentValue === undefined ? "" : String(currentValue).trim();
-  if (/^[<>]=?\d+$/.test(test)) {
-    const operatorMatch = test.match(/^([<>]=?)(\d+)$/);
-    if (!operatorMatch) return false;
-    const operator = operatorMatch[1];
-    const expected = Number.parseInt(operatorMatch[2], 10);
-    const numericCurrent = Number.parseFloat(currentText);
-    if (!Number.isFinite(numericCurrent)) return false;
-
-    if (operator === ">") return numericCurrent > expected;
-    if (operator === ">=") return numericCurrent >= expected;
-    if (operator === "<") return numericCurrent < expected;
-    if (operator === "<=") return numericCurrent <= expected;
-    return false;
-  }
-
-  return currentText === test;
-}
-
-
-function collectVisibleRefs(node, state) {
-  if (node === null || node === undefined) return;
-  if (Array.isArray(node)) {
-    for (const child of node) collectVisibleRefs(child, state);
-    return;
-  }
-  if (typeof node !== "object") return;
-
-  for (const [key, value] of Object.entries(node)) {
-    if (key === "choose") {
-      for (const chooseNode of asArray(value)) {
-        const paramRefId = chooseNode?.["@_ParamRefId"];
-        const currentValue = paramRefId ? state.parameterValueByRefId.get(paramRefId) : null;
-        for (const whenNode of asArray(chooseNode?.when)) {
-          if (matchesChooseTest(currentValue, whenNode?.["@_test"])) {
-            collectVisibleRefs(whenNode, state);
-          }
-        }
-      }
-      continue;
-    }
-
-    if (key === "ParameterRefRef") {
-      for (const refNode of asArray(value)) {
-        const refId = refNode?.["@_RefId"];
-        if (refId) state.visibleParameterRefIds.add(refId);
-      }
-      continue;
-    }
-
-    if (key === "ComObjectRefRef") {
-      for (const refNode of asArray(value)) {
-        const refId = refNode?.["@_RefId"];
-        const baseId = extractComObjectBaseId(refId);
-        if (baseId) state.visibleComObjectBaseIds.add(baseId);
-      }
-      continue;
-    }
-
-    collectVisibleRefs(value, state);
-  }
-}
-
-
-function buildVisibilityState(appXmlObj, parameterValueByRefId) {
-  const visibleParameterRefIds = new Set();
-  const visibleComObjectBaseIds = new Set();
-
-  collectVisibleRefs(appXmlObj, {
-    parameterValueByRefId,
-    visibleParameterRefIds,
-    visibleComObjectBaseIds
-  });
-
-  return {
-    visibleParameterRefIds,
-    visibleComObjectBaseIds
-  };
-}
-
-
 function getChannelFamilyFromFunctionCode(functionCode) {
   switch (String(functionCode)) {
     case "1":
@@ -331,6 +240,7 @@ function buildGroupAddressMap(projectObj) {
 
 // za svaki app program xml, kreira dva indeksa: jedan za parametre (parameterById) 
 // i jedan za reference na parametre (parameterRefById)
+// te dva indeksa za com objekti i njihove reference (comObjectById, comObjectBySuffix, comObjectRefById, comObjectRefBySuffix)
 function buildAppIndexes(appXmlObj) {
   const parameterById = new Map();
   const parameterRefById = new Map();
@@ -493,11 +403,6 @@ function buildDeviceSettingsJson() {
     const pRefs = asArray(di?.ParameterInstanceRefs?.ParameterInstanceRef);
     const comObjectRefs = asArray(di?.ComObjectInstanceRefs?.ComObjectInstanceRef);
     const productMeta = productRefId ? productMetadataByRefId.get(productRefId) || null : null;
-    const deviceParameterValueByRefId = new Map();
-    for (const pInst of pRefs) {
-      const instanceRefId = pInst?.["@_RefId"];
-      if (instanceRefId) deviceParameterValueByRefId.set(instanceRefId, pInst?.["@_Value"] ?? null);
-    }
     const channelFamilyByIndex = new Map();
     if (indexes) {
       // prati kanale koji imaju FNC
@@ -541,9 +446,6 @@ function buildDeviceSettingsJson() {
         }
       }
     }
-    const visibilityState = indexes && pRefs.length > 0
-      ? buildVisibilityState(indexes.appXmlObj, deviceParameterValueByRefId)
-      : { visibleParameterRefIds: new Set(), visibleComObjectBaseIds: new Set() };
 
     const device = {
       settings: {
@@ -606,15 +508,6 @@ function buildDeviceSettingsJson() {
     if (comObjectRefs.length > 0) {
       for (const cInst of comObjectRefs) {
         const instanceRefId = cInst?.["@_RefId"] || null;
-        const instanceBaseId = extractComObjectBaseId(instanceRefId);
-        if (
-          indexes &&
-          visibilityState.visibleComObjectBaseIds.size > 0 &&
-          instanceBaseId &&
-          !visibilityState.visibleComObjectBaseIds.has(instanceBaseId)
-        ) {
-          continue;
-        }
         const channelId = cInst?.["@_ChannelId"] || null;
         const description = cInst?.["@_Description"] || null;
         const instanceDatapointType = cInst?.["@_DatapointType"] || null;
