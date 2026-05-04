@@ -500,19 +500,10 @@ function buildDeviceSettingsJson() {
     }
     const channelFamilyByIndex = new Map();
     if (indexes) {
-      for (const pInst of pRefs) {
-        const instanceRefId = pInst?.["@_RefId"];
-        if (!instanceRefId) continue;
+      // prati kanale koji imaju FNC
+      const channelsWithExplicitFunctionCodes = new Set();
 
-        const pRef = indexes.parameterRefById.get(instanceRefId);
-        const param = pRef ? indexes.parameterById.get(pRef.refId) : null;
-        const parameterName = param?.name || pRef?.name || null;
-        const value = pInst?.["@_Value"] ?? null;
-        const dynamicTextMatch = parseChannelTextParameterName(parameterName);
-        if (!dynamicTextMatch) continue;
-
-        channelFamilyByIndex.set(dynamicTextMatch.index, dynamicTextMatch.family);
-      }
+      // Prvi prolaz: iz FNC kodova (PAR_CH{index}_FNC0 ili PAR_CH{index}_FNC)
       for (const pInst of pRefs) {
         const instanceRefId = pInst?.["@_RefId"];
         if (!instanceRefId) continue;
@@ -526,8 +517,28 @@ function buildDeviceSettingsJson() {
         if (!fnMatch) continue;
 
         const channelIndex = Number.parseInt(fnMatch[1], 10);
+        channelsWithExplicitFunctionCodes.add(channelIndex); // Postavi da ovaj ima FNC kod(pouzdanije od DYNAMIC_TEXT_PAR)
+
         const family = getChannelFamilyFromFunctionCode(value);
         if (family) channelFamilyByIndex.set(channelIndex, family);
+      }
+
+      // Drugi prolaz: extract channel family info from DYNAMIC_TEXT_PAR parameters, 
+      // ali samo za kanale koji nemaju eksplicitni FNC kod (jer eksplicitni kodovi su pouzdaniji i trebaju imati prednost)
+      for (const pInst of pRefs) {
+        const instanceRefId = pInst?.["@_RefId"];
+        if (!instanceRefId) continue;
+
+        const pRef = indexes.parameterRefById.get(instanceRefId);
+        const param = pRef ? indexes.parameterById.get(pRef.refId) : null;
+        const parameterName = param?.name || pRef?.name || null;
+        const dynamicTextMatch = parseChannelTextParameterName(parameterName);
+        if (!dynamicTextMatch) continue;
+
+        // Samo postavi channel family iz DYNAMIC_TEXT_PAR ako kanal nema eksplicitni FNC kod, jer eksplicitni kodovi su pouzdaniji i trebaju imati prednost
+        if (!channelsWithExplicitFunctionCodes.has(dynamicTextMatch.index)) {
+          channelFamilyByIndex.set(dynamicTextMatch.index, dynamicTextMatch.family);
+        }
       }
     }
     const visibilityState = indexes && pRefs.length > 0
@@ -564,8 +575,9 @@ function buildDeviceSettingsJson() {
           const parameterName = param?.name || pRef?.name || null;
           const channelTextMeta = parseChannelTextParameterName(parameterName);
           if (channelTextMeta) {
-            const activeFamily = channelFamilyByIndex.get(channelTextMeta.index) || null;
-            if (activeFamily && activeFamily !== channelTextMeta.family) {
+            const activeFamily = channelFamilyByIndex.get(channelTextMeta.index);
+            // Preskoci ako ne postoji ili ako se chanel family ne slaže s onim iz funkcijskog koda (ako postoji)
+            if (activeFamily !== channelTextMeta.family) {
               continue;
             }
           }
