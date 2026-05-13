@@ -179,6 +179,16 @@ function getChannelFamilyFromFunctionCode(functionCode) {
 }
 
 
+function getChannelFamilyFromComObjectName(name) {
+  if (!name) return null;
+  const raw = String(name).toUpperCase();
+  if (raw.includes("_SW") || raw.includes("_SWITCH")) return "switch";
+  if (raw.includes("_SH") || raw.includes("SHUTTER")) return "shutter";
+  if (raw.includes("_BL") || raw.includes("BLIND")) return "blind";
+  return null;
+}
+
+
 function parseChannelTextParameterName(parameterName) {
   if (!parameterName) return null;
   const match = String(parameterName).match(/^DYNAMIC_TEXT_PAR_(SWITCH|SHUTTER|BLIND)(\d+)$/);
@@ -404,6 +414,40 @@ function buildDeviceSettingsJson() {
     const comObjectRefs = asArray(di?.ComObjectInstanceRefs?.ComObjectInstanceRef);
     const productMeta = productRefId ? productMetadataByRefId.get(productRefId) || null : null;
     const channelFamilyByIndex = new Map();
+    const linkedComObjectFamilies = new Set();
+
+    if (indexes && comObjectRefs.length > 0) {
+      for (const cInst of comObjectRefs) {
+        const instanceRefId = cInst?.["@_RefId"] || null;
+        if (!instanceRefId) continue;
+
+        const comRef =
+          indexes.comObjectRefBySuffix.get(instanceRefId) ||
+          indexes.comObjectRefById.get(instanceRefId) ||
+          null;
+
+        let comObject = null;
+        if (comRef?.refId) {
+          comObject =
+            indexes.comObjectById.get(comRef.refId) ||
+            indexes.comObjectBySuffix.get(extractObjectSuffix(comRef.refId)) ||
+            null;
+        }
+
+        if (!comObject) {
+          comObject =
+            indexes.comObjectBySuffix.get(instanceRefId) ||
+            indexes.comObjectById.get(instanceRefId) ||
+            null;
+        }
+
+        const family =
+          getChannelFamilyFromComObjectName(comRef?.name) ||
+          getChannelFamilyFromComObjectName(comObject?.name);
+        if (family) linkedComObjectFamilies.add(family);
+      }
+    }
+
     if (indexes) {
       // prati kanale koji imaju FNC
       const channelsWithExplicitFunctionCodes = new Set();
@@ -442,7 +486,22 @@ function buildDeviceSettingsJson() {
 
         // Samo postavi channel family iz DYNAMIC_TEXT_PAR ako kanal nema eksplicitni FNC kod, jer eksplicitni kodovi su pouzdaniji i trebaju imati prednost
         if (!channelsWithExplicitFunctionCodes.has(dynamicTextMatch.index)) {
-          channelFamilyByIndex.set(dynamicTextMatch.index, dynamicTextMatch.family);
+          const existingFamily = channelFamilyByIndex.get(dynamicTextMatch.index);
+          if (!existingFamily) {
+            channelFamilyByIndex.set(dynamicTextMatch.index, dynamicTextMatch.family);
+            continue;
+          }
+
+          if (existingFamily === dynamicTextMatch.family) continue;
+
+          const existingIsLinked = linkedComObjectFamilies.has(existingFamily);
+          const candidateIsLinked = linkedComObjectFamilies.has(dynamicTextMatch.family);
+
+          // Ako za isti kanal postoji konflikt (npr. ghost SHUTTER + aktivni SWITCH),
+          // preferiraj family koji je prisutan među aktivnim linkanim ComObjectima.
+          if (!existingIsLinked && candidateIsLinked) {
+            channelFamilyByIndex.set(dynamicTextMatch.index, dynamicTextMatch.family);
+          }
         }
       }
     }
