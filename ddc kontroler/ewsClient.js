@@ -215,7 +215,7 @@ function buildGetValuesBody(ids) {
     throw new Error("buildGetValuesBody expects a non-empty array of ids.");
   }
 
-  const idXml = ids.map((id) => `<Id>${escapeXml(id)}</Id>`).join("\n        ");
+  const idXml = ids.map((id) => `<Id>${escapeXml(id)}</Id>`).join("\n");
 
   return buildSoapEnvelope(`
 <GetValuesRequest
@@ -239,7 +239,7 @@ function buildSetValuesBody(items) {
   <Value>${escapeXml(item.value)}</Value>
 </ValueItem>`
     )
-    .join("\n        ");
+    .join("\n");
 
   return buildSoapEnvelope(`
 <SetValuesRequest
