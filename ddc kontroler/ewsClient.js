@@ -7,12 +7,51 @@ const DEFAULT_SERVICE_URL =
 const EWS_NAMESPACE =
   "http://www.schneider-electric.com/common/dataexchange/2011/05";
 
-const SOAP_ACTIONS = {
-  GET_WEB_SERVICE_INFORMATION: `${EWS_NAMESPACE}/GetWebServiceInformationIn`,
-  GET_CONTAINER_ITEMS: `${EWS_NAMESPACE}/GetContainerItemsIn`,
-  GET_VALUES: `${EWS_NAMESPACE}/GetValuesIn`,
-  SET_VALUES: `${EWS_NAMESPACE}/SetValuesIn`,
-};
+const SOAP_ACTIONS = Object.freeze({
+  GET_WEB_SERVICE_INFORMATION:
+    `${EWS_NAMESPACE}/GetWebServiceInformationIn`,
+  GET_CONTAINER_ITEMS:
+    `${EWS_NAMESPACE}/GetContainerItemsIn`,
+  GET_ITEMS:
+    `${EWS_NAMESPACE}/GetItemsIn`,
+  GET_VALUES:
+    `${EWS_NAMESPACE}/GetValuesIn`,
+  SET_VALUES:
+    `${EWS_NAMESPACE}/SetValuesIn`,
+
+  GET_ALARM_EVENTS:
+    `${EWS_NAMESPACE}/GetAlarmEventsIn`,
+  GET_UPDATED_ALARM_EVENTS:
+    `${EWS_NAMESPACE}/GetUpdatedAlarmEventsIn`,
+  GET_ALARM_EVENT_TYPES:
+    `${EWS_NAMESPACE}/GetAlarmEventTypesIn`,
+  ACKNOWLEDGE_ALARM_EVENTS:
+    `${EWS_NAMESPACE}/AcknowledgeAlarmEventsIn`,
+
+  GET_HISTORY:
+    `${EWS_NAMESPACE}/GetHistoryIn`,
+  GET_ALARM_HISTORY:
+    `${EWS_NAMESPACE}/GetAlarmHistoryIn`,
+
+  FORCE_VALUES:
+    `${EWS_NAMESPACE}/ForceValuesIn`,
+  UNFORCE_VALUES:
+    `${EWS_NAMESPACE}/UnforceValuesIn`,
+
+  GET_ENUMS:
+    `${EWS_NAMESPACE}/GetEnumsIn`,
+  GET_HIERARCHICAL_INFORMATION:
+    `${EWS_NAMESPACE}/GetHierarchicalInformationIn`,
+
+  SUBSCRIBE:
+    `${EWS_NAMESPACE}/SubscribeIn`,
+  GET_NOTIFICATION:
+    `${EWS_NAMESPACE}/GetNotificationIn`,
+  RENEW:
+    `${EWS_NAMESPACE}/RenewIn`,
+  UNSUBSCRIBE:
+    `${EWS_NAMESPACE}/UnsubscribeIn`,
+});
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -210,6 +249,346 @@ function buildGetContainerItemsBody(containerId) {
 </GetContainerItemsRequest>`);
 }
 
+function buildGetAlarmEventsBody({
+  moreDataRef,
+  priorityFrom,
+  priorityTo,
+  types = [],
+  metadata = false,
+} = {}) {
+  const typesXml =
+    types.length > 0
+      ? `<Types>${types
+          .map((type) => `<Type>${escapeXml(type)}</Type>`)
+          .join("")}</Types>`
+      : "";
+
+  return buildSoapEnvelope(`
+<GetAlarmEventsRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2"
+  metadata="${metadata}">
+  <GetAlarmEventsParameter>
+    ${moreDataRef ? `<MoreDataRef>${escapeXml(moreDataRef)}</MoreDataRef>` : ""}
+  </GetAlarmEventsParameter>
+  <GetAlarmEventsFilter>
+    ${
+      priorityFrom !== undefined
+        ? `<PriorityFrom>${priorityFrom}</PriorityFrom>`
+        : ""
+    }
+    ${
+      priorityTo !== undefined
+        ? `<PriorityTo>${priorityTo}</PriorityTo>`
+        : ""
+    }
+    ${typesXml}
+  </GetAlarmEventsFilter>
+</GetAlarmEventsRequest>`);
+}
+
+function buildGetUpdatedAlarmEventsBody({
+  lastUpdate,
+  moreDataRef,
+  priorityFrom,
+  priorityTo,
+  types = [],
+  metadata = false,
+}) {
+  if (!lastUpdate) {
+    throw new Error("lastUpdate is required.");
+  }
+
+  const typesXml =
+    types.length > 0
+      ? `<Types>${types
+          .map((type) => `<Type>${escapeXml(type)}</Type>`)
+          .join("")}</Types>`
+      : "";
+
+  return buildSoapEnvelope(`
+<GetUpdatedAlarmEventsRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2"
+  metadata="${metadata}">
+  <GetUpdatedAlarmEventsParameter>
+    <LastUpdate>${escapeXml(lastUpdate)}</LastUpdate>
+    ${moreDataRef ? `<MoreDataRef>${escapeXml(moreDataRef)}</MoreDataRef>` : ""}
+  </GetUpdatedAlarmEventsParameter>
+  <GetUpdatedAlarmEventsFilter>
+    ${
+      priorityFrom !== undefined
+        ? `<PriorityFrom>${priorityFrom}</PriorityFrom>`
+        : ""
+    }
+    ${
+      priorityTo !== undefined
+        ? `<PriorityTo>${priorityTo}</PriorityTo>`
+        : ""
+    }
+    ${typesXml}
+  </GetUpdatedAlarmEventsFilter>
+</GetUpdatedAlarmEventsRequest>`);
+}
+
+function buildGetAlarmEventTypesBody() {
+  return buildSoapEnvelope(`
+<GetAlarmEventTypesRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2" />`);
+}
+
+function buildAcknowledgeAlarmEventsBody(eventIds) {
+  if (!Array.isArray(eventIds) || eventIds.length === 0) {
+    throw new Error("eventIds must be a non-empty array.");
+  }
+
+  const idsXml = eventIds
+    .map((id) => `<Id>${escapeXml(id)}</Id>`)
+    .join("\n");
+
+  return buildSoapEnvelope(`
+<AcknowledgeAlarmEventsRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2">
+  <AcknowledgeAlarmEventsIds>
+    ${idsXml}
+  </AcknowledgeAlarmEventsIds>
+</AcknowledgeAlarmEventsRequest>`);
+}
+
+function buildGetHistoryBody({
+  historyItemId,
+  timeFrom,
+  timeTo,
+  moreDataRef,
+  metadata = false,
+}) {
+  return buildSoapEnvelope(`
+<GetHistoryRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2"
+  metadata="${metadata}">
+  <GetHistoryParameter>
+    <Id>${escapeXml(historyItemId)}</Id>
+    ${moreDataRef ? `<MoreDataRef>${escapeXml(moreDataRef)}</MoreDataRef>` : ""}
+  </GetHistoryParameter>
+  <GetHistoryFilter>
+    ${timeFrom ? `<TimeFrom>${escapeXml(timeFrom)}</TimeFrom>` : ""}
+    ${timeTo ? `<TimeTo>${escapeXml(timeTo)}</TimeTo>` : ""}
+  </GetHistoryFilter>
+</GetHistoryRequest>`);
+}
+
+function buildForceValuesBody(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error("buildForceValuesBody expects a non-empty array of items.");
+  }
+
+  const itemXml = items
+    .map(
+      (item) => `<ValueItem>
+  <Id>${escapeXml(item.id)}</Id>
+  <Value>${escapeXml(item.value)}</Value>
+</ValueItem>`
+    )
+    .join("\n");
+
+  return buildSoapEnvelope(`
+<ForceValuesRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2">
+  <ForceValuesItems>
+    ${itemXml}
+  </ForceValuesItems>
+</ForceValuesRequest>`);
+}
+
+function buildUnforceValuesBody(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new Error("buildUnforceValuesBody expects a non-empty array of ids.");
+  }
+
+  const idXml = ids.map((id) => `<Id>${escapeXml(id)}</Id>`).join("\n");
+
+  return buildSoapEnvelope(`
+<UnforceValuesRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2">
+  <UnforceValuesIds>
+    ${idXml}
+  </UnforceValuesIds>
+</UnforceValuesRequest>`);
+}
+
+function buildGetEnumsBody(enumIds) {
+  const ids = Array.isArray(enumIds) ? enumIds : [enumIds];
+
+  if (ids.length === 0) {
+    throw new Error("enumIds must not be empty.");
+  }
+
+  const idsXml = ids
+    .map((id) => `<Id>${escapeXml(id)}</Id>`)
+    .join("\n");
+
+  return buildSoapEnvelope(`
+<GetEnumsRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2">
+  <GetEnumIds>
+    ${idsXml}
+  </GetEnumIds>
+</GetEnumsRequest>`);
+}
+
+function buildGetHierarchicalInformationBody(itemId) {
+  return buildSoapEnvelope(`
+<GetHierarchicalInformationRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2">
+  <GetHierarchicalInformationId>${escapeXml(itemId)}</GetHierarchicalInformationId>
+</GetHierarchicalInformationRequest>`);
+}
+
+function buildGetAlarmHistoryBody({
+  alarmItemId,
+  moreDataRef,
+  timeFrom,
+  timeTo,
+  priorityFrom,
+  priorityTo,
+  types = [],
+  metadata = false,
+}) {
+  const typesXml =
+    types.length > 0
+      ? `<Types>${types
+          .map((type) => `<Type>${escapeXml(type)}</Type>`)
+          .join("")}</Types>`
+      : "";
+
+  return buildSoapEnvelope(`
+<GetAlarmHistoryRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2"
+  metadata="${metadata}">
+  <GetAlarmHistoryParameter>
+    ${alarmItemId ? `<Id>${escapeXml(alarmItemId)}</Id>` : ""}
+    ${moreDataRef ? `<MoreDataRef>${escapeXml(moreDataRef)}</MoreDataRef>` : ""}
+  </GetAlarmHistoryParameter>
+  <GetAlarmHistoryFilter>
+    ${timeFrom ? `<TimeFrom>${escapeXml(timeFrom)}</TimeFrom>` : ""}
+    ${timeTo ? `<TimeTo>${escapeXml(timeTo)}</TimeTo>` : ""}
+    ${
+      priorityFrom !== undefined
+        ? `<PriorityFrom>${priorityFrom}</PriorityFrom>`
+        : ""
+    }
+    ${
+      priorityTo !== undefined
+        ? `<PriorityTo>${priorityTo}</PriorityTo>`
+        : ""
+    }
+    ${typesXml}
+  </GetAlarmHistoryFilter>
+</GetAlarmHistoryRequest>`);
+}
+
+function buildSubscribeBody({
+  ids,
+  eventType = 0,
+  eventMode = 0,
+  expires = "PT30M",
+  notifyToAddress = "",
+  metadata = false,
+}) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new Error("ids must be a non-empty array.");
+  }
+
+  const idsXml = ids
+    .map((id) => `<Id>${escapeXml(id)}</Id>`)
+    .join("\n");
+
+  return buildSoapEnvelope(`
+<Subscribe
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2"
+  Mode="0"
+  metadata="${metadata}">
+  <Delivery>
+    <NotifyTo>
+      <Address>${escapeXml(notifyToAddress)}</Address>
+    </NotifyTo>
+  </Delivery>
+  <Expires>${escapeXml(expires)}</Expires>
+  <Filter>
+    <EventType>${eventType}</EventType>
+    <Ids eventMode="${eventMode}">
+      ${idsXml}
+    </Ids>
+  </Filter>
+</Subscribe>`);
+}
+
+
+function buildUnsubscribeBody(subscriptionId) {
+  return buildSoapEnvelope(`
+<Unsubscribe
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2">
+  <SubscriptionId>${escapeXml(subscriptionId)}</SubscriptionId>
+</Unsubscribe>`);
+}
+
+function buildGetNotificationBody({
+  subscriptionId,
+  notificationId,
+  moreDataRef,
+}) {
+  return buildSoapEnvelope(`
+<GetNotificationRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2">
+  <SubscriptionId>${escapeXml(subscriptionId)}</SubscriptionId>
+  ${
+    notificationId !== undefined
+      ? `<NotificationId>${escapeXml(notificationId)}</NotificationId>`
+      : ""
+  }
+  ${moreDataRef ? `<MoreDataRef>${escapeXml(moreDataRef)}</MoreDataRef>` : ""}
+</GetNotificationRequest>`);
+}
+
+function buildRenewBody(subscriptionId, expires = "PT30M") {
+  return buildSoapEnvelope(`
+<Renew
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2">
+  <SubscriptionId>${escapeXml(subscriptionId)}</SubscriptionId>
+  <Expires>${escapeXml(expires)}</Expires>
+</Renew>`);
+}
+
+function buildGetItemsBody(ids, metadata = false) {
+  const normalizedIds = Array.isArray(ids) ? ids : [ids];
+
+  const idsXml = normalizedIds
+    .map((id) => `<Id>${escapeXml(id)}</Id>`)
+    .join("\n");
+
+  return buildSoapEnvelope(`
+<GetItemsRequest
+  xmlns="${EWS_NAMESPACE}"
+  version="1.2"
+  metadata="${metadata}">
+  <GetItemsIds>
+    ${idsXml}
+  </GetItemsIds>
+</GetItemsRequest>`);
+}
+
 function buildGetValuesBody(ids) {
   if (!Array.isArray(ids) || ids.length === 0) {
     throw new Error("buildGetValuesBody expects a non-empty array of ids.");
@@ -384,6 +763,65 @@ function parseGetWebServiceInformationResponse(xmlText) {
   };
 }
 
+function getSoapBody(xmlText) {
+  const parsed = parseXml(xmlText);
+  const body = parsed.Envelope?.Body;
+
+  if (!body) {
+    throw new Error("Invalid SOAP response: Envelope.Body is missing.");
+  }
+
+  return body;
+}
+
+function extractSoapFault(xmlText) {
+  const body = getSoapBody(xmlText);
+  const fault = body.Fault;
+
+  if (!fault) {
+    return null;
+  }
+
+  const reasonValue = fault.Reason?.Text;
+  const reason =
+    typeof reasonValue === "object"
+      ? reasonValue["#text"]
+      : reasonValue;
+
+  return {
+    code: fault.Code?.Value || "SOAP_FAULT",
+    reason: reason || "Unknown SOAP fault",
+    detail: fault.Detail || null,
+  };
+}
+
+function parseOperationResponse(xmlText, responseElementName) {
+  const body = getSoapBody(xmlText);
+
+  if (body.Fault) {
+    const fault = extractSoapFault(xmlText);
+
+    const error = new Error(
+      `${fault.code}: ${fault.reason}`
+    );
+
+    error.soapFault = fault;
+    error.body = xmlText;
+
+    throw error;
+  }
+
+  const response = body[responseElementName];
+
+  if (!response) {
+    throw new Error(
+      `Invalid SOAP response: ${responseElementName} is missing.`
+    );
+  }
+
+  return response;
+}
+
 function formatXmlForDisplay(xmlText) {
   const compact = String(xmlText).replace(/>\s+</g, "><").trim();
 
@@ -425,7 +863,8 @@ function createEwsClient(config = {}) {
       {
         method: "POST",
         headers: {
-          "Content-Type": `application/soap+xml; charset=utf-8; action="${soapAction}"`,
+          "Content-Type":
+            `application/soap+xml; charset=utf-8; action="${soapAction}"`,
           Accept: "application/soap+xml, text/xml, */*",
         },
         body: soapBody,
@@ -437,14 +876,29 @@ function createEwsClient(config = {}) {
     );
 
     const text = await response.text();
+    const soapFault = extractSoapFault(text);
+
+    if (soapFault) {
+      const error = new Error(
+        `${soapFault.code}: ${soapFault.reason}`
+      );
+
+      error.status = response.status;
+      error.soapFault = soapFault;
+      error.body = text;
+
+      throw error;
+    }
 
     if (!response.ok) {
       const error = new Error(
         `EWS request failed: ${response.status} ${response.statusText}`
       );
+
       error.status = response.status;
       error.statusText = response.statusText;
       error.body = text;
+
       throw error;
     }
 
@@ -493,12 +947,190 @@ function createEwsClient(config = {}) {
     return parseSetValuesResponse(rawXml);
   }
 
+  async function getItems(ids, metadata = false) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.GET_ITEMS,
+      buildGetItemsBody(ids, metadata)
+    );
+
+    return parseOperationResponse(rawXml, "GetItemsResponse");
+  }
+
+  async function getAlarmEvents(options = {}) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.GET_ALARM_EVENTS,
+      buildGetAlarmEventsBody(options)
+    );
+
+    return parseOperationResponse(rawXml, "GetAlarmEventsResponse");
+  }
+
+  async function getUpdatedAlarmEvents(options) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.GET_UPDATED_ALARM_EVENTS,
+      buildGetUpdatedAlarmEventsBody(options)
+    );
+
+    return parseOperationResponse(
+      rawXml,
+      "GetUpdatedAlarmEventsResponse"
+    );
+  }
+
+  async function getAlarmEventTypes() {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.GET_ALARM_EVENT_TYPES,
+      buildGetAlarmEventTypesBody()
+    );
+
+    return parseOperationResponse(
+      rawXml,
+      "GetAlarmEventTypesResponse"
+    );
+  }
+
+  async function acknowledgeAlarmEvents(eventIds) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.ACKNOWLEDGE_ALARM_EVENTS,
+      buildAcknowledgeAlarmEventsBody(eventIds)
+    );
+
+    return parseOperationResponse(
+      rawXml,
+      "AcknowledgeAlarmEventsResponse"
+    );
+  }
+
+  async function getHistory(options) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.GET_HISTORY,
+      buildGetHistoryBody(options)
+    );
+
+    return parseOperationResponse(rawXml, "GetHistoryResponse");
+  }
+
+  async function forceValues(items) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.FORCE_VALUES,
+      buildForceValuesBody(items)
+    );
+
+    return parseOperationResponse(rawXml, "ForceValuesResponse");
+  }
+
+  async function unforceValues(ids) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.UNFORCE_VALUES,
+      buildUnforceValuesBody(ids)
+    );
+
+    return parseOperationResponse(
+      rawXml,
+      "UnforceValuesResponse"
+    );
+  }
+
+  async function getEnums(enumIds) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.GET_ENUMS,
+      buildGetEnumsBody(enumIds)
+    );
+
+    return parseOperationResponse(rawXml, "GetEnumsResponse");
+  }
+
+  async function getHierarchicalInformation(itemId) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.GET_HIERARCHICAL_INFORMATION,
+      buildGetHierarchicalInformationBody(itemId)
+    );
+
+    return parseOperationResponse(
+      rawXml,
+      "GetHierarchicalInformationResponse"
+    );
+  }
+
+  async function getAlarmHistory(options) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.GET_ALARM_HISTORY,
+      buildGetAlarmHistoryBody(options)
+    );
+
+    return parseOperationResponse(
+      rawXml,
+      "GetAlarmHistoryResponse"
+    );
+  }
+
+  async function subscribe(options) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.SUBSCRIBE,
+      buildSubscribeBody(options)
+    );
+
+    return parseOperationResponse(rawXml, "SubscribeResponse");
+  }
+
+  async function getNotification(options) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.GET_NOTIFICATION,
+      buildGetNotificationBody(options)
+    );
+
+    return parseOperationResponse(
+      rawXml,
+      "GetNotificationResponse"
+    );
+  }
+
+  async function renew(subscriptionId, expires = "PT30M") {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.RENEW,
+      buildRenewBody(subscriptionId, expires)
+    );
+
+    return parseOperationResponse(rawXml, "RenewResponse");
+  }
+
+  async function unsubscribe(subscriptionId) {
+    const { rawXml } = await sendSoapRequest(
+      SOAP_ACTIONS.UNSUBSCRIBE,
+      buildUnsubscribeBody(subscriptionId)
+    );
+
+    return parseOperationResponse(rawXml, "UnsubscribeResponse");
+  }
+
   return {
     serviceUrl,
+
     getWebServiceInformation,
     getContainerItems,
+    getItems,
     getValues,
     setValues,
+
+    getAlarmEvents,
+    getUpdatedAlarmEvents,
+    getAlarmEventTypes,
+    acknowledgeAlarmEvents,
+
+    getHistory,
+    getAlarmHistory,
+
+    forceValues,
+    unforceValues,
+
+    getEnums,
+    getHierarchicalInformation,
+
+    subscribe,
+    getNotification,
+    renew,
+    unsubscribe,
+
     sendSoapRequest,
   };
 }
@@ -507,6 +1139,10 @@ module.exports = {
   createEwsClient,
   escapeXml,
   formatXmlForDisplay,
+
+  parseOperationResponse,
+  extractSoapFault,
+
   parseGetValuesResponse,
   parseGetContainerItemsResponse,
   parseGetWebServiceInformationResponse,

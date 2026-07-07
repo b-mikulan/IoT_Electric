@@ -11,6 +11,20 @@ app.use(express.json());
 
 const ews = createEwsClient();
 
+function asyncRoute(handler) {
+  return function routeHandler(req, res, next) {
+    Promise.resolve(handler(req, res, next)).catch(next);
+  };
+}
+
+function requireNonEmptyArray(value, fieldName) {
+  if (!Array.isArray(value) || value.length === 0) {
+    const error = new Error(`${fieldName} must be a non-empty array.`);
+    error.status = 400;
+    throw error;
+  }
+}
+
 const swaggerDocument = {
   openapi: "3.0.0",
   info: {
@@ -196,6 +210,262 @@ app.post("/api/values/read", async (req, res) => {
     });
   }
 });
+
+app.post("/api/items/read", async (req, res) => {
+  try {
+    const { ids, metadata = false } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        error: "ids must be a non-empty array",
+      });
+    }
+
+    const result = await ews.getItems(ids, metadata);
+
+    res.json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({
+      error: error.message,
+      soapFault: error.soapFault || null,
+    });
+  }
+});
+
+app.get(
+  "/api/alarm-event-types",
+  asyncRoute(async (req, res) => {
+    const result = await ews.getAlarmEventTypes();
+
+    res.json(result);
+  })
+);
+
+
+app.post(
+  "/api/enums/read",
+  asyncRoute(async (req, res) => {
+    const { ids } = req.body;
+
+    requireNonEmptyArray(ids, "ids");
+
+    const result = await ews.getEnums(ids);
+
+    res.json(result);
+  })
+);
+
+app.get(
+  "/api/hierarchy",
+  asyncRoute(async (req, res) => {
+    const id = req.query.id;
+
+    if (!id) {
+      return res.status(400).json({
+        error: "Query parameter 'id' is required.",
+      });
+    }
+
+    const result = await ews.getHierarchicalInformation(id);
+
+    res.json(result);
+  })
+);
+
+app.post(
+  "/api/alarms/query",
+  asyncRoute(async (req, res) => {
+    const {
+      moreDataRef,
+      priorityFrom,
+      priorityTo,
+      types = [],
+      metadata = false,
+    } = req.body || {};
+
+    if (!Array.isArray(types)) {
+      return res.status(400).json({
+        error: "types must be an array.",
+      });
+    }
+
+    const result = await ews.getAlarmEvents({
+      moreDataRef,
+      priorityFrom,
+      priorityTo,
+      types,
+      metadata,
+    });
+
+    res.json(result);
+  })
+);
+
+
+app.post(
+  "/api/history/query",
+  asyncRoute(async (req, res) => {
+    const {
+      historyItemId,
+      timeFrom,
+      timeTo,
+      moreDataRef,
+      metadata = false,
+    } = req.body;
+
+    if (!historyItemId) {
+      return res.status(400).json({
+        error: "historyItemId is required.",
+      });
+    }
+
+    const result = await ews.getHistory({
+      historyItemId,
+      timeFrom,
+      timeTo,
+      moreDataRef,
+      metadata,
+    });
+
+    res.json(result);
+  })
+);
+
+app.post(
+  "/api/alarm-history/query",
+  asyncRoute(async (req, res) => {
+    const {
+      alarmItemId,
+      moreDataRef,
+      timeFrom,
+      timeTo,
+      priorityFrom,
+      priorityTo,
+      types = [],
+      metadata = false,
+    } = req.body || {};
+
+    if (!Array.isArray(types)) {
+      return res.status(400).json({
+        error: "types must be an array.",
+      });
+    }
+
+    const result = await ews.getAlarmHistory({
+      alarmItemId,
+      moreDataRef,
+      timeFrom,
+      timeTo,
+      priorityFrom,
+      priorityTo,
+      types,
+      metadata,
+    });
+
+    res.json(result);
+  })
+);
+
+app.post(
+  "/api/subscriptions",
+  asyncRoute(async (req, res) => {
+    const {
+      ids,
+      eventType = 0,
+      eventMode = 0,
+      expires = "PT30M",
+      notifyToAddress = "",
+      metadata = false,
+    } = req.body;
+
+    requireNonEmptyArray(ids, "ids");
+
+    if (![0, 1, 2, 3].includes(Number(eventType))) {
+      return res.status(400).json({
+        error: "eventType must be 0, 1, 2 or 3.",
+      });
+    }
+
+    if (![0, 1].includes(Number(eventMode))) {
+      return res.status(400).json({
+        error: "eventMode must be 0 or 1.",
+      });
+    }
+
+    const result = await ews.subscribe({
+      ids,
+      eventType: Number(eventType),
+      eventMode: Number(eventMode),
+      expires,
+      notifyToAddress,
+      metadata,
+    });
+
+    res.status(201).json(result);
+  })
+);
+
+
+app.post(
+  "/api/subscriptions/:subscriptionId/notifications",
+  asyncRoute(async (req, res) => {
+    const { subscriptionId } = req.params;
+    const {
+      notificationId,
+      moreDataRef,
+    } = req.body || {};
+
+    const result = await ews.getNotification({
+      subscriptionId,
+      notificationId,
+      moreDataRef,
+    });
+
+    res.json(result);
+  })
+);
+
+app.post(
+  "/api/subscriptions/:subscriptionId/renew",
+  asyncRoute(async (req, res) => {
+    const { subscriptionId } = req.params;
+    const { expires = "PT30M" } = req.body || {};
+
+    const result = await ews.renew(
+      subscriptionId,
+      expires
+    );
+
+    res.json(result);
+  })
+);
+
+app.delete(
+  "/api/subscriptions/:subscriptionId",
+  asyncRoute(async (req, res) => {
+    const { subscriptionId } = req.params;
+
+    const result = await ews.unsubscribe(subscriptionId);
+
+    res.json(result);
+  })
+);
+
+app.use((error, req, res, next) => {
+  console.error(error);
+
+  res.status(error.status || 500).json({
+    error: error.message,
+    soapFault: error.soapFault || null,
+
+    // Za razvoj je korisno, ali nemoj izlagati raw XML u produkciji.
+    rawResponse:
+      process.env.NODE_ENV === "development"
+        ? error.body || null
+        : undefined,
+  });
+});
+
 
 app.listen(port, () => {
   console.log(`REST wrapper running on http://localhost:${port}`);
