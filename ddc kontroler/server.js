@@ -60,7 +60,7 @@ const swaggerDocument = {
       get: {
         summary: "Get container items",
         description:
-          "Calls the EWS SOAP operation GetContainerItems. Use an empty id to get the root container.",
+          "Calls the EWS SOAP operation GetContainerItems. Leave id empty to get the root container. Known test containers include 00/ES/Test4EWS and 00/ES/Test4EWS/Values.",
         parameters: [
           {
             name: "id",
@@ -70,8 +70,30 @@ const swaggerDocument = {
               type: "string",
               example: "00/ES/Test4EWS/Values",
             },
+            examples: {
+              root: {
+                summary: "Root container",
+                value: "",
+              },
+              testFolder: {
+                summary: "Test4EWS folder",
+                value: "00/ES/Test4EWS",
+              },
+              valuesFolder: {
+                summary: "Values folder",
+                value: "00/ES/Test4EWS/Values",
+              },
+              alarmsFolder: {
+                summary: "Alarms folder",
+                value: "00/ES/Test4EWS/Alarms",
+              },
+              trendLogsFolder: {
+                summary: "Trend Logs folder",
+                value: "00/ES/Test4EWS/Trend Logs",
+              },
+            },
             description:
-              "EWS container ID. If omitted, the root container is requested.",
+              "EWS container ID. If omitted or empty, the root container is requested.",
           },
         ],
         responses: {
@@ -87,9 +109,9 @@ const swaggerDocument = {
 
     "/api/values/test": {
       get: {
-        summary: "Read test datapoints",
+        summary: "Read known test datapoints",
         description:
-          "Reads predefined test datapoints from 00/ES/Test4EWS/Values using the EWS GetValues SOAP operation.",
+          "Reads predefined test datapoints from 00/ES/Test4EWS/Values using the EWS GetValues SOAP operation. This is the easiest demo endpoint.",
         responses: {
           200: {
             description: "Test datapoint values",
@@ -119,9 +141,26 @@ const swaggerDocument = {
                     items: {
                       type: "string",
                     },
-                    example: [
+                  },
+                },
+              },
+              examples: {
+                oneValue: {
+                  summary: "Read Analog Value",
+                  value: {
+                    ids: [
+                      "01/ES/Test4EWS/Values/Analog Value",
+                    ],
+                  },
+                },
+                multipleValues: {
+                  summary: "Read multiple test values",
+                  value: {
+                    ids: [
                       "01/ES/Test4EWS/Values/Analog Value",
                       "01/ES/Test4EWS/Values/Digital Value",
+                      "01/ES/Test4EWS/Values/String Value",
+                      "01/ES/Test4EWS/Values/Time Stamp Value",
                     ],
                   },
                 },
@@ -147,7 +186,7 @@ const swaggerDocument = {
       post: {
         summary: "Read items with optional metadata",
         description:
-          "Calls the EWS SOAP operation GetItems for the provided item IDs.",
+          "Calls the EWS SOAP operation GetItems for the provided item IDs. This returns item metadata/details, while GetValues returns actual current values.",
         requestBody: {
           required: true,
           content: {
@@ -165,6 +204,18 @@ const swaggerDocument = {
                   metadata: {
                     type: "boolean",
                     default: false,
+                  },
+                },
+              },
+              examples: {
+                valueItems: {
+                  summary: "Read known ValueItems",
+                  value: {
+                    ids: [
+                      "01/ES/Test4EWS/Values/Analog Value",
+                      "01/ES/Test4EWS/Values/Digital Value",
+                    ],
+                    metadata: false,
                   },
                 },
               },
@@ -189,7 +240,7 @@ const swaggerDocument = {
       get: {
         summary: "Get alarm event types",
         description:
-          "Calls the EWS SOAP operation GetAlarmEventTypes.",
+          "Calls the EWS SOAP operation GetAlarmEventTypes. This request does not need input parameters.",
         responses: {
           200: {
             description: "Alarm event types",
@@ -205,7 +256,7 @@ const swaggerDocument = {
       post: {
         summary: "Read enumerations",
         description:
-          "Calls the EWS SOAP operation GetEnums for the provided enum IDs.",
+          "Calls the EWS SOAP operation GetEnums for the provided enum IDs. The Digital Value test point uses ~/system.pt.Boolean.",
         requestBody: {
           required: true,
           content: {
@@ -219,6 +270,16 @@ const swaggerDocument = {
                     items: {
                       type: "string",
                     },
+                  },
+                },
+              },
+              examples: {
+                booleanEnum: {
+                  summary: "Read Boolean enum",
+                  value: {
+                    ids: [
+                      "~/system.pt.Boolean",
+                    ],
                   },
                 },
               },
@@ -243,7 +304,7 @@ const swaggerDocument = {
       get: {
         summary: "Get hierarchical information",
         description:
-          "Calls the EWS SOAP operation GetHierarchicalInformation.",
+          "Calls the EWS SOAP operation GetHierarchicalInformation for a known item ID.",
         parameters: [
           {
             name: "id",
@@ -251,6 +312,17 @@ const swaggerDocument = {
             required: true,
             schema: {
               type: "string",
+              example: "01/ES/Test4EWS/Values/Analog Value",
+            },
+            examples: {
+              analogValue: {
+                summary: "Analog Value hierarchy",
+                value: "01/ES/Test4EWS/Values/Analog Value",
+              },
+              valuesFolder: {
+                summary: "Values folder hierarchy",
+                value: "00/ES/Test4EWS/Values",
+              },
             },
             description: "Item ID for hierarchical information.",
           },
@@ -271,9 +343,9 @@ const swaggerDocument = {
 
     "/api/alarms/query": {
       post: {
-        summary: "Query alarms and events",
+        summary: "Query active alarm events",
         description:
-          "Calls the EWS SOAP operation GetAlarmEvents.",
+          "Calls the EWS SOAP operation GetAlarmEvents. Empty body should be valid and may return an empty list if there are no active alarms.",
         requestBody: {
           required: false,
           content: {
@@ -285,10 +357,10 @@ const swaggerDocument = {
                     type: "string",
                   },
                   priorityFrom: {
-                    type: "number",
+                    type: "integer",
                   },
                   priorityTo: {
-                    type: "number",
+                    type: "integer",
                   },
                   types: {
                     type: "array",
@@ -300,6 +372,21 @@ const swaggerDocument = {
                   metadata: {
                     type: "boolean",
                     default: false,
+                  },
+                },
+              },
+              examples: {
+                noFilter: {
+                  summary: "No filter",
+                  value: {},
+                },
+                priorityFilter: {
+                  summary: "Priority range",
+                  value: {
+                    priorityFrom: 1,
+                    priorityTo: 255,
+                    types: [],
+                    metadata: false,
                   },
                 },
               },
@@ -324,7 +411,7 @@ const swaggerDocument = {
       post: {
         summary: "Query historical data",
         description:
-          "Calls the EWS SOAP operation GetHistory.",
+          "Calls the EWS SOAP operation GetHistory. You must first discover a real HistoryItem ID, for example by calling /api/containers?id=00/ES/Test4EWS/Trend Logs.",
         requestBody: {
           required: true,
           content: {
@@ -338,9 +425,11 @@ const swaggerDocument = {
                   },
                   timeFrom: {
                     type: "string",
+                    format: "date-time",
                   },
                   timeTo: {
                     type: "string",
+                    format: "date-time",
                   },
                   moreDataRef: {
                     type: "string",
@@ -348,6 +437,17 @@ const swaggerDocument = {
                   metadata: {
                     type: "boolean",
                     default: false,
+                  },
+                },
+              },
+              examples: {
+                needsRealHistoryItemId: {
+                  summary: "Replace with discovered HistoryItem ID",
+                  value: {
+                    historyItemId: "REPLACE_WITH_HISTORY_ITEM_ID_FROM_TREND_LOGS",
+                    timeFrom: "2026-07-01T00:00:00Z",
+                    timeTo: "2026-07-08T00:00:00Z",
+                    metadata: false,
                   },
                 },
               },
@@ -372,7 +472,7 @@ const swaggerDocument = {
       post: {
         summary: "Query alarm history",
         description:
-          "Calls the EWS SOAP operation GetAlarmHistory.",
+          "Calls the EWS SOAP operation GetAlarmHistory. You can try an empty body first. For a specific alarm item, discover AlarmItem IDs from /api/containers?id=00/ES/Test4EWS/Alarms.",
         requestBody: {
           required: false,
           content: {
@@ -388,15 +488,17 @@ const swaggerDocument = {
                   },
                   timeFrom: {
                     type: "string",
+                    format: "date-time",
                   },
                   timeTo: {
                     type: "string",
+                    format: "date-time",
                   },
                   priorityFrom: {
-                    type: "number",
+                    type: "integer",
                   },
                   priorityTo: {
-                    type: "number",
+                    type: "integer",
                   },
                   types: {
                     type: "array",
@@ -408,6 +510,32 @@ const swaggerDocument = {
                   metadata: {
                     type: "boolean",
                     default: false,
+                  },
+                },
+              },
+              examples: {
+                noFilter: {
+                  summary: "No filter",
+                  value: {},
+                },
+                withDateRange: {
+                  summary: "Date range",
+                  value: {
+                    timeFrom: "2026-07-01T00:00:00Z",
+                    timeTo: "2026-07-08T00:00:00Z",
+                    priorityFrom: 1,
+                    priorityTo: 255,
+                    types: [],
+                    metadata: false,
+                  },
+                },
+                needsRealAlarmItemId: {
+                  summary: "Replace with discovered AlarmItem ID",
+                  value: {
+                    alarmItemId: "REPLACE_WITH_ALARM_ITEM_ID_FROM_ALARMS_FOLDER",
+                    timeFrom: "2026-07-01T00:00:00Z",
+                    timeTo: "2026-07-08T00:00:00Z",
+                    metadata: false,
                   },
                 },
               },
@@ -432,7 +560,7 @@ const swaggerDocument = {
       post: {
         summary: "Create subscription",
         description:
-          "Calls the EWS SOAP operation Subscribe.",
+          "Calls the EWS SOAP operation Subscribe. The safest test is subscribing to Analog Value change events with eventType 0 and eventMode 0.",
         requestBody: {
           required: true,
           content: {
@@ -448,14 +576,18 @@ const swaggerDocument = {
                     },
                   },
                   eventType: {
-                    type: "number",
+                    type: "integer",
                     enum: [0, 1, 2, 3],
                     default: 0,
+                    description:
+                      "0 = ValueItemChanged, 1 = AlarmEventCreated, 2 = SystemEventCreated, 3 = HierarchyChanged",
                   },
                   eventMode: {
-                    type: "number",
+                    type: "integer",
                     enum: [0, 1],
                     default: 0,
+                    description:
+                      "0 = exact item IDs, 1 = container and first-level children",
                   },
                   expires: {
                     type: "string",
@@ -468,6 +600,34 @@ const swaggerDocument = {
                   metadata: {
                     type: "boolean",
                     default: false,
+                  },
+                },
+              },
+              examples: {
+                analogValueSubscription: {
+                  summary: "Subscribe to Analog Value changes",
+                  value: {
+                    ids: [
+                      "01/ES/Test4EWS/Values/Analog Value",
+                    ],
+                    eventType: 0,
+                    eventMode: 0,
+                    expires: "PT30M",
+                    notifyToAddress: "",
+                    metadata: false,
+                  },
+                },
+                valuesFolderSubscription: {
+                  summary: "Subscribe to Values folder children",
+                  value: {
+                    ids: [
+                      "00/ES/Test4EWS/Values",
+                    ],
+                    eventType: 0,
+                    eventMode: 1,
+                    expires: "PT30M",
+                    notifyToAddress: "",
+                    metadata: false,
                   },
                 },
               },
@@ -492,7 +652,7 @@ const swaggerDocument = {
       post: {
         summary: "Get subscription notifications",
         description:
-          "Calls the EWS SOAP operation GetNotification.",
+          "Calls the EWS SOAP operation GetNotification. First call it with an empty JSON body, then reuse NotificationId and MoreDataRef returned by the server if needed.",
         parameters: [
           {
             name: "subscriptionId",
@@ -500,8 +660,9 @@ const swaggerDocument = {
             required: true,
             schema: {
               type: "string",
+              example: "REPLACE_WITH_SUBSCRIPTION_ID",
             },
-            description: "Subscription ID",
+            description: "Subscription ID returned by POST /api/subscriptions.",
           },
         ],
         requestBody: {
@@ -519,12 +680,34 @@ const swaggerDocument = {
                   },
                 },
               },
+              examples: {
+                firstCall: {
+                  summary: "First notification call",
+                  value: {},
+                },
+                nextCall: {
+                  summary: "Next notification call",
+                  value: {
+                    notificationId: "REPLACE_WITH_NOTIFICATION_ID",
+                  },
+                },
+                pagingCall: {
+                  summary: "Paging call",
+                  value: {
+                    notificationId: "REPLACE_WITH_NOTIFICATION_ID",
+                    moreDataRef: "REPLACE_WITH_MORE_DATA_REF",
+                  },
+                },
+              },
             },
           },
         },
         responses: {
           200: {
             description: "Notifications",
+          },
+          400: {
+            description: "Invalid request body",
           },
           500: {
             description: "Server or EWS communication error",
@@ -537,7 +720,7 @@ const swaggerDocument = {
       post: {
         summary: "Renew subscription",
         description:
-          "Calls the EWS SOAP operation Renew.",
+          "Calls the EWS SOAP operation Renew. Use the SubscriptionId returned by POST /api/subscriptions.",
         parameters: [
           {
             name: "subscriptionId",
@@ -545,6 +728,7 @@ const swaggerDocument = {
             required: true,
             schema: {
               type: "string",
+              example: "REPLACE_WITH_SUBSCRIPTION_ID",
             },
             description: "Subscription ID",
           },
@@ -559,6 +743,14 @@ const swaggerDocument = {
                   expires: {
                     type: "string",
                     default: "PT30M",
+                  },
+                },
+              },
+              examples: {
+                thirtyMinutes: {
+                  summary: "Renew for 30 minutes",
+                  value: {
+                    expires: "PT30M",
                   },
                 },
               },
@@ -580,7 +772,7 @@ const swaggerDocument = {
       delete: {
         summary: "Unsubscribe",
         description:
-          "Calls the EWS SOAP operation Unsubscribe.",
+          "Calls the EWS SOAP operation Unsubscribe. Use this to clean up a test subscription.",
         parameters: [
           {
             name: "subscriptionId",
@@ -588,6 +780,7 @@ const swaggerDocument = {
             required: true,
             schema: {
               type: "string",
+              example: "REPLACE_WITH_SUBSCRIPTION_ID",
             },
             description: "Subscription ID",
           },
