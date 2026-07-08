@@ -142,6 +142,466 @@ const swaggerDocument = {
         },
       },
     },
+
+    "/api/items/read": {
+      post: {
+        summary: "Read items with optional metadata",
+        description:
+          "Calls the EWS SOAP operation GetItems for the provided item IDs.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["ids"],
+                properties: {
+                  ids: {
+                    type: "array",
+                    items: {
+                      type: "string",
+                    },
+                  },
+                  metadata: {
+                    type: "boolean",
+                    default: false,
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Items data",
+          },
+          400: {
+            description: "Invalid request body",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
+
+    "/api/alarm-event-types": {
+      get: {
+        summary: "Get alarm event types",
+        description:
+          "Calls the EWS SOAP operation GetAlarmEventTypes.",
+        responses: {
+          200: {
+            description: "Alarm event types",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
+
+    "/api/enums/read": {
+      post: {
+        summary: "Read enumerations",
+        description:
+          "Calls the EWS SOAP operation GetEnums for the provided enum IDs.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["ids"],
+                properties: {
+                  ids: {
+                    type: "array",
+                    items: {
+                      type: "string",
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Enumeration values",
+          },
+          400: {
+            description: "Invalid request body",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
+
+    "/api/hierarchy": {
+      get: {
+        summary: "Get hierarchical information",
+        description:
+          "Calls the EWS SOAP operation GetHierarchicalInformation.",
+        parameters: [
+          {
+            name: "id",
+            in: "query",
+            required: true,
+            schema: {
+              type: "string",
+            },
+            description: "Item ID for hierarchical information.",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Hierarchical information",
+          },
+          400: {
+            description: "Missing required parameter",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
+
+    "/api/alarms/query": {
+      post: {
+        summary: "Query alarms and events",
+        description:
+          "Calls the EWS SOAP operation GetAlarmEvents.",
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  moreDataRef: {
+                    type: "string",
+                  },
+                  priorityFrom: {
+                    type: "number",
+                  },
+                  priorityTo: {
+                    type: "number",
+                  },
+                  types: {
+                    type: "array",
+                    items: {
+                      type: "string",
+                    },
+                    default: [],
+                  },
+                  metadata: {
+                    type: "boolean",
+                    default: false,
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Alarm events",
+          },
+          400: {
+            description: "Invalid request body",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
+
+    "/api/history/query": {
+      post: {
+        summary: "Query historical data",
+        description:
+          "Calls the EWS SOAP operation GetHistory.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["historyItemId"],
+                properties: {
+                  historyItemId: {
+                    type: "string",
+                  },
+                  timeFrom: {
+                    type: "string",
+                  },
+                  timeTo: {
+                    type: "string",
+                  },
+                  moreDataRef: {
+                    type: "string",
+                  },
+                  metadata: {
+                    type: "boolean",
+                    default: false,
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Historical data",
+          },
+          400: {
+            description: "Invalid request body",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
+
+    "/api/alarm-history/query": {
+      post: {
+        summary: "Query alarm history",
+        description:
+          "Calls the EWS SOAP operation GetAlarmHistory.",
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  alarmItemId: {
+                    type: "string",
+                  },
+                  moreDataRef: {
+                    type: "string",
+                  },
+                  timeFrom: {
+                    type: "string",
+                  },
+                  timeTo: {
+                    type: "string",
+                  },
+                  priorityFrom: {
+                    type: "number",
+                  },
+                  priorityTo: {
+                    type: "number",
+                  },
+                  types: {
+                    type: "array",
+                    items: {
+                      type: "string",
+                    },
+                    default: [],
+                  },
+                  metadata: {
+                    type: "boolean",
+                    default: false,
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Alarm history",
+          },
+          400: {
+            description: "Invalid request body",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
+
+    "/api/subscriptions": {
+      post: {
+        summary: "Create subscription",
+        description:
+          "Calls the EWS SOAP operation Subscribe.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["ids"],
+                properties: {
+                  ids: {
+                    type: "array",
+                    items: {
+                      type: "string",
+                    },
+                  },
+                  eventType: {
+                    type: "number",
+                    enum: [0, 1, 2, 3],
+                    default: 0,
+                  },
+                  eventMode: {
+                    type: "number",
+                    enum: [0, 1],
+                    default: 0,
+                  },
+                  expires: {
+                    type: "string",
+                    default: "PT30M",
+                  },
+                  notifyToAddress: {
+                    type: "string",
+                    default: "",
+                  },
+                  metadata: {
+                    type: "boolean",
+                    default: false,
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          201: {
+            description: "Subscription created",
+          },
+          400: {
+            description: "Invalid request body",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
+
+    "/api/subscriptions/{subscriptionId}/notifications": {
+      post: {
+        summary: "Get subscription notifications",
+        description:
+          "Calls the EWS SOAP operation GetNotification.",
+        parameters: [
+          {
+            name: "subscriptionId",
+            in: "path",
+            required: true,
+            schema: {
+              type: "string",
+            },
+            description: "Subscription ID",
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  notificationId: {
+                    type: "string",
+                  },
+                  moreDataRef: {
+                    type: "string",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Notifications",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
+
+    "/api/subscriptions/{subscriptionId}/renew": {
+      post: {
+        summary: "Renew subscription",
+        description:
+          "Calls the EWS SOAP operation Renew.",
+        parameters: [
+          {
+            name: "subscriptionId",
+            in: "path",
+            required: true,
+            schema: {
+              type: "string",
+            },
+            description: "Subscription ID",
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  expires: {
+                    type: "string",
+                    default: "PT30M",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Subscription renewed",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
+
+    "/api/subscriptions/{subscriptionId}": {
+      delete: {
+        summary: "Unsubscribe",
+        description:
+          "Calls the EWS SOAP operation Unsubscribe.",
+        parameters: [
+          {
+            name: "subscriptionId",
+            in: "path",
+            required: true,
+            schema: {
+              type: "string",
+            },
+            description: "Subscription ID",
+          },
+        ],
+        responses: {
+          200: {
+            description: "Unsubscribed successfully",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
   },
 };
 
