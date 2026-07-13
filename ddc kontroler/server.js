@@ -161,6 +161,8 @@ const swaggerDocument = {
                       "01/ES/Test4EWS/Values/Digital Value",
                       "01/ES/Test4EWS/Values/String Value",
                       "01/ES/Test4EWS/Values/Time Stamp Value",
+                      "01/ES/Test4EWS/Values/Multistate Value",
+                      "01/ES/Test4EWS/Values/access_token"
                     ],
                   },
                 },
@@ -832,6 +834,8 @@ app.get("/api/values/test", async (req, res) => {
       "01/ES/Test4EWS/Values/Digital Value",
       "01/ES/Test4EWS/Values/String Value",
       "01/ES/Test4EWS/Values/Time Stamp Value",
+      "01/ES/Test4EWS/Values/access_token",
+      "01/ES/Test4EWS/Values/Multistate Value"
     ];
 
     const result = await ews.getValues(ids);

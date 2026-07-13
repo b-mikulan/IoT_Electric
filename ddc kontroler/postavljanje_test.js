@@ -9,13 +9,13 @@ async function main() {
 
     // test dodavanja vrijednosti na server
     const ids = [
-        "01/ES/Test4EWS/Values/String Value",
+        "01/ES/Test4EWS/Values/Analog Value",
     ];
 
     const values = [
         {
-            id: "01/ES/Test4EWS/Values/String Value",
-            value: "Testna vrijednost, prije je pisalo Hello World"
+            id: "01/ES/Test4EWS/Values/Analog Value",
+            value: 69
         }
     ];
 
