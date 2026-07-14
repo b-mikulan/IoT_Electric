@@ -444,9 +444,9 @@ const swaggerDocument = {
               },
               examples: {
                 needsRealHistoryItemId: {
-                  summary: "Replace with discovered HistoryItem ID",
+                  summary: "HistoryItem ID",
                   value: {
-                    historyItemId: "REPLACE_WITH_HISTORY_ITEM_ID_FROM_TREND_LOGS",
+                    historyItemId: "03/ES/Test4EWS/Trend Logs/Multistate Value Interval Trend Log",
                     timeFrom: "2026-07-01T00:00:00Z",
                     timeTo: "2026-07-08T00:00:00Z",
                     metadata: false,
@@ -532,9 +532,9 @@ const swaggerDocument = {
                   },
                 },
                 needsRealAlarmItemId: {
-                  summary: "Replace with discovered AlarmItem ID",
+                  summary: "AlarmItem ID",
                   value: {
-                    alarmItemId: "REPLACE_WITH_ALARM_ITEM_ID_FROM_ALARMS_FOLDER",
+                    alarmItemId: "02/ES/Test4EWS/Alarms/Change of State Alarm",
                     timeFrom: "2026-07-01T00:00:00Z",
                     timeTo: "2026-07-08T00:00:00Z",
                     metadata: false,
