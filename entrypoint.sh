@@ -2,10 +2,9 @@
 set -eu
 
 if [ -f /run/secrets/ews_credentials ]; then
-  # credentials.txt treba imati username i password u formatu:
-  # EWS_USER=...
-  # EWS_PASSWORD=...
+  set -a
   . /run/secrets/ews_credentials
+  set +a
 fi
 
 exec "$@"
