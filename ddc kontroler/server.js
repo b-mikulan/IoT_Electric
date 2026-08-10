@@ -1,3 +1,5 @@
+const dotenv = require("dotenv");
+dotenv.config();
 const express = require("express");
 const swaggerUi = require("swagger-ui-express");
 const { createEwsClient } = require("./ewsClient");
@@ -8,6 +10,10 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// Debug: print raw env values to detect stray characters (temporary)
+console.error('DEBUG EWS_USER raw:', JSON.stringify(process.env.EWS_USER));
+console.error('DEBUG EWS_PASSWORD raw:', JSON.stringify(process.env.EWS_PASSWORD));
 
 const ews = createEwsClient();
 

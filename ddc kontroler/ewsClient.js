@@ -67,6 +67,11 @@ function assertCredentials(username, password) {
   }
 }
 
+function sanitizeEnvValue(value) {
+  if (value === undefined || value === null) return value;
+  return String(value).replace(/\r/g, "").trim();
+}
+
 function escapeXml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -851,9 +856,13 @@ function formatXmlForDisplay(xmlText) {
 }
 
 function createEwsClient(config = {}) {
-  const serviceUrl = config.serviceUrl || process.env.EWS_URL || DEFAULT_SERVICE_URL;
-  const username = config.username || process.env.EWS_USER;
-  const password = config.password || process.env.EWS_PASSWORD;
+  const serviceUrlRaw = config.serviceUrl || process.env.EWS_URL || DEFAULT_SERVICE_URL;
+  const usernameRaw = config.username || process.env.EWS_USER;
+  const passwordRaw = config.password || process.env.EWS_PASSWORD;
+
+  const serviceUrl = sanitizeEnvValue(serviceUrlRaw) || DEFAULT_SERVICE_URL;
+  const username = sanitizeEnvValue(usernameRaw);
+  const password = sanitizeEnvValue(passwordRaw);
 
   assertCredentials(username, password);
 

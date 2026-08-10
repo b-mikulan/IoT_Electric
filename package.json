@@ -1,6 +1,7 @@
 {
   "dependencies": {
-    "adm-zip": "^0.5.17",
+    "adm-zip": "^0.6.0",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "fast-xml-parser": "^5.5.12",
     "soap": "^1.9.3",

@@ -6,3 +6,4 @@
 *.log
 *.knxproj
 credentials.txt
+.env

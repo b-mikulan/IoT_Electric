@@ -5,13 +5,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       PORT: "3000"
       # Optional override if you need a different EWS endpoint.
       # EWS_URL: "https://example.com/EcoStruxure/DataExchange"
-    secrets:
-      - ews_credentials
-
-secrets:
-  ews_credentials:
-    file: ./credentials.txt
