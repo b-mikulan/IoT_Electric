@@ -7,3 +7,8 @@
 *.knxproj
 credentials.txt
 .env
+*.crt
+*.key
+*.p12
+*.pfx
+!ddc kontroler/root_certificate_iotelectric.crt

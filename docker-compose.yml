@@ -11,3 +11,4 @@ services:
       PORT: "3000"
       # Optional override if you need a different EWS endpoint.
       # EWS_URL: "https://example.com/EcoStruxure/DataExchange"
+    restart: unless-stopped

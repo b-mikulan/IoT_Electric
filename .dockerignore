@@ -4,3 +4,10 @@ npm-debug.log
 .gitignore
 output
 xml_extracted
+*.crt
+*.cer
+*.pem
+*.key
+*.p12
+*.pfx
+!ddc kontroler/root_certificate_iotelectric.crt

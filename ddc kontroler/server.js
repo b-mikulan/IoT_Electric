@@ -4,8 +4,6 @@ const express = require("express");
 const swaggerUi = require("swagger-ui-express");
 const { createEwsClient } = require("./ewsClient");
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
 const app = express();
 const port = process.env.PORT || 3000;
 
