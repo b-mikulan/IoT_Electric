@@ -11,20 +11,23 @@ Run npm install to get dependencies
 
 Build and run the service with Docker Compose:
 
-1. Create a `credentials.txt` file in the repo root with these lines:
+1. Copy `.env.example` to `.env` in the repository root.
+
+2. Set the controller credentials and, if necessary, override its EWS URL:
 
 ```sh
 EWS_USER=your_username
 EWS_PASSWORD=your_password
+# EWS_URL=https://controller.example/EcoStruxure/DataExchange
 ```
 
-2. Run:
+3. Build and start the container:
 
 ```sh
 docker compose up --build
 ```
 
-The app listens on port `3000`. The secret file is mounted into the container at runtime and read by `entrypoint.sh`, so credentials do not need to be baked into the image.
+The app listens on port `3000`. Docker Compose reads `.env` at deployment time and injects its values into the container environment. The `.env` file is excluded from Git and from the Docker build context, so it is not committed or baked into the image.
 
 
 

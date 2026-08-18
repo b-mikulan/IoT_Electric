@@ -2,6 +2,11 @@ node_modules
 npm-debug.log
 .git
 .gitignore
+.env
+.env.*
+!.env.example
+credentials.txt
+entrypoint.sh
 output
 xml_extracted
 *.crt
