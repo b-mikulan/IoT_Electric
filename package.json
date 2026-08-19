@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "auth:generate": "node scripts/generateMiddlewareCredentials.js",
+    "test": "node --test test/middlewareAuth.test.js test/routes.test.js"
+  },
   "dependencies": {
     "adm-zip": "^0.6.0",
     "dotenv": "^17.4.2",
