@@ -288,7 +288,8 @@ class PointPoller extends EventEmitter {
     ).toString("base64");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
-    timeout.unref?.();
+    // This timer guarantees that poll() settles even when fetch never does.
+    // Keep it referenced until the request finishes or the timeout aborts it.
     let payload;
 
     try {
