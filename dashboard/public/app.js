@@ -90,9 +90,12 @@ function updateWidget(widget, syncedAt) {
     widget.value,
     config.precision
   );
-  column.querySelector(".widget-time").textContent = formatTime(
-    widget.updatedAt || syncedAt
-  );
+  const changedAt = Object.hasOwn(widget, "updatedAt")
+    ? widget.updatedAt
+    : syncedAt;
+  const widgetTime = column.querySelector(".widget-time");
+  widgetTime.textContent = `Promjena: ${formatTime(changedAt)}`;
+  widgetTime.title = "Vrijeme kada je dashboard zadnji put uočio promjenu vrijednosti.";
 
   card.classList.toggle("has-error", Boolean(widget.error));
   state.classList.toggle("is-error", Boolean(widget.error));
@@ -133,9 +136,9 @@ function applyPayload(payload = {}) {
 
   const syncTime = payload.syncedAt || payload.lastSync;
   if (syncTime) {
-    lastSync.textContent = `Zadnja sinkronizacija: ${formatTime(syncTime)}`;
+    lastSync.textContent = `Zadnja uspješna provjera: ${formatTime(syncTime)}`;
   }
-  if (payload.status) showStatus(payload.status);
+  if (payload.status) showStatus(payload);
 }
 
 async function boot() {

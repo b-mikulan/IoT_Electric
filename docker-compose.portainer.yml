@@ -25,7 +25,13 @@ services:
       POLL_INTERVAL_MS: "${DASHBOARD_POLL_INTERVAL_MS:-15000}"
       MIDDLEWARE_TIMEOUT_MS: "${DASHBOARD_MIDDLEWARE_TIMEOUT_MS:-10000}"
       DEMO_MODE: "${DASHBOARD_DEMO_MODE:-true}"
+      WIDGETS_FILE: "${DASHBOARD_WIDGETS_FILE:-}"
       WIDGETS_JSON: "${DASHBOARD_WIDGETS_JSON:-}"
+    volumes:
+      - "${DASHBOARD_CONFIG_SOURCE:-dashboard-config}:/app/config:ro"
     depends_on:
       - middleware
     restart: unless-stopped
+
+volumes:
+  dashboard-config:

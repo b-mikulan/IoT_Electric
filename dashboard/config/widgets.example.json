@@ -1,0 +1,16 @@
+[
+  {
+    "id": "01/ES/Test4EWS/Values/Analog Value",
+    "label": "Analogna vrijednost",
+    "description": "Test4EWS",
+    "unit": "",
+    "precision": 1
+  },
+  {
+    "id": "01/ES/Test4EWS/Values/Digital Value",
+    "label": "Digitalna vrijednost",
+    "description": "Test4EWS",
+    "unit": "",
+    "precision": 0
+  }
+]

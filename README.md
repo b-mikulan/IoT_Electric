@@ -56,7 +56,7 @@ Local `.env`, `*.knxproj`, `output/`, and dependency folders are intentionally i
    docker compose up --build
    ```
 
-Open `http://localhost:3000/api-docs` for the API or `http://localhost:3001` for the dashboard. Dashboard demo mode is enabled by default; see [dashboard/README.md](dashboard/README.md) to connect real points.
+Open `http://localhost:3000/api-docs` for the API or `http://localhost:3001` for the dashboard. Dashboard demo mode is enabled by default. Real widget definitions can be kept as readable JSON in `dashboard/config/widgets.json`; see [dashboard/README.md](dashboard/README.md) for setup.
 
 There are two separate sets of credentials:
 

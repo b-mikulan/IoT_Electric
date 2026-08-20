@@ -70,6 +70,23 @@ function readMiddlewarePassword(env) {
   }
 }
 
+function readWidgetConfiguration(env) {
+  const inlineWidgets = String(env.WIDGETS_JSON || "").trim();
+  if (inlineWidgets) return inlineWidgets;
+
+  const filePath = String(env.WIDGETS_FILE || "").trim();
+  if (!filePath) return "";
+
+  try {
+    return fs
+      .readFileSync(filePath, "utf8")
+      .replace(/^\uFEFF/, "")
+      .trim();
+  } catch (error) {
+    throw new Error(`Unable to read WIDGETS_FILE ${filePath}: ${error.message}`);
+  }
+}
+
 function normalizeWidget(widget, index) {
   if (!widget || typeof widget !== "object" || Array.isArray(widget)) {
     throw new Error(`Widget ${index + 1} must be an object.`);
@@ -105,7 +122,7 @@ function parseWidgets(rawWidgets, demoMode) {
     if (demoMode) return DEFAULT_DEMO_WIDGETS.map((widget) => ({ ...widget }));
 
     throw new Error(
-      "WIDGETS_JSON is required when DEMO_MODE is disabled."
+      "WIDGETS_JSON or WIDGETS_FILE is required when DEMO_MODE is disabled."
     );
   }
 
@@ -113,11 +130,11 @@ function parseWidgets(rawWidgets, demoMode) {
   try {
     parsed = JSON.parse(rawWidgets);
   } catch (error) {
-    throw new Error(`WIDGETS_JSON is not valid JSON: ${error.message}`);
+    throw new Error(`Widget configuration is not valid JSON: ${error.message}`);
   }
 
   if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new Error("WIDGETS_JSON must contain a non-empty array.");
+    throw new Error("Widget configuration must contain a non-empty array.");
   }
 
   const widgets = parsed.map(normalizeWidget);
@@ -125,7 +142,7 @@ function parseWidgets(rawWidgets, demoMode) {
 
   for (const widget of widgets) {
     if (ids.has(widget.id)) {
-      throw new Error(`WIDGETS_JSON contains duplicate id: ${widget.id}`);
+      throw new Error(`Widget configuration contains duplicate id: ${widget.id}`);
     }
     ids.add(widget.id);
   }
@@ -134,8 +151,9 @@ function parseWidgets(rawWidgets, demoMode) {
 }
 
 function loadConfig(env = process.env) {
-  const demoMode = parseBoolean(env.DEMO_MODE, !env.WIDGETS_JSON);
-  const widgets = parseWidgets(env.WIDGETS_JSON, demoMode);
+  const rawWidgets = readWidgetConfiguration(env);
+  const demoMode = parseBoolean(env.DEMO_MODE, !rawWidgets);
+  const widgets = parseWidgets(rawWidgets, demoMode);
   const password = readMiddlewarePassword(env);
   const port = Number(env.PORT || 3001);
 
@@ -167,4 +185,5 @@ module.exports = {
   DEFAULT_DEMO_WIDGETS,
   loadConfig,
   parseWidgets,
+  readWidgetConfiguration,
 };

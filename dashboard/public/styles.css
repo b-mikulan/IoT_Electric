@@ -12,6 +12,10 @@
   --border: #dce6e4;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -235,6 +239,8 @@ h1 {
 .widget-value {
   max-width: 100%;
   overflow: hidden;
+  padding-inline-start: 0.08em;
+  margin-inline-start: -0.08em;
   color: #17393a;
   font-size: clamp(2.6rem, 5vw, 4rem);
   font-weight: 760;
@@ -278,6 +284,11 @@ h1 {
 .widget-state.is-current::before { background: var(--ok); }
 .widget-state.is-error { color: var(--error); }
 .widget-state.is-error::before { background: var(--error); }
+
+.widget-time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
 .error-banner,
 .empty-state,

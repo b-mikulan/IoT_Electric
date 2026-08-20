@@ -2,7 +2,7 @@ const swaggerDocument = {
   openapi: "3.0.0",
   info: {
     title: "EcoStruxure EWS REST Wrapper",
-    version: "0.2.0",
+    version: "0.3.0",
     description:
       "Simple Node/Express REST wrapper around Schneider EcoStruxure Web Services SOAP API.",
   },
@@ -167,6 +167,120 @@ const swaggerDocument = {
         responses: {
           200: {
             description: "Datapoint values",
+          },
+          400: {
+            description: "Invalid request body",
+          },
+          500: {
+            description: "Server or EWS communication error",
+          },
+        },
+      },
+    },
+
+    "/api/values/write": {
+      post: {
+        summary: "Write one or more datapoint values",
+        description:
+          "Calls the EWS SOAP operation SetValues for the provided ValueItems. Each item must contain a writable datapoint ID and a scalar value. A successful HTTP response can still contain success: false when the controller rejects an individual write.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["items"],
+                properties: {
+                  items: {
+                    type: "array",
+                    minItems: 1,
+                    maxItems: 100,
+                    items: {
+                      type: "object",
+                      required: ["id", "value"],
+                      properties: {
+                        id: {
+                          type: "string",
+                          minLength: 1,
+                          pattern: "\\S",
+                        },
+                        value: {
+                          oneOf: [
+                            { type: "string" },
+                            { type: "number" },
+                            { type: "boolean" },
+                          ],
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              examples: {
+                analogValue: {
+                  summary: "Set Analog Value",
+                  value: {
+                    items: [
+                      {
+                        id: "01/ES/Test4EWS/Values/Analog Value",
+                        value: 69,
+                      },
+                    ],
+                  },
+                },
+                multipleValues: {
+                  summary: "Set multiple values",
+                  value: {
+                    items: [
+                      {
+                        id: "01/ES/Test4EWS/Values/Analog Value",
+                        value: 69,
+                      },
+                      {
+                        id: "01/ES/Test4EWS/Values/Digital Value",
+                        value: true,
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Per-datapoint write results",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["results"],
+                  properties: {
+                    results: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        required: ["id", "success", "message"],
+                        properties: {
+                          id: { type: "string" },
+                          success: { type: "boolean" },
+                          message: { type: "string" },
+                        },
+                      },
+                    },
+                  },
+                },
+                example: {
+                  results: [
+                    {
+                      id: "01/ES/Test4EWS/Values/Analog Value",
+                      success: true,
+                      message: "",
+                    },
+                  ],
+                },
+              },
+            },
           },
           400: {
             description: "Invalid request body",

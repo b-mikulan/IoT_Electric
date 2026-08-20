@@ -67,6 +67,10 @@ test("posts widget ids with Basic auth and exposes values without credentials", 
   assert.equal(updates.length, 1);
   assert.equal(updates[0].widgets[0].label, "Office");
   assert.equal(updates[0].widgets[0].value, 22.4);
+  assert.equal(
+    updates[0].widgets[0].updatedAt,
+    "2026-08-20T08:15:00.000Z"
+  );
   assert.equal(snapshot.status, "connected");
   assert.equal(snapshot.widgets[1].value, 3.17);
   assert.equal(Object.hasOwn(snapshot, "username"), false);
@@ -103,16 +107,25 @@ test("does not emit an update when a second poll has unchanged point data", asyn
   assert.equal(updates.length, 1);
   assert.equal(syncs.length, 2);
   assert.equal(poller.getSnapshot().syncedAt, "2026-08-20T08:00:15.000Z");
+  assert.equal(
+    poller.getSnapshot().widgets[0].updatedAt,
+    "2026-08-20T08:00:00.000Z"
+  );
 });
 
 test("emits only the point that changed after the initial snapshot", async () => {
   const updates = [];
   let pollNumber = 0;
+  const times = [
+    new Date("2026-08-20T08:00:00.000Z"),
+    new Date("2026-08-20T08:00:15.000Z"),
+  ];
   const poller = new PointPoller({
     middlewareUrl: "http://middleware",
     username: "user",
     password: "password",
     widgets: [{ id: "temperature" }, { id: "humidity" }],
+    now: () => times.shift(),
     fetchImpl: async () => {
       pollNumber += 1;
       return jsonResponse({
@@ -128,12 +141,20 @@ test("emits only the point that changed after the initial snapshot", async () =>
   poller.on("update", (event) => updates.push(event));
 
   await poller.poll();
-  await poller.poll();
+  const secondSnapshot = await poller.poll();
 
   assert.equal(updates.length, 2);
   assert.deepEqual(
     updates[1].widgets.map(({ id }) => id),
     ["temperature"]
+  );
+  assert.equal(
+    secondSnapshot.widgets.find(({ id }) => id === "temperature").updatedAt,
+    "2026-08-20T08:00:15.000Z"
+  );
+  assert.equal(
+    secondSnapshot.widgets.find(({ id }) => id === "humidity").updatedAt,
+    "2026-08-20T08:00:00.000Z"
   );
 });
 

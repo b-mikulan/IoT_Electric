@@ -19,6 +19,7 @@ function normalizeWidget(widget, index) {
   delete normalized.value;
   delete normalized.state;
   delete normalized.error;
+  delete normalized.updatedAt;
 
   return normalized;
 }
@@ -156,6 +157,7 @@ class PointPoller extends EventEmitter {
         value: null,
         state: null,
         error: null,
+        updatedAt: null,
       })),
     };
   }
@@ -216,17 +218,30 @@ class PointPoller extends EventEmitter {
       const previousById = new Map(
         this.snapshot.widgets.map((widget) => [widget.id, widget])
       );
-      const nextWidgets = this.#widgets.map((widget) => ({
-        ...clone(widget),
-        ...(points.get(widget.id) || {
-          value: null,
-          state: null,
-          error: NO_VALUE_ERROR,
-        }),
-      }));
-      const changedWidgets = nextWidgets.filter((widget) =>
-        pointChanged(previousById.get(widget.id), widget)
-      );
+      const evaluatedWidgets = this.#widgets.map((widget) => {
+        const previous = previousById.get(widget.id);
+        const nextPoint = {
+          ...clone(widget),
+          ...(points.get(widget.id) || {
+            value: null,
+            state: null,
+            error: NO_VALUE_ERROR,
+          }),
+        };
+        const changed = !previous?.updatedAt || pointChanged(previous, nextPoint);
+
+        return {
+          changed,
+          widget: {
+            ...nextPoint,
+            updatedAt: changed ? syncedAt : previous.updatedAt,
+          },
+        };
+      });
+      const nextWidgets = evaluatedWidgets.map(({ widget }) => widget);
+      const changedWidgets = evaluatedWidgets
+        .filter(({ changed }) => changed)
+        .map(({ widget }) => widget);
       const previousStatus = this.snapshot.status;
 
       this.snapshot = {
@@ -288,8 +303,7 @@ class PointPoller extends EventEmitter {
     ).toString("base64");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
-    // This timer guarantees that poll() settles even when fetch never does.
-    // Keep it referenced until the request finishes or the timeout aborts it.
+    // Keep the timeout referenced so its abort can fire while poll() is pending.
     let payload;
 
     try {

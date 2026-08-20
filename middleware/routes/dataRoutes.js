@@ -4,6 +4,46 @@ const {
   requireNonEmptyArray,
 } = require("./routeUtils");
 
+const MAX_WRITE_ITEMS = 100;
+
+function validateWriteItems(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return "items must be a non-empty array.";
+  }
+
+  if (items.length > MAX_WRITE_ITEMS) {
+    return `items must contain no more than ${MAX_WRITE_ITEMS} entries.`;
+  }
+
+  for (const [index, item] of items.entries()) {
+    const field = `items[${index}]`;
+
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return `${field} must be an object.`;
+    }
+
+    if (typeof item.id !== "string" || item.id.trim() === "") {
+      return `${field}.id must be a non-empty string.`;
+    }
+
+    if (!Object.hasOwn(item, "value")) {
+      return `${field}.value is required.`;
+    }
+
+    const valueType = typeof item.value;
+    const isSupportedType =
+      valueType === "string" ||
+      valueType === "boolean" ||
+      (valueType === "number" && Number.isFinite(item.value));
+
+    if (!isSupportedType) {
+      return `${field}.value must be a string, finite number, or boolean.`;
+    }
+  }
+
+  return null;
+}
+
 function createDataRouter(ews) {
   const router = express.Router();
 
@@ -47,6 +87,21 @@ function createDataRouter(ews) {
       });
     }
   });
+
+  router.post(
+    "/values/write",
+    asyncRoute(async (req, res) => {
+      const { items } = req.body || {};
+      const validationError = validateWriteItems(items);
+
+      if (validationError) {
+        return res.status(400).json({ error: validationError });
+      }
+
+      const result = await ews.setValues(items);
+      return res.json(result);
+    })
+  );
 
   router.post("/items/read", async (req, res) => {
     try {

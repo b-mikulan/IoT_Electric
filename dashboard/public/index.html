@@ -33,7 +33,11 @@
         <div>
           <p class="eyebrow">Nadzor sustava</p>
           <h1 id="page-title">PLC vrijednosti uživo</h1>
-          <p id="last-sync" class="last-sync">Čekam prvi odgovor servera.</p>
+          <p
+            id="last-sync"
+            class="last-sync"
+            title="Vrijeme posljednje uspješne provjere svih konfiguriranih točaka."
+          >Čekam prvu uspješnu provjeru servera.</p>
         </div>
         <div id="demo-badge" class="demo-badge" hidden>Demo podaci</div>
       </section>
@@ -46,12 +50,12 @@
       <div id="empty-state" class="empty-state" hidden>
         <span class="empty-icon" aria-hidden="true">◇</span>
         <h2>Nema konfiguriranih točaka</h2>
-        <p>Dodaj PLC identifikatore u WIDGETS_JSON i ponovno pokreni servis.</p>
+        <p>Dodaj PLC identifikatore u dashboard/config/widgets.json i ponovno pokreni servis.</p>
       </div>
 
       <div id="error-banner" class="error-banner" role="alert" hidden>
-        <strong>Podaci trenutačno nisu dostupni.</strong>
-        <span id="error-message">Servis će pokušati ponovno.</span>
+        <strong>Osvježavanje podataka nije uspjelo.</strong>
+        <span id="error-message">Prikazane su zadnje dostupne vrijednosti. Servis će pokušati ponovno.</span>
       </div>
     </main>
 
@@ -78,7 +82,7 @@
             </div>
             <div class="widget-meta">
               <span class="widget-state">Čekanje podataka</span>
-              <span class="widget-time">—</span>
+              <span class="widget-time">Promjena: —</span>
             </div>
           </div>
         </article>

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "fixture/temperature",
+    "label": "Temperature",
+    "unit": "°C",
+    "precision": 1
+  },
+  {
+    "id": "fixture/humidity",
+    "label": "Humidity",
+    "unit": "%",
+    "precision": 0
+  }
+]
