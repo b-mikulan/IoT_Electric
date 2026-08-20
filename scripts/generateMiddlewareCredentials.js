@@ -1,7 +1,7 @@
 const { randomBytes } = require("node:crypto");
 const {
   createPasswordHash,
-} = require("../ddc kontroler/middlewareAuth");
+} = require("../middleware/middlewareAuth");
 
 const username = "middleware-admin";
 const password = randomBytes(24).toString("base64url");

@@ -5,7 +5,7 @@ const {
   createPasswordHash,
   parseBasicAuthorization,
   verifyPassword,
-} = require("../ddc kontroler/middlewareAuth");
+} = require("../middleware/middlewareAuth");
 
 const TEST_SALT = "00112233445566778899aabbccddeeff";
 
@@ -125,7 +125,7 @@ test("leaves health and Swagger UI public while protecting the API", async (t) =
     TEST_SALT
   );
 
-  const { app } = require("../ddc kontroler/server");
+  const { app } = require("../middleware/server");
   const server = await new Promise((resolve) => {
     const listeningServer = app.listen(0, "127.0.0.1", () => {
       resolve(listeningServer);

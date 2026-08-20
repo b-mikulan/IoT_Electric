@@ -7,12 +7,18 @@ npm-debug.log
 !.env.example
 credentials.txt
 entrypoint.sh
+dashboard
+tools
+scripts
+test
+.github
+README.md
+docker-compose*.yml
 output
-xml_extracted
 *.crt
 *.cer
 *.pem
 *.key
 *.p12
 *.pfx
-!ddc kontroler/root_certificate_iotelectric.crt
+!middleware/root_certificate_iotelectric.crt

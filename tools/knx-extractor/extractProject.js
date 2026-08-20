@@ -4,14 +4,34 @@ const path = require("path");
 const { XMLParser } = require("fast-xml-parser");
 
 const args = process.argv.slice(2);
-const INPUT_FILE = args[0] || path.join(__dirname, "Bruno 1.knxproj");
-const INPUT_BASE = path.parse(INPUT_FILE).name;
-const OUTPUT_PARENT_DIR = args[1] || path.join(__dirname, "output");
-const OUTPUT_DIR = path.join(OUTPUT_PARENT_DIR, `${INPUT_BASE}_extracted`);
-const OUTPUT_JSON = path.join(OUTPUT_PARENT_DIR, `${INPUT_BASE}_settings.json`);
+const INPUT_FILE = args[0] ? path.resolve(args[0]) : null;
+const INPUT_BASE = INPUT_FILE ? path.parse(INPUT_FILE).name : null;
+const OUTPUT_PARENT_DIR = path.resolve(args[1] || "output");
+const OUTPUT_DIR = INPUT_BASE
+  ? path.join(OUTPUT_PARENT_DIR, `${INPUT_BASE}_extracted`)
+  : null;
+const OUTPUT_JSON = INPUT_BASE
+  ? path.join(OUTPUT_PARENT_DIR, `${INPUT_BASE}_settings.json`)
+  : null;
 
 function ensureDirectory(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
+}
+
+function resolveZipEntryTarget(outputDir, entryName) {
+  const outputRoot = path.resolve(outputDir);
+  const targetPath = path.resolve(outputRoot, entryName);
+  const relativeTarget = path.relative(outputRoot, targetPath);
+
+  if (
+    relativeTarget === ".." ||
+    relativeTarget.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativeTarget)
+  ) {
+    throw new Error(`Unsafe path in KNX archive: ${entryName}`);
+  }
+
+  return targetPath;
 }
 
 
@@ -41,7 +61,7 @@ function extractXmlFiles(zip, outputDir) {
     if (entry.isDirectory) return;
     if (path.extname(entry.entryName).toLowerCase() !== ".xml") return;
 
-    const targetPath = path.join(outputDir, entry.entryName);
+    const targetPath = resolveZipEntryTarget(outputDir, entry.entryName);
     ensureDirectory(path.dirname(targetPath));
     fs.writeFileSync(targetPath, entry.getData());
     extractedCount += 1;
@@ -652,6 +672,16 @@ function buildDeviceSettingsJson() {
 }
 
 function main() {
+  if (!INPUT_FILE) {
+    throw new Error(
+      "Usage: npm run knx:extract -- <project.knxproj> [output-directory]"
+    );
+  }
+
+  if (!fs.existsSync(INPUT_FILE)) {
+    throw new Error(`KNX project not found: ${INPUT_FILE}`);
+  }
+
   ensureDirectory(OUTPUT_DIR);
 
   const zip = new AdmZip(INPUT_FILE);
@@ -662,4 +692,15 @@ function main() {
   console.log(`Wrote settings JSON for ${deviceCount} device instance(s) to ${OUTPUT_JSON}`);
 }
 
-main();
+if (require.main === module) {
+  try {
+    main();
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
+  }
+}
+
+module.exports = {
+  resolveZipEntryTarget,
+};

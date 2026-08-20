@@ -1,14 +1,25 @@
 {
+  "name": "iot-electric-middleware",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
     "auth:generate": "node scripts/generateMiddlewareCredentials.js",
-    "test": "node --test test/middlewareAuth.test.js test/routes.test.js"
+    "dev": "node --watch middleware/server.js",
+    "knx:extract": "node tools/knx-extractor/extractProject.js",
+    "start": "node middleware/server.js",
+    "test": "npm run test:middleware && npm run test:tools && npm run test:dashboard",
+    "test:dashboard": "npm test --prefix dashboard",
+    "test:middleware": "node --test test/middlewareAuth.test.js test/routes.test.js",
+    "test:tools": "node --test test/knxExtractor.test.js"
   },
   "dependencies": {
-    "adm-zip": "^0.6.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "fast-xml-parser": "^5.5.12",
-    "soap": "^1.9.3",
     "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "adm-zip": "^0.6.0",
+    "soap": "^1.9.3"
   }
 }

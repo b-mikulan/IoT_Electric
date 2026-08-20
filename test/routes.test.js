@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createApp } = require("../ddc kontroler/app");
-const swaggerDocument = require("../ddc kontroler/swaggerDocument");
+const { createApp } = require("../middleware/app");
+const swaggerDocument = require("../middleware/swaggerDocument");
 
 function createFakeEws() {
   return {

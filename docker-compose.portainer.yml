@@ -1,8 +1,6 @@
 services:
   middleware:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/b-mikulan/iot-electric:${IMAGE_TAG:-latest}
     ports:
       - "3000:3000"
     environment:
@@ -15,9 +13,7 @@ services:
     restart: unless-stopped
 
   dashboard:
-    build:
-      context: ./dashboard
-      dockerfile: Dockerfile
+    image: ghcr.io/b-mikulan/iot-electric-dashboard:${IMAGE_TAG:-latest}
     ports:
       - "3001:3001"
     environment:

@@ -1,0 +1,20 @@
+{
+  "name": "iot-electric-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Live widget dashboard for IoT Electric DDC values",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@materializecss/materialize": "^2.3.3",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}

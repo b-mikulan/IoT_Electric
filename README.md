@@ -1,71 +1,103 @@
-# IoT_Electric
-All files related to work at IoT Electric
+# IoT Electric
 
+IoT Electric contains two small services: a REST middleware for Schneider EcoStruxure Web Services (EWS) and a browser dashboard for live PLC values.
 
-Run npm install to get dependencies
-  - adm-zip
-  - fast-xml-parser
+## What runs where
 
+| Service | Folder | Local URL | Purpose |
+| --- | --- | --- | --- |
+| Middleware | `middleware/` | `http://localhost:3000` | Converts EWS/SOAP operations into a REST API |
+| Dashboard | `dashboard/` | `http://localhost:3001` | Polls the middleware and displays live point values |
 
-## Docker
+The middleware exposes public health and Swagger pages at `/health` and `/api-docs`. All `/api/*` endpoints require HTTP Basic authentication. Open Swagger and use **Authorize** before trying an API endpoint.
 
-Build and run the service with Docker Compose:
-
-1. Copy `.env.example` to `.env` in the repository root.
-
-2. Generate a separate username and password for access to the middleware:
-
-```sh
-npm run auth:generate
-```
-
-Save the generated password in a password manager. Copy only the generated `MIDDLEWARE_USER` and `MIDDLEWARE_PASSWORD_HASH` values into `.env`.
-
-3. Set the controller credentials and, if necessary, override its EWS URL:
-
-```sh
-EWS_USER=your_username
-EWS_PASSWORD=your_password
-MIDDLEWARE_USER=middleware-admin
-MIDDLEWARE_PASSWORD_HASH=scrypt:generated_salt:generated_hash
-# EWS_URL=https://controller.example/EcoStruxure/DataExchange
-```
-
-The middleware credentials protect the REST API and Swagger UI. They are separate from `EWS_USER` and `EWS_PASSWORD`, which the middleware uses to authenticate to the DDC controller.
-
-4. Build and start the container:
-
-```sh
-docker compose up --build
-```
-
-The app listens on port `3000`. `/api-docs` is public so the API documentation can be viewed without signing in. Use Swagger's **Authorize** button before calling protected `/api` endpoints. API clients such as Postman should use the same credentials with HTTP Basic authentication. `/health` also remains available without authentication for container health checks.
-
-Docker Compose reads `.env` at deployment time and injects its values into the container environment. The `.env` file is excluded from Git and from the Docker build context, so it is not committed or baked into the image.
-
-Basic authentication must use HTTPS in production because its credentials are only Base64-encoded. The current plain-HTTP setup is suitable only for isolated testing with non-production credentials.
-
-## DDC middleware structure
-
-The Express middleware is split by responsibility:
+## Repository layout
 
 ```text
-ddc kontroler/
-├── server.js                 # Loads configuration and starts the HTTP server
-├── app.js                    # Creates and configures the Express application
-├── ewsClient.js              # Communicates with the EcoStruxure EWS service
-├── middlewareAuth.js         # Verifies middleware Basic authentication
-├── swaggerDocument.js        # OpenAPI document used by Swagger UI
-├── middleware/
-│   └── errorHandler.js       # Final Express error response handler
-└── routes/
-    ├── index.js              # Combines all API routers
-    ├── coreRoutes.js         # Service information and containers
-    ├── dataRoutes.js         # Values, items, enums and hierarchy
-    ├── alarmRoutes.js        # Current alarms and alarm history
-    ├── historyRoutes.js      # Value history
-    ├── subscriptionRoutes.js # Subscription lifecycle
-    └── routeUtils.js         # Shared route validation/error helpers
+.
+├── middleware/                  # Express app, EWS client, API routes and OpenAPI document
+├── dashboard/                   # Independent PLC widget service and browser UI
+├── test/                        # Middleware tests
+├── scripts/                     # Repository maintenance helpers
+├── tools/
+│   ├── ews-sandbox/             # Manual EWS experiments; not used by the application
+│   └── knx-extractor/            # KNX project extraction utility and legacy fixtures
+├── .github/workflows/           # Test and Docker image automation
+├── Dockerfile                   # Middleware image
+├── docker-compose.yml           # Local/test build
+└── docker-compose.portainer.yml # Deployment with published images
 ```
 
-All API routers are mounted below `/api`, so their public URLs remain unchanged.
+Local `.env`, `*.knxproj`, `output/`, and dependency folders are intentionally ignored. They contain credentials, local project data, generated files, or installed packages and should not be committed.
+
+## Start locally with Docker
+
+1. Copy `.env.example` to `.env`.
+2. Install the local development and test dependencies, then generate middleware credentials:
+
+   ```sh
+   npm ci
+   npm ci --prefix dashboard
+   npm run auth:generate
+   ```
+
+3. Put the generated `MIDDLEWARE_USER` and `MIDDLEWARE_PASSWORD_HASH` in `.env`. Save the displayed plaintext password in a password manager; it cannot be recovered from the hash.
+4. Add the controller connection:
+
+   ```env
+   EWS_URL=https://controller.example/EcoStruxure/DataExchange
+   EWS_USER=controller_username
+   EWS_PASSWORD=controller_password
+   ```
+
+5. Start both services:
+
+   ```sh
+   docker compose up --build
+   ```
+
+Open `http://localhost:3000/api-docs` for the API or `http://localhost:3001` for the dashboard. Dashboard demo mode is enabled by default; see [dashboard/README.md](dashboard/README.md) to connect real points.
+
+There are two separate sets of credentials:
+
+- `EWS_USER` and `EWS_PASSWORD` let the middleware connect to a DDC controller.
+- `MIDDLEWARE_USER` and its generated password let Swagger, Postman, or the dashboard call the REST API.
+
+The dashboard needs the middleware's plaintext password because it is an API client. Keep it only in the untracked `.env`, a Portainer secret, or a Docker secret. Compose injects credentials at container start; they are not baked into either image.
+
+## Useful commands
+
+| Command | Purpose |
+| --- | --- |
+| `npm start` | Start the middleware |
+| `npm run dev` | Start the middleware with file watching |
+| `npm test` | Run middleware, tool, and dashboard tests |
+| `npm run test:middleware` | Run only middleware tests |
+| `npm run test:tools` | Run only development-tool tests |
+| `npm run test:dashboard` | Run only dashboard tests |
+| `npm run auth:generate` | Generate middleware login credentials |
+| `npm run knx:extract -- project.knxproj` | Extract a KNX project into ignored `output/` |
+
+For a non-Docker dashboard preview, install its dependencies with `npm ci --prefix dashboard` and run `npm start --prefix dashboard`.
+
+## Docker images and Portainer
+
+GitHub Actions tests the repository and builds both images:
+
+- `ghcr.io/b-mikulan/iot-electric`
+- `ghcr.io/b-mikulan/iot-electric-dashboard`
+
+A push to `main` publishes `latest`, `main`, and a commit-specific tag. A Git tag such as `v1.0.0` publishes version tags. For a stable deployment, use the same exact version for both services:
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+In Portainer, deploy `docker-compose.portainer.yml` and set `IMAGE_TAG=1.0.0`. Portainer pulls the published images directly, so the server does not need a Git clone or a manual build. Private GHCR packages require read-only package credentials in Portainer.
+
+## Security status
+
+The current Compose configuration is intended for an isolated test server. Basic authentication must be placed behind HTTPS in production. Port `3001` currently has no separate dashboard login, so anyone who can reach it can view telemetry. Restrict that port or put the dashboard behind an authenticated HTTPS reverse proxy before production use.
+
+The middleware image installs the project CA certificate from `middleware/root_certificate_iotelectric.crt`. Replace it when the target controller uses a different CA. If no private CA is needed, remove the certificate `COPY`, `update-ca-certificates`, and `NODE_EXTRA_CA_CERTS` lines from the Dockerfile together.

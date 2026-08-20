@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="hr" theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Live pregled vrijednosti s IoT Electric PLC kontrolera"
+    />
+    <title>IoT Electric · PLC pregled</title>
+    <link rel="stylesheet" href="/vendor/materialize/materialize.min.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="container header-content">
+        <div class="brand" aria-label="IoT Electric">
+          <span class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+          <span class="brand-name">IoT Electric</span>
+        </div>
+
+        <div class="connection" aria-live="polite">
+          <span id="connection-dot" class="connection-dot is-connecting"></span>
+          <span id="connection-label">Povezivanje…</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="container dashboard-shell">
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Nadzor sustava</p>
+          <h1 id="page-title">PLC vrijednosti uživo</h1>
+          <p id="last-sync" class="last-sync">Čekam prvi odgovor servera.</p>
+        </div>
+        <div id="demo-badge" class="demo-badge" hidden>Demo podaci</div>
+      </section>
+
+      <section aria-labelledby="widgets-heading">
+        <h2 id="widgets-heading" class="visually-hidden">Mjerne točke</h2>
+        <div id="widget-grid" class="row widget-grid" aria-live="polite"></div>
+      </section>
+
+      <div id="empty-state" class="empty-state" hidden>
+        <span class="empty-icon" aria-hidden="true">◇</span>
+        <h2>Nema konfiguriranih točaka</h2>
+        <p>Dodaj PLC identifikatore u WIDGETS_JSON i ponovno pokreni servis.</p>
+      </div>
+
+      <div id="error-banner" class="error-banner" role="alert" hidden>
+        <strong>Podaci trenutačno nisu dostupni.</strong>
+        <span id="error-message">Servis će pokušati ponovno.</span>
+      </div>
+    </main>
+
+    <footer class="container app-footer">
+      <span>Automatsko osvježavanje bez ponovnog učitavanja stranice</span>
+      <span id="poll-interval"></span>
+    </footer>
+
+    <template id="widget-template">
+      <div class="col s12 m6 l4 widget-column">
+        <article class="card widget-card">
+          <div class="widget-accent"></div>
+          <div class="card-content">
+            <div class="widget-heading">
+              <span class="widget-icon" aria-hidden="true"></span>
+              <div>
+                <h3 class="widget-label"></h3>
+                <p class="widget-description"></p>
+              </div>
+            </div>
+            <div class="widget-reading">
+              <span class="widget-value">—</span>
+              <span class="widget-unit"></span>
+            </div>
+            <div class="widget-meta">
+              <span class="widget-state">Čekanje podataka</span>
+              <span class="widget-time">—</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </template>
+
+    <noscript>
+      <div class="noscript">Za prikaz vrijednosti potrebno je uključiti JavaScript.</div>
+    </noscript>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

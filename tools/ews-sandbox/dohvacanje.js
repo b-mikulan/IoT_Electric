@@ -1,4 +1,4 @@
-const { createEwsClient } = require("../ewsClient");
+const { createEwsClient } = require("../../middleware/ewsClient");
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 

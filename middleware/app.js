@@ -1,7 +1,7 @@
 const express = require("express");
 const swaggerUi = require("swagger-ui-express");
 const { createMiddlewareAuth } = require("./middlewareAuth");
-const { errorHandler } = require("./middleware/errorHandler");
+const { errorHandler } = require("./errorHandler");
 const { createApiRouter } = require("./routes");
 const defaultSwaggerDocument = require("./swaggerDocument");
 

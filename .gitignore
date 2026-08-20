@@ -1,7 +1,6 @@
 /node_modules
 /dist
 /output
-/xml_extracted
 *.zip
 *.log
 *.knxproj
@@ -11,4 +10,4 @@ credentials.txt
 *.key
 *.p12
 *.pfx
-!ddc kontroler/root_certificate_iotelectric.crt
+!middleware/root_certificate_iotelectric.crt

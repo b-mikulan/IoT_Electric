@@ -3,8 +3,10 @@ const soap = require("soap");
 // SAMO ZA TESTIRANJE zbog self-signed certifikata.
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-const WSDL_URL = "https://bms.iot-electric.hr/EcoStruxure/DataExchange?wsdl";
-const ENDPOINT_URL = "https://bms.iot-electric.hr/EcoStruxure/DataExchange";
+const ENDPOINT_URL =
+  process.env.EWS_URL ||
+  "https://bms.iot-electric.hr/EcoStruxure/DataExchange";
+const WSDL_URL = `${ENDPOINT_URL}?wsdl`;
 
 const USERNAME = process.env.EWS_USER;
 const PASSWORD = process.env.EWS_PASSWORD;
