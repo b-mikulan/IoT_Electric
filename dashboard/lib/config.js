@@ -107,6 +107,14 @@ function normalizeWidget(widget, index) {
     throw new Error(`Widget ${id} has an invalid precision.`);
   }
 
+  if (widget.writable !== undefined && typeof widget.writable !== "boolean") {
+    throw new Error(`Widget ${id} has an invalid writable flag.`);
+  }
+
+  if (widget.visible !== undefined && typeof widget.visible !== "boolean") {
+    throw new Error(`Widget ${id} has an invalid visible flag.`);
+  }
+
   return {
     id,
     label: String(widget.label || id),
@@ -114,6 +122,8 @@ function normalizeWidget(widget, index) {
     unit: String(widget.unit || ""),
     ...(precision === undefined ? {} : { precision }),
     ...(widget.demoValue === undefined ? {} : { demoValue: widget.demoValue }),
+    writable: widget.writable === true,
+    visible: widget.visible !== false,
   };
 }
 
@@ -152,6 +162,10 @@ function parseWidgets(rawWidgets, demoMode) {
 
 function loadConfig(env = process.env) {
   const rawWidgets = readWidgetConfiguration(env);
+  const inlineWidgets = String(env.WIDGETS_JSON || "").trim();
+  const widgetsFile = inlineWidgets
+    ? ""
+    : String(env.WIDGETS_FILE || "").trim();
   const demoMode = parseBoolean(env.DEMO_MODE, !rawWidgets);
   const widgets = parseWidgets(rawWidgets, demoMode);
   const password = readMiddlewarePassword(env);
@@ -178,6 +192,7 @@ function loadConfig(env = process.env) {
     username: String(env.MIDDLEWARE_USER || ""),
     password,
     widgets,
+    widgetsFile,
   };
 }
 

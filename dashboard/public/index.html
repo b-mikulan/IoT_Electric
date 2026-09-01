@@ -39,7 +39,67 @@
             title="Vrijeme posljednje uspješne provjere svih konfiguriranih točaka."
           >Čekam prvu uspješnu provjeru servera.</p>
         </div>
-        <div id="demo-badge" class="demo-badge" hidden>Demo podaci</div>
+        <div class="intro-actions">
+          <div id="demo-badge" class="demo-badge" hidden>Demo podaci</div>
+          <button
+            id="visibility-open"
+            class="dashboard-menu-open"
+            type="button"
+            title="Uredi prikaz dashboarda"
+            aria-label="Uredi prikaz dashboarda"
+            hidden
+          >
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+          </button>
+          <button
+            id="discovery-open"
+            class="discovery-open"
+            type="button"
+            title="Pronađi nove objekte"
+            aria-label="Pronađi nove objekte"
+            hidden
+          >
+            <span class="discovery-icon" aria-hidden="true">↻</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="control-panel" class="control-panel" aria-labelledby="control-title" hidden>
+        <details class="control-disclosure">
+          <summary class="control-summary">
+            <span>
+              <span class="eyebrow">Upravljanje</span>
+              <span id="control-title" class="control-title">Postavi vrijednost</span>
+            </span>
+            <span class="control-chevron" aria-hidden="true"></span>
+          </summary>
+
+          <div class="control-body">
+            <p class="control-description">Prikazani su samo widgeti koji u widgets.json imaju <code>"writable": true</code>.</p>
+
+            <form id="write-form" class="write-form">
+              <div class="write-field">
+                <label for="write-widget">Widget</label>
+                <select id="write-widget" class="browser-default" required>
+                  <option value="">Odaberi widget</option>
+                </select>
+              </div>
+
+              <div class="write-field">
+                <label id="write-value-label" for="write-value">Nova vrijednost</label>
+                <input id="write-value" type="text" maxlength="1000" required />
+              </div>
+
+              <button id="write-submit" class="btn waves-effect waves-light" type="submit">
+                Pošalji
+              </button>
+            </form>
+            <p class="write-warning">Promjena se šalje stvarnom kontroleru. Prije slanja provjeri odabrani widget i vrijednost.</p>
+            <p id="write-status" class="write-status" role="status" aria-live="polite"></p>
+          </div>
+        </details>
       </section>
 
       <section aria-labelledby="widgets-heading">
@@ -49,8 +109,8 @@
 
       <div id="empty-state" class="empty-state" hidden>
         <span class="empty-icon" aria-hidden="true">◇</span>
-        <h2>Nema konfiguriranih točaka</h2>
-        <p>Dodaj PLC identifikatore u dashboard/config/widgets.json i ponovno pokreni servis.</p>
+        <h2>Nema vidljivih točaka</h2>
+        <p>Uključi postojeći widget kroz izbornik prikaza ili dodaj novu PLC vrijednost u dashboard/config/widgets.json.</p>
       </div>
 
       <div id="error-banner" class="error-banner" role="alert" hidden>
@@ -58,6 +118,133 @@
         <span id="error-message">Prikazane su zadnje dostupne vrijednosti. Servis će pokušati ponovno.</span>
       </div>
     </main>
+
+    <dialog id="discovery-dialog" class="discovery-dialog" aria-labelledby="discovery-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <div>
+            <p class="eyebrow">EWS objekti</p>
+            <h2 id="discovery-title">Dodaj vrijednost na dashboard</h2>
+          </div>
+          <button
+            id="discovery-close"
+            class="dialog-close"
+            type="button"
+            aria-label="Zatvori"
+          >×</button>
+        </header>
+
+        <p class="discovery-description">
+          Upiši container ID za pregled njegove neposredne djece, zalijepi puni ID vrijednosti ili ostavi prazno za početak od root containera.
+        </p>
+
+        <form id="discovery-form" class="discovery-form">
+          <div class="discovery-field">
+            <label for="discovery-query">Container ili object ID</label>
+            <input
+              id="discovery-query"
+              type="text"
+              maxlength="1024"
+              autocomplete="off"
+              placeholder="npr. 01/ES/Test4EWS/Values"
+            />
+          </div>
+          <button id="discovery-search" class="btn waves-effect waves-light" type="submit">
+            <span class="button-spinner" aria-hidden="true">↻</span>
+            <span>Traži</span>
+          </button>
+        </form>
+
+        <p id="discovery-status" class="discovery-status" role="status" aria-live="polite">
+          Pretraga još nije pokrenuta.
+        </p>
+        <div id="discovery-results" class="discovery-results"></div>
+      </div>
+    </dialog>
+
+    <dialog id="visibility-dialog" class="discovery-dialog visibility-dialog" aria-labelledby="visibility-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <div>
+            <p class="eyebrow">Prikaz dashboarda</p>
+            <h2 id="visibility-title">Odaberi vidljive widgete</h2>
+          </div>
+          <button
+            id="visibility-close"
+            class="dialog-close"
+            type="button"
+            aria-label="Zatvori"
+          >×</button>
+        </header>
+
+        <p class="discovery-description">
+          Skriveni widget ostaje spremljen u widgets.json i može se ponovno uključiti u bilo kojem trenutku.
+        </p>
+        <div id="visibility-list" class="visibility-list"></div>
+        <p id="visibility-status" class="discovery-status" role="status" aria-live="polite"></p>
+      </div>
+    </dialog>
+
+    <dialog id="settings-dialog" class="discovery-dialog settings-dialog" aria-labelledby="settings-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <div>
+            <p class="eyebrow">Postavke widgeta</p>
+            <h2 id="settings-title">Uredi widget</h2>
+          </div>
+          <button
+            id="settings-close"
+            class="dialog-close"
+            type="button"
+            aria-label="Zatvori"
+          >×</button>
+        </header>
+
+        <form id="settings-form" class="settings-form">
+          <div class="settings-field settings-field-wide">
+            <label for="settings-id">Controller ID</label>
+            <input id="settings-id" type="text" readonly />
+            <small>ID se ne mijenja ovdje; za drugi datapoint koristi discovery.</small>
+          </div>
+
+          <div class="settings-field">
+            <label for="settings-label">Naziv</label>
+            <input id="settings-label" type="text" maxlength="160" required />
+          </div>
+
+          <div class="settings-field">
+            <label for="settings-description">Opis</label>
+            <input id="settings-description" type="text" maxlength="500" />
+          </div>
+
+          <div class="settings-field">
+            <label for="settings-unit">Jedinica</label>
+            <input id="settings-unit" type="text" maxlength="32" placeholder="npr. °C, %, kW" />
+          </div>
+
+          <div class="settings-field">
+            <label for="settings-precision">Broj decimala</label>
+            <input id="settings-precision" type="number" min="0" max="6" step="1" placeholder="Automatski" />
+          </div>
+
+          <label class="settings-check">
+            <input id="settings-writable" class="browser-default" type="checkbox" />
+            <span>Dozvoli upis vrijednosti</span>
+          </label>
+
+          <label class="settings-check">
+            <input id="settings-visible" class="browser-default" type="checkbox" />
+            <span>Prikaži na dashboardu</span>
+          </label>
+
+          <div class="settings-actions settings-field-wide">
+            <button id="settings-cancel" class="btn-flat" type="button">Odustani</button>
+            <button id="settings-save" class="btn waves-effect waves-light" type="submit">Spremi</button>
+          </div>
+        </form>
+        <p id="settings-status" class="discovery-status" role="status" aria-live="polite"></p>
+      </div>
+    </dialog>
 
     <footer class="container app-footer">
       <span>Automatsko osvježavanje bez ponovnog učitavanja stranice</span>
@@ -69,6 +256,9 @@
         <article class="card widget-card">
           <div class="widget-accent"></div>
           <div class="card-content">
+            <button class="widget-settings-button" type="button" aria-label="Uredi widget" hidden>
+              <span aria-hidden="true">⚙</span>
+            </button>
             <div class="widget-heading">
               <span class="widget-icon" aria-hidden="true"></span>
               <div>
@@ -87,6 +277,35 @@
           </div>
         </article>
       </div>
+    </template>
+
+    <template id="discovery-item-template">
+      <article class="discovery-item">
+        <div class="discovery-item-copy">
+          <div class="discovery-item-heading">
+            <span class="discovery-kind"></span>
+            <strong class="discovery-name"></strong>
+          </div>
+          <code class="discovery-id"></code>
+          <p class="discovery-item-description"></p>
+        </div>
+        <button class="discovery-action btn-small waves-effect" type="button"></button>
+      </article>
+    </template>
+
+    <template id="visibility-item-template">
+      <article class="visibility-item">
+        <div class="visibility-copy">
+          <strong class="visibility-name"></strong>
+          <code class="visibility-id"></code>
+        </div>
+        <label class="visibility-switch">
+          <input class="visibility-checkbox" type="checkbox" />
+          <span class="visibility-track" aria-hidden="true">
+            <span class="visibility-thumb"></span>
+          </span>
+        </label>
+      </article>
     </template>
 
     <noscript>

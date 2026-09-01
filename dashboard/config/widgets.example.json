@@ -4,7 +4,8 @@
     "label": "Analogna vrijednost",
     "description": "Test4EWS",
     "unit": "",
-    "precision": 1
+    "precision": 1,
+    "writable": true
   },
   {
     "id": "01/ES/Test4EWS/Values/Digital Value",

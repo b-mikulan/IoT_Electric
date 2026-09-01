@@ -32,7 +32,7 @@ services:
       WIDGETS_FILE: "${DASHBOARD_WIDGETS_FILE:-}"
       WIDGETS_JSON: "${DASHBOARD_WIDGETS_JSON:-}"
     volumes:
-      - "${DASHBOARD_CONFIG_SOURCE:-./dashboard/config}:/app/config:ro"
+      - "${DASHBOARD_CONFIG_SOURCE:-./dashboard/config}:/app/config:rw"
     depends_on:
       - middleware
     restart: unless-stopped

@@ -294,3 +294,255 @@ test("demo mode creates values in plausible ranges without fetching", async () =
   assert.equal(values.power, 6);
   assert.equal(values.other, 50);
 });
+
+test("writes only explicitly writable scalar values through middleware", async () => {
+  const requests = [];
+  const poller = new PointPoller({
+    middlewareUrl: "http://middleware",
+    username: "dashboard",
+    password: "secret",
+    widgets: [
+      { id: "setpoint", writable: true },
+      { id: "temperature", writable: false },
+    ],
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      if (url.endsWith("/api/values/write")) {
+        return jsonResponse({
+          results: [{ id: "setpoint", success: true, message: "accepted" }],
+        });
+      }
+      return jsonResponse({
+        values: [
+          { id: "setpoint", value: 20, state: "ok" },
+          { id: "temperature", value: 21, state: "ok" },
+        ],
+        errors: [],
+      });
+    },
+  });
+
+  await poller.poll();
+  const result = await poller.writeValue("setpoint", 21.5);
+
+  assert.deepEqual(result, {
+    id: "setpoint",
+    success: true,
+    message: "accepted",
+  });
+  assert.equal(requests[1].url, "http://middleware/api/values/write");
+  assert.equal(
+    requests[1].options.headers.Authorization,
+    `Basic ${Buffer.from("dashboard:secret").toString("base64")}`
+  );
+  assert.deepEqual(JSON.parse(requests[1].options.body), {
+    items: [{ id: "setpoint", value: 21.5 }],
+  });
+
+  await poller.writeValue("setpoint", "Hello World");
+  assert.deepEqual(JSON.parse(requests.at(-1).options.body), {
+    items: [{ id: "setpoint", value: "Hello World" }],
+  });
+
+  await poller.writeValue("setpoint", false);
+  assert.deepEqual(JSON.parse(requests.at(-1).options.body), {
+    items: [{ id: "setpoint", value: false }],
+  });
+
+  await assert.rejects(poller.writeValue("temperature", 22), {
+    name: "PointWriteError",
+    status: 403,
+    code: "POINT_NOT_WRITABLE",
+  });
+  await assert.rejects(poller.writeValue("setpoint", null), {
+    name: "PointWriteError",
+    status: 400,
+    code: "INVALID_VALUE",
+  });
+});
+
+test("does not write in demo mode", async () => {
+  const poller = new PointPoller({
+    demoMode: true,
+    widgets: [{ id: "demo", writable: true }],
+  });
+
+  await assert.rejects(poller.writeValue("demo", 1), {
+    name: "PointWriteError",
+    status: 409,
+    code: "DEMO_MODE",
+  });
+});
+
+test("discovers child containers and values with middleware credentials", async () => {
+  const requests = [];
+  const poller = new PointPoller({
+    middlewareUrl: "http://middleware",
+    username: "dashboard",
+    password: "secret",
+    widgets: [{ id: "building/existing" }],
+    fetchImpl: async (url, options) => {
+      requests.push({ url: String(url), options });
+      return jsonResponse({
+        containers: [
+          {
+            id: "building",
+            name: "Building",
+            containerItems: [
+              { id: "building/floor", name: "Floor", type: "Container" },
+            ],
+            valueItems: [
+              {
+                id: "building/existing",
+                name: "Existing",
+                type: "AnalogValue",
+                unit: "°C",
+                writeable: 1,
+              },
+              {
+                id: "building/power",
+                name: "Power",
+                type: "AnalogValue",
+                unit: "kW",
+                writeable: 0,
+              },
+            ],
+          },
+        ],
+        errors: [],
+      });
+    },
+  });
+
+  const result = await poller.discoverObjects("building");
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, "http://middleware/api/containers?id=building");
+  assert.equal(
+    requests[0].options.headers.Authorization,
+    `Basic ${Buffer.from("dashboard:secret").toString("base64")}`
+  );
+  assert.deepEqual(
+    result.items.map(({ id, kind }) => [id, kind]),
+    [
+      ["building/floor", "container"],
+      ["building/existing", "value"],
+      ["building/power", "value"],
+    ]
+  );
+  assert.equal(result.items[1].alreadyAdded, true);
+  assert.equal(result.items[1].controllerWritable, true);
+});
+
+test("finds a pasted value id by looking in its parent container", async () => {
+  const requests = [];
+  const poller = new PointPoller({
+    middlewareUrl: "http://middleware",
+    username: "dashboard",
+    password: "secret",
+    widgets: [{ id: "configured" }],
+    fetchImpl: async (url) => {
+      const requestUrl = String(url);
+      requests.push(requestUrl);
+      if (requestUrl.endsWith("id=building%2Ftemperature")) {
+        return jsonResponse({ error: "not a container" }, 500);
+      }
+      return jsonResponse({
+        containers: [
+          {
+            id: "building",
+            name: "Building",
+            containerItems: [],
+            valueItems: [
+              {
+                id: "building/temperature",
+                name: "Temperature",
+                unit: "°C",
+                writeable: 0,
+              },
+            ],
+          },
+        ],
+        errors: [],
+      });
+    },
+  });
+
+  const result = await poller.discoverObjects("building/temperature");
+
+  assert.equal(requests.length, 2);
+  assert.equal(result.exactMatch, true);
+  assert.equal(result.containerId, "building");
+  assert.deepEqual(result.items.map(({ id }) => id), ["building/temperature"]);
+});
+
+test("adds a discovered widget to the live poller as read-only", () => {
+  const configEvents = [];
+  const poller = new PointPoller({
+    middlewareUrl: "http://middleware",
+    username: "dashboard",
+    password: "secret",
+    widgets: [{ id: "existing" }],
+    fetchImpl: async () =>
+      jsonResponse({
+        values: [
+          { id: "existing", value: 1 },
+          { id: "new", value: 2 },
+        ],
+        errors: [],
+      }),
+  });
+  poller.on("config", (event) => configEvents.push(event));
+
+  const added = poller.addWidget({
+    id: "new",
+    label: "New",
+    unit: "kW",
+    writable: true,
+  });
+
+  assert.equal(added.writable, false);
+  assert.equal(poller.getSnapshot().widgets.at(-1).id, "new");
+  assert.equal(configEvents[0].widget.id, "new");
+  assert.throws(() => poller.addWidget({ id: "new" }), {
+    name: "PointDiscoveryError",
+    code: "WIDGET_ALREADY_EXISTS",
+  });
+});
+
+test("updates widget presentation settings without losing its current value", async () => {
+  const configEvents = [];
+  const poller = new PointPoller({
+    demoMode: true,
+    widgets: [
+      {
+        id: "temperature",
+        label: "Temperature",
+        unit: "°C",
+        precision: 1,
+      },
+    ],
+    random: () => 0.5,
+  });
+  poller.on("config", (event) => configEvents.push(event));
+  await poller.poll();
+  const previousValue = poller.getSnapshot().widgets[0].value;
+
+  const updated = poller.updateWidget("temperature", {
+    label: "Sobna temperatura",
+    description: "Ured",
+    unit: "°C",
+    precision: 2,
+    writable: true,
+    visible: false,
+  });
+  const snapshot = poller.getSnapshot().widgets[0];
+
+  assert.equal(updated.id, "temperature");
+  assert.equal(updated.label, "Sobna temperatura");
+  assert.equal(updated.writable, true);
+  assert.equal(updated.visible, false);
+  assert.equal(snapshot.value, previousValue);
+  assert.equal(snapshot.precision, 2);
+  assert.equal(configEvents[0].widget.label, "Sobna temperatura");
+});

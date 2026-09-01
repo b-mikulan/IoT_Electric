@@ -3,6 +3,7 @@ require("dotenv").config({ quiet: true });
 const { createApp } = require("./app");
 const { loadConfig } = require("./lib/config");
 const { PointPoller } = require("./lib/pointPoller");
+const { WidgetStore } = require("./lib/widgetStore");
 
 function createRuntime(env = process.env) {
   const config = loadConfig(env);
@@ -15,9 +16,10 @@ function createRuntime(env = process.env) {
     timeoutMs: config.timeoutMs,
     demoMode: config.demoMode,
   });
-  const app = createApp({ poller, config });
+  const widgetStore = new WidgetStore(config.demoMode ? "" : config.widgetsFile);
+  const app = createApp({ poller, config, widgetStore });
 
-  return { app, config, poller };
+  return { app, config, poller, widgetStore };
 }
 
 if (require.main === module) {

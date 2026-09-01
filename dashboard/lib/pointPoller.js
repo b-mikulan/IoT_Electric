@@ -3,6 +3,24 @@ const { isDeepStrictEqual } = require("node:util");
 
 const NO_VALUE_ERROR = "No value returned by middleware";
 
+class PointWriteError extends Error {
+  constructor(message, status, code) {
+    super(message);
+    this.name = "PointWriteError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+class PointDiscoveryError extends Error {
+  constructor(message, status, code) {
+    super(message);
+    this.name = "PointDiscoveryError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 function clone(value) {
   return structuredClone(value);
 }
@@ -20,6 +38,8 @@ function normalizeWidget(widget, index) {
   delete normalized.state;
   delete normalized.error;
   delete normalized.updatedAt;
+  normalized.writable = normalized.writable === true;
+  normalized.visible = normalized.visible !== false;
 
   return normalized;
 }
@@ -72,6 +92,12 @@ function pointChanged(previous, next) {
   );
 }
 
+function itemName(item) {
+  const id = String(item?.id || "").trim();
+  const fallback = id.split("/").filter(Boolean).at(-1) || id;
+  return String(item?.name || fallback || "Neimenovani objekt");
+}
+
 class PointPoller extends EventEmitter {
   #middlewareUrl;
 
@@ -96,6 +122,8 @@ class PointPoller extends EventEmitter {
   #timer = null;
 
   #pollPromise = null;
+
+  #writesInFlight = new Set();
 
   constructor({
     middlewareUrl,
@@ -207,6 +235,368 @@ class PointPoller extends EventEmitter {
 
   getSnapshot() {
     return clone(this.snapshot);
+  }
+
+  addWidget(widget) {
+    const normalized = normalizeWidget(widget, this.#widgets.length);
+    if (this.#widgets.some((item) => item.id === normalized.id)) {
+      throw new PointDiscoveryError(
+        "This object is already on the dashboard.",
+        409,
+        "WIDGET_ALREADY_EXISTS"
+      );
+    }
+
+    normalized.writable = false;
+    this.#widgets.push(normalized);
+    this.snapshot.widgets.push({
+      ...clone(normalized),
+      value: null,
+      state: null,
+      error: null,
+      updatedAt: null,
+    });
+
+    this.emit("config", { widget: clone(normalized) });
+    void this.#refreshAfterWidgetAdd();
+    return clone(normalized);
+  }
+
+  updateWidget(id, settings) {
+    const widgetId = typeof id === "string" ? id.trim() : "";
+    const index = this.#widgets.findIndex((widget) => widget.id === widgetId);
+    if (index < 0) {
+      throw new PointDiscoveryError(
+        "Widget was not found in the running dashboard.",
+        404,
+        "WIDGET_NOT_FOUND"
+      );
+    }
+
+    const normalized = normalizeWidget(
+      { ...this.#widgets[index], ...settings, id: widgetId },
+      index
+    );
+    this.#widgets[index] = normalized;
+
+    const current = this.snapshot.widgets[index] || {};
+    this.snapshot.widgets[index] = {
+      ...clone(normalized),
+      value: Object.hasOwn(current, "value") ? current.value : null,
+      state: Object.hasOwn(current, "state") ? current.state : null,
+      error: Object.hasOwn(current, "error") ? current.error : null,
+      updatedAt: Object.hasOwn(current, "updatedAt")
+        ? current.updatedAt
+        : null,
+    };
+
+    this.emit("config", { widget: clone(normalized) });
+    return clone(normalized);
+  }
+
+  async discoverObjects(query = "") {
+    if (this.#demoMode) {
+      throw new PointDiscoveryError(
+        "Object discovery is unavailable in demo mode.",
+        409,
+        "DEMO_MODE"
+      );
+    }
+
+    const containerId = typeof query === "string" ? query.trim() : "";
+    if (containerId.length > 1_024 || /[\r\n\0]/.test(containerId)) {
+      throw new PointDiscoveryError(
+        "Container or object ID is not valid.",
+        400,
+        "INVALID_DISCOVERY_QUERY"
+      );
+    }
+
+    let payload = null;
+    let initialError = null;
+    try {
+      payload = await this.#fetchContainer(containerId);
+    } catch (error) {
+      initialError = error;
+    }
+
+    const initial = payload ? this.#normalizeDiscoveryItems(payload) : [];
+    if (initial.length > 0 || !containerId) {
+      if (initialError) throw initialError;
+      return this.#discoveryResponse(containerId, initial, payload);
+    }
+
+    const slash = containerId.lastIndexOf("/");
+    const parentId = slash >= 0 ? containerId.slice(0, slash) : "";
+    if (parentId !== containerId) {
+      try {
+        const parentPayload = await this.#fetchContainer(parentId);
+        const exact = this.#normalizeDiscoveryItems(parentPayload).find(
+          (item) => item.kind === "value" && item.id === containerId
+        );
+        if (exact) {
+          return this.#discoveryResponse(parentId, [exact], parentPayload, true);
+        }
+      } catch (error) {
+        if (!initialError) initialError = error;
+      }
+    }
+
+    if (initialError) throw initialError;
+    return this.#discoveryResponse(containerId, [], payload);
+  }
+
+  async writeValue(id, value) {
+    if (this.#demoMode) {
+      throw new PointWriteError(
+        "Writing is unavailable in demo mode.",
+        409,
+        "DEMO_MODE"
+      );
+    }
+
+    const pointId = typeof id === "string" ? id.trim() : "";
+    const widget = this.#widgets.find((item) => item.id === pointId);
+    if (!widget || widget.writable !== true) {
+      throw new PointWriteError(
+        "This dashboard point is not writable.",
+        403,
+        "POINT_NOT_WRITABLE"
+      );
+    }
+
+    const valueType = typeof value;
+    const isSupportedValue =
+      valueType === "string" ||
+      valueType === "boolean" ||
+      (valueType === "number" && Number.isFinite(value));
+    if (!isSupportedValue) {
+      throw new PointWriteError(
+        "Value must be a string, finite number, or boolean.",
+        400,
+        "INVALID_VALUE"
+      );
+    }
+
+    const current = this.snapshot.widgets.find((item) => item.id === pointId);
+    if (this.snapshot.status !== "connected" || !current || current.error) {
+      throw new PointWriteError(
+        "The point is not currently available for writing.",
+        409,
+        "POINT_UNAVAILABLE"
+      );
+    }
+
+    if (this.#writesInFlight.has(pointId)) {
+      throw new PointWriteError(
+        "A write for this point is already in progress.",
+        409,
+        "WRITE_IN_PROGRESS"
+      );
+    }
+
+    this.#writesInFlight.add(pointId);
+    const authorization = Buffer.from(
+      `${this.#username}:${this.#password}`,
+      "utf8"
+    ).toString("base64");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
+
+    try {
+      const response = await this.#fetch(
+        `${this.#middlewareUrl}/api/values/write`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Basic ${authorization}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ items: [{ id: pointId, value }] }),
+          signal: controller.signal,
+        }
+      );
+
+      if (!response || !response.ok) {
+        const status = response?.status ? ` (${response.status})` : "";
+        throw new PointWriteError(
+          `Middleware rejected the write request${status}.`,
+          502,
+          "MIDDLEWARE_WRITE_FAILED"
+        );
+      }
+
+      const payload = await response.json();
+      const result = Array.isArray(payload?.results)
+        ? payload.results.find((item) => item?.id === pointId)
+        : null;
+
+      if (!result) {
+        throw new PointWriteError(
+          "Middleware did not return a result for this point.",
+          502,
+          "MISSING_WRITE_RESULT"
+        );
+      }
+
+      if (result.success !== true) {
+        throw new PointWriteError(
+          String(result.message || "The controller rejected the value."),
+          422,
+          "CONTROLLER_REJECTED"
+        );
+      }
+
+      const refresh = setImmediate(() => void this.poll());
+      refresh.unref?.();
+
+      return {
+        id: pointId,
+        success: true,
+        message: String(result.message || ""),
+      };
+    } catch (error) {
+      if (error instanceof PointWriteError) throw error;
+
+      if (controller.signal.aborted) {
+        throw new PointWriteError(
+          "Middleware write timed out. Check the current value before trying again.",
+          504,
+          "WRITE_TIMEOUT"
+        );
+      }
+
+      throw new PointWriteError(
+        "Middleware write failed. Check the current value before trying again.",
+        502,
+        "MIDDLEWARE_WRITE_FAILED"
+      );
+    } finally {
+      clearTimeout(timeout);
+      this.#writesInFlight.delete(pointId);
+    }
+  }
+
+  async #refreshAfterWidgetAdd() {
+    if (this.#pollPromise) await this.#pollPromise;
+    await this.poll();
+  }
+
+  #discoveryResponse(containerId, items, payload, exactMatch = false) {
+    const limit = 500;
+    return {
+      containerId,
+      exactMatch,
+      items: items.slice(0, limit),
+      truncated: items.length > limit,
+      errors: Array.isArray(payload?.errors)
+        ? payload.errors.map((item) => ({
+            id: String(item?.id || ""),
+            message: String(item?.message || "Unknown discovery error"),
+          }))
+        : [],
+    };
+  }
+
+  #normalizeDiscoveryItems(payload) {
+    const configured = new Set(this.#widgets.map((widget) => widget.id));
+    const results = new Map();
+    const containers = Array.isArray(payload?.containers)
+      ? payload.containers
+      : [];
+
+    for (const container of containers) {
+      const context = String(container?.name || container?.id || "PLC objekt");
+      const childContainers = Array.isArray(container?.containerItems)
+        ? container.containerItems
+        : [];
+      const valueItems = Array.isArray(container?.valueItems)
+        ? container.valueItems
+        : [];
+
+      for (const item of childContainers) {
+        const id = String(item?.id || "").trim();
+        if (!id) continue;
+        results.set(id, {
+          id,
+          kind: "container",
+          name: itemName(item),
+          description: String(item?.description || context),
+          type: String(item?.type || "Container"),
+          unit: "",
+          controllerWritable: false,
+          alreadyAdded: configured.has(id),
+        });
+      }
+
+      for (const item of valueItems) {
+        const id = String(item?.id || "").trim();
+        if (!id) continue;
+        results.set(id, {
+          id,
+          kind: "value",
+          name: itemName(item),
+          description: String(item?.description || context),
+          type: String(item?.type || "ValueItem"),
+          unit: String(item?.unit || ""),
+          controllerWritable: Number(item?.writeable) === 1,
+          alreadyAdded: configured.has(id),
+        });
+      }
+    }
+
+    return [...results.values()].sort((left, right) => {
+      if (left.kind !== right.kind) return left.kind === "container" ? -1 : 1;
+      return left.name.localeCompare(right.name, "hr");
+    });
+  }
+
+  async #fetchContainer(containerId) {
+    const authorization = Buffer.from(
+      `${this.#username}:${this.#password}`,
+      "utf8"
+    ).toString("base64");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
+
+    try {
+      const url = new URL(`${this.#middlewareUrl}/api/containers`);
+      url.searchParams.set("id", containerId);
+      const response = await this.#fetch(url, {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Basic ${authorization}`,
+        },
+        signal: controller.signal,
+      });
+
+      if (!response || !response.ok) {
+        throw new PointDiscoveryError(
+          `Middleware rejected the discovery request${response?.status ? ` (${response.status})` : ""}.`,
+          502,
+          "MIDDLEWARE_DISCOVERY_FAILED"
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof PointDiscoveryError) throw error;
+      if (controller.signal.aborted) {
+        throw new PointDiscoveryError(
+          "Object discovery timed out.",
+          504,
+          "DISCOVERY_TIMEOUT"
+        );
+      }
+      throw new PointDiscoveryError(
+        "Object discovery through middleware failed.",
+        502,
+        "MIDDLEWARE_DISCOVERY_FAILED"
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   async #performPoll() {
@@ -385,4 +775,6 @@ class PointPoller extends EventEmitter {
 
 module.exports = {
   PointPoller,
+  PointDiscoveryError,
+  PointWriteError,
 };
