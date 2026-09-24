@@ -1,7 +1,11 @@
 function errorHandler(error, req, res, next) {
   console.error(error);
 
-  res.status(error.status || 500).json({
+  // EWS can return a SOAP fault with HTTP 200; REST clients must see a failure.
+  const status = Number.isInteger(error.status) && error.status >= 400 && error.status <= 599
+    ? error.status
+    : error.soapFault ? 502 : 500;
+  res.status(status).json({
     error: error.message,
     soapFault: error.soapFault || null,
 

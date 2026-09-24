@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("node:path");
+const { TelemetryClient } = require("./lib/telemetry");
 
 const publicDirectory = path.join(__dirname, "public");
 const materializeDirectory = path.dirname(
@@ -78,7 +79,7 @@ function parseWidgetSettings(body) {
   };
 }
 
-function createApp({ poller, config, widgetStore = null }) {
+function createApp({ poller, config, widgetStore = null, telemetry = new TelemetryClient(config) }) {
   if (!poller) throw new Error("A point poller is required.");
   if (!config) throw new Error("Dashboard configuration is required.");
 
@@ -141,6 +142,23 @@ function createApp({ poller, config, widgetStore = null }) {
 
   app.get("/api/snapshot", (request, response) => {
     response.json(poller.getSnapshot());
+  });
+
+  for (const kind of ["history", "alarms"]) {
+    app.post(`/api/${kind}/query`, requireJson, express.json({ limit: "16kb" }), async (request, response) => {
+      try {
+        return response.json(await telemetry.query(kind, request.body || {}));
+      } catch (error) {
+        return sendOperationError(response, error, "TELEMETRY_FAILED", "Dohvat podataka nije uspio.");
+      }
+    });
+  }
+  app.post("/api/history/browse", requireJson, express.json({ limit: "8kb" }), async (request, response) => {
+    try {
+      return response.json(await telemetry.browse(request.body?.containerId ?? ""));
+    } catch (error) {
+      return sendOperationError(response, error, "TELEMETRY_FAILED", "Dohvat trendova nije uspio.");
+    }
   });
 
   app.post(
@@ -384,6 +402,14 @@ function createApp({ poller, config, widgetStore = null }) {
       maxAge: "7d",
     })
   );
+  const vendorFiles = {
+    "/vendor/datatables.js": require.resolve("datatables.net/js/dataTables.min.js"),
+    "/vendor/datatables.css": require.resolve("datatables.net-dt/css/dataTables.dataTables.min.css"),
+    "/vendor/chart.js": path.join(path.dirname(require.resolve("chart.js")), "chart.umd.min.js"),
+  };
+  for (const [url, file] of Object.entries(vendorFiles)) {
+    app.get(url, (request, response) => response.sendFile(file));
+  }
   app.use(express.static(publicDirectory));
 
   app.use((error, request, response, next) => {

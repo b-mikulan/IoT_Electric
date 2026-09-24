@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="hr" theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trendovi i alarmi · IoT Electric</title>
+    <link rel="stylesheet" href="/vendor/materialize/materialize.min.css" />
+    <link rel="stylesheet" href="/vendor/datatables.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/trends.css" />
+    <script src="/vendor/datatables.js" defer></script>
+    <script src="/vendor/chart.js" defer></script>
+    <script src="/trends.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header"><div class="container header-content">
+      <span class="brand-name">IoT Electric</span><a class="telemetry-back" href="/">← Vrijednosti uživo</a>
+    </div></header>
+    <main class="container dashboard-shell telemetry-shell">
+      <div class="intro"><div><p class="eyebrow">Pregled podataka</p><h1>Trendovi i alarmi</h1></div>
+        <span id="telemetry-mode" role="status">Provjeravam izvor…</span>
+      </div>
+      <section class="telemetry-panel" aria-labelledby="history-title">
+        <h2 id="history-title">Povijesne vrijednosti</h2>
+        <details>
+          <summary>Pronađi trend kroz mape kontrolera</summary>
+          <form id="browse-form" class="telemetry-form">
+            <div class="telemetry-field"><label for="container-id">ID mape (prazno za početnu mapu)</label><input id="container-id" maxlength="4096" /></div>
+            <button class="btn" type="submit">Otvori mapu</button>
+            <button class="btn-flat" id="browse-root" type="button">Početna mapa</button>
+          </form>
+          <p id="browse-status" role="status"></p><ul id="browse-items" class="browse-items"></ul>
+        </details>
+        <form id="history-form" class="telemetry-form">
+          <div class="telemetry-field telemetry-wide"><label for="history-id">ID trenda</label><input id="history-id" required maxlength="4096" placeholder="Odaberi trend iz mape ili zalijepi njegov ID" /></div>
+          <div class="telemetry-field"><label for="time-from">Od</label><input id="time-from" type="datetime-local" required /></div>
+          <div class="telemetry-field"><label for="time-to">Do</label><input id="time-to" type="datetime-local" required /></div>
+          <button class="btn" type="submit">Dohvati trend</button>
+        </form>
+        <p id="timezone-note" class="telemetry-note"></p>
+        <p id="history-status" role="status">Odaberi trend i razdoblje za dohvat.</p>
+        <div id="chart-wrap" class="chart-wrap" hidden><canvas id="history-chart" role="img" aria-label="Graf povijesnih vrijednosti; isti podaci dostupni su u tablici ispod."></canvas></div>
+        <p id="chart-note" class="telemetry-note"></p>
+        <div class="telemetry-table"><table id="history-table" class="display"><thead><tr><th>Vrijeme</th><th>Vrijednost</th><th>Stanje (EWS)</th></tr></thead><tbody></tbody></table></div>
+        <button id="history-more" class="btn" type="button" hidden>Učitaj još vrijednosti</button>
+      </section>
+      <section class="telemetry-panel" aria-labelledby="alarms-title">
+        <div class="telemetry-heading"><h2 id="alarms-title">Lista alarma</h2><button id="alarms-refresh" class="btn" type="button">Dohvati alarme</button></div>
+        <p id="alarms-status" role="status">Pokreni dohvat za pregled liste alarma.</p>
+        <div class="telemetry-table"><table id="alarms-table" class="display"><thead><tr><th>Zadnja promjena</th><th>Nastanak</th><th>Izvor</th><th>Poruka</th><th>Prioritet</th><th>Stanje (EWS)</th><th>Tip</th><th>ID alarma</th><th>ID izvora</th></tr></thead><tbody></tbody></table></div>
+        <button id="alarms-more" class="btn" type="button" hidden>Učitaj još alarma</button>
+      </section>
+      <noscript>Za pregled trendova i alarma uključi JavaScript.</noscript>
+    </main>
+  </body>
+</html>

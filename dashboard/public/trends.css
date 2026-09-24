@@ -1,0 +1,27 @@
+.telemetry-shell { max-width: 1400px; }
+.telemetry-back { color: white; }
+.telemetry-panel { background: white; padding: 24px; margin-bottom: 24px; border: 1px solid var(--border); border-radius: 12px; }
+.telemetry-panel h2 { font-size: 1.5rem; margin: 0 0 20px; }
+.telemetry-panel details { padding-bottom: 20px; }
+.telemetry-panel summary { cursor: pointer; color: var(--brand-dark); }
+.telemetry-form { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-top: 18px; }
+.telemetry-field { flex: 1 1 200px; min-width: 0; }
+.telemetry-wide { flex-basis: 100%; }
+.telemetry-field label { display: block; color: var(--ink); }
+.telemetry-field input { width: 100%; min-height: 42px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: white; color: var(--ink); margin-bottom: 0 !important; font: inherit; }
+.telemetry-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.telemetry-note { color: var(--muted); font-size: .9rem; }
+.telemetry-table { overflow-x: auto; margin: 20px 0; }
+.telemetry-table table { width: 100% !important; }
+.telemetry-table td { overflow-wrap: anywhere; min-width: 90px; }
+#alarms-table { min-width: 1400px; }
+#alarms-table td { vertical-align: top; }
+#alarms-table th:nth-child(4) { min-width: 220px; }
+#alarms-table th:nth-child(8), #alarms-table th:nth-child(9) { min-width: 200px; }
+.telemetry-table select { display: inline-block; width: auto; }
+.telemetry-table input { width: auto !important; height: 2rem !important; }
+.chart-wrap { height: 320px; position: relative; }
+.browse-items { display: grid; gap: 8px; max-height: 320px; overflow-y: auto; }
+.browse-items button { text-align: left; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--canvas); color: var(--ink); cursor: pointer; width: 100%; overflow-wrap: anywhere; }
+.telemetry-error { color: var(--error); }
+@media (max-width: 600px) { .telemetry-panel { padding: 16px; } .telemetry-shell .intro { align-items: flex-start; flex-direction: column; } }

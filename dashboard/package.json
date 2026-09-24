@@ -14,6 +14,8 @@
   },
   "dependencies": {
     "@materializecss/materialize": "^2.3.3",
+    "chart.js": "^4.5.1",
+    "datatables.net-dt": "^3.1.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1"
   }

@@ -11,3 +11,6 @@ credentials.txt
 *.p12
 *.pfx
 !middleware/root_certificate_iotelectric.crt
+
+# Local project and release guide
+/UPUTE.html

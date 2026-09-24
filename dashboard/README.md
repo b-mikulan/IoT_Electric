@@ -12,6 +12,29 @@ npm start
 
 Open `http://localhost:3001`. Demo mode is enabled by default and is visibly marked in the interface.
 
+## Trends and alarms
+
+Open **Trendovi i alarmi** on the dashboard (or `/trends.html`). The page uses locally served [DataTables](https://datatables.net/) for searchable, sortable, paginated tables and [Chart.js](https://www.chartjs.org/) for a history line chart. No CDN access is required in the browser.
+
+Use **Pronađi trend kroz mape kontrolera** to browse from the root or paste a known container ID. Select a history item, choose **Od** and **Do**, then click **Dohvati trend**. A trend has its own EWS history ID; the live value/widget ID is not interchangeable with it. Dates use the browser's local time zone and are sent to EWS in UTC. The graph uses elapsed time on its horizontal axis and displays numeric values; the table retains all records and EWS state codes.
+
+Click **Dohvati alarme** to retrieve the controller's alarm event list. The table includes transition/occurrence timestamps, source, message, priority, raw EWS state, type and identifiers. This view reads alarms only; it does not acknowledge them.
+
+Both views expose **Učitaj još** when EWS returns `MoreDataAvailable`. Each click fetches one additional controller page with `MoreDataRef` and the original query. DataTables pagination/search/sort operate on the rows already fetched. The status explicitly distinguishes partial data from a completed query. A new query clears the previous result; a failed continuation retains the successfully fetched rows and allows retrying. A repeated continuation token stops loading and asks for a new query. History and alarm queries run on demand, independently of live widget polling.
+
+The backend calls the existing middleware `/api/history/query`, `/api/alarms/query`, and `/api/containers` endpoints with the configured middleware credentials; credentials remain on the server. Demo mode supplies clearly labelled synthetic history and one demo alarm without contacting EWS.
+
+### Live verification, 22 September 2026
+
+Read-only checks against the configured EWS controller succeeded through the dashboard and authenticated middleware:
+
+- Container `00/ES/Test4EWS/Trend Logs` exposed two history items: **Multistate Value Interval Trend Log** and **Multistate Value Change of Value Trend Log** (IDs start with `03/ES/Test4EWS/Trend Logs/`).
+- Each trend returned **1,441 records over two controller pages** for `2026-09-21T00:00:00Z` through `2026-09-22T00:00:00Z`, with a completed continuation sequence.
+- The alarm event query returned **4 alarms**, with no further page.
+- Browser verification confirmed history discovery, the real history chart/table, **Učitaj još**, and the real alarm table. These counts describe that check; they are not fixed expected production values.
+
+When running the middleware directly on Windows, use the project CA just as the Docker image does: set `NODE_EXTRA_CA_CERTS` to the absolute path of `middleware/root_certificate_iotelectric.crt` before starting Node. TLS verification remains enabled.
+
 ## Connect real PLC points with Docker Compose
 
 Widget definitions live in `dashboard/config/widgets.json`, not in the root `.env`. Create the local file once:

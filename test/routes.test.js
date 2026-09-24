@@ -81,6 +81,17 @@ test("serves the existing API routes after modularization", async (t) => {
   });
 });
 
+test("returns a REST error when an EWS history SOAP fault has HTTP status 200", async (t) => {
+  const baseUrl = await startTestApp(t, createFakeEws({
+    async getHistory() {
+      throw Object.assign(new Error("Invalid ID"), { status: 200, soapFault: { reason: "Invalid ID" } });
+    },
+  }));
+  const response = await postJson(baseUrl, "/api/history/query", { historyItemId: "03/missing" });
+  assert.equal(response.status, 502);
+  assert.equal((await response.json()).soapFault.reason, "Invalid ID");
+});
+
 test("preserves validation and subscription creation status", async (t) => {
   const baseUrl = await startTestApp(t);
 

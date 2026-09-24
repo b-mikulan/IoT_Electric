@@ -13,6 +13,7 @@ scripts
 test
 .github
 README.md
+UPUTE.html
 docker-compose*.yml
 output
 *.crt
