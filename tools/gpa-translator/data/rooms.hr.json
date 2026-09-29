@@ -1,0 +1,265 @@
+{
+  "schema_version": 1,
+  "source_language": "en-GB",
+  "target_language": "hr",
+  "scope": "Room and location names, including building levels and functional groups.",
+  "translation_status": "Observed reference-project translations plus editable proposed vocabulary.",
+  "notes": [
+    "Keys are English base names; hr is the Croatian display name.",
+    "Dictionary entries contain base names without numeric suffixes. Numbers are handled separately by name-processing logic.",
+    "Outside -> Zgrada is specific to the reference project, not a general literal translation; review in other projects.",
+    "Corridor -> Degažman and Loggia -> Loggia preserve the reference-project terminology.",
+    "Room names do not necessarily give the desired short suffix for every function name (e.g. Dječja soba versus dječja).",
+    "Do not derive a room name solely from its icon; project locations can have generic or repurposed icons."
+  ],
+  "translations": {
+    "Apartment": {
+      "hr": "Stan",
+      "source": "reference_project_pair"
+    },
+    "Outside": {
+      "hr": "Zgrada",
+      "source": "reference_project_pair"
+    },
+    "Entrance": {
+      "hr": "Ulaz",
+      "source": "reference_project_pair"
+    },
+    "Living room": {
+      "hr": "Boravak",
+      "source": "reference_project_pair"
+    },
+    "Kitchen": {
+      "hr": "Kuhinja",
+      "source": "reference_project_pair"
+    },
+    "WC": {
+      "hr": "WC",
+      "source": "reference_project_pair"
+    },
+    "Bedroom": {
+      "hr": "Spavaća",
+      "source": "reference_project_pair"
+    },
+    "Bathroom": {
+      "hr": "Kupaonica",
+      "source": "reference_project_pair"
+    },
+    "Loggia": {
+      "hr": "Loggia",
+      "source": "reference_project_pair"
+    },
+    "Corridor": {
+      "hr": "Degažman",
+      "source": "reference_project_pair"
+    },
+    "Child's room": {
+      "hr": "Dječja soba",
+      "source": "reference_project_pair"
+    },
+    "Common": {
+      "hr": "Opći",
+      "source": "reference_project_pair"
+    },
+    "Permissions": {
+      "hr": "Dopuštenja",
+      "source": "reference_project_pair"
+    },
+    "KO": {
+      "hr": "KO",
+      "source": "reference_project_pair"
+    },
+    "RO": {
+      "hr": "RO",
+      "source": "reference_project_pair"
+    },
+    "Recuperator": {
+      "hr": "Rekuperator",
+      "source": "reference_project_pair"
+    },
+    "Children's room": {
+      "hr": "Dječja soba",
+      "source": "proposed_vocabulary"
+    },
+    "Dining room": {
+      "hr": "Blagovaonica",
+      "source": "proposed_vocabulary"
+    },
+    "Hall": {
+      "hr": "Hodnik",
+      "source": "proposed_vocabulary"
+    },
+    "Hallway": {
+      "hr": "Hodnik",
+      "source": "proposed_vocabulary"
+    },
+    "Playroom": {
+      "hr": "Igraonica",
+      "source": "proposed_vocabulary"
+    },
+    "Wine cellar": {
+      "hr": "Vinski podrum",
+      "source": "proposed_vocabulary"
+    },
+    "Library": {
+      "hr": "Knjižnica",
+      "source": "proposed_vocabulary"
+    },
+    "Balcony": {
+      "hr": "Balkon",
+      "source": "proposed_vocabulary"
+    },
+    "Home office": {
+      "hr": "Radna soba",
+      "source": "proposed_vocabulary"
+    },
+    "Study": {
+      "hr": "Radna soba",
+      "source": "proposed_vocabulary"
+    },
+    "Office": {
+      "hr": "Ured",
+      "source": "proposed_vocabulary"
+    },
+    "Hotel": {
+      "hr": "Hotel",
+      "source": "proposed_vocabulary"
+    },
+    "Exercise room": {
+      "hr": "Vježbaonica",
+      "source": "proposed_vocabulary"
+    },
+    "Workshop": {
+      "hr": "Radionica",
+      "source": "proposed_vocabulary"
+    },
+    "Garage": {
+      "hr": "Garaža",
+      "source": "proposed_vocabulary"
+    },
+    "Garden": {
+      "hr": "Vrt",
+      "source": "proposed_vocabulary"
+    },
+    "Swimming pool": {
+      "hr": "Bazen",
+      "source": "proposed_vocabulary"
+    },
+    "Sauna": {
+      "hr": "Sauna",
+      "source": "proposed_vocabulary"
+    },
+    "Stairway": {
+      "hr": "Stubište",
+      "source": "proposed_vocabulary"
+    },
+    "Billiard room": {
+      "hr": "Biljarska soba",
+      "source": "proposed_vocabulary"
+    },
+    "Laundry": {
+      "hr": "Praonica",
+      "source": "proposed_vocabulary"
+    },
+    "Wardrobe": {
+      "hr": "Garderoba",
+      "source": "proposed_vocabulary"
+    },
+    "Conference room": {
+      "hr": "Konferencijska soba",
+      "source": "proposed_vocabulary"
+    },
+    "House": {
+      "hr": "Kuća",
+      "source": "proposed_vocabulary"
+    },
+    "Building": {
+      "hr": "Zgrada",
+      "source": "proposed_vocabulary"
+    },
+    "Office building": {
+      "hr": "Poslovna zgrada",
+      "source": "proposed_vocabulary"
+    },
+    "Outdoor area": {
+      "hr": "Vanjski prostor",
+      "source": "proposed_vocabulary"
+    },
+    "Building part": {
+      "hr": "Dio zgrade",
+      "source": "proposed_vocabulary"
+    },
+    "Control cabinet": {
+      "hr": "Razvodni ormar",
+      "source": "proposed_vocabulary"
+    },
+    "Basement": {
+      "hr": "Podrum",
+      "source": "proposed_vocabulary"
+    },
+    "Cellar": {
+      "hr": "Podrum",
+      "source": "proposed_vocabulary"
+    },
+    "Ground floor": {
+      "hr": "Prizemlje",
+      "source": "proposed_vocabulary"
+    },
+    "Floor": {
+      "hr": "Kat",
+      "source": "proposed_vocabulary"
+    },
+    "Attic": {
+      "hr": "Potkrovlje",
+      "source": "proposed_vocabulary"
+    },
+    "Room": {
+      "hr": "Prostorija",
+      "source": "proposed_vocabulary"
+    },
+    "Break room": {
+      "hr": "Prostorija za odmor",
+      "source": "proposed_vocabulary"
+    },
+    "Kitchenette": {
+      "hr": "Čajna kuhinja",
+      "source": "proposed_vocabulary"
+    },
+    "Reception": {
+      "hr": "Recepcija",
+      "source": "proposed_vocabulary"
+    },
+    "Canteen": {
+      "hr": "Kantina",
+      "source": "proposed_vocabulary"
+    },
+    "Entry": {
+      "hr": "Ulaz",
+      "source": "proposed_vocabulary"
+    },
+    "Patio": {
+      "hr": "Terasa",
+      "source": "proposed_vocabulary"
+    },
+    "Terrace": {
+      "hr": "Terasa",
+      "source": "proposed_vocabulary"
+    },
+    "Winter garden": {
+      "hr": "Zimski vrt",
+      "source": "proposed_vocabulary"
+    },
+    "Storage room": {
+      "hr": "Spremište",
+      "source": "proposed_vocabulary"
+    },
+    "Utility room": {
+      "hr": "Tehnička prostorija",
+      "source": "proposed_vocabulary"
+    },
+    "Guest room": {
+      "hr": "Gostinjska soba",
+      "source": "proposed_vocabulary"
+    }
+  }
+}

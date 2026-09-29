@@ -1,0 +1,698 @@
+{
+  "schema_version": 1,
+  "source_language": "en-GB",
+  "target_language": "hr",
+  "source": "reference_project_pair",
+  "scope": "Existing Visu OnAction, OffAction, OnText and OffText string parameters, grouped by function type and icon.",
+  "notes": [
+    "Mappings were extracted by matching stable channel-view IDs in the reference pair; project IDs and names are not stored.",
+    "Keys are exact original parameter texts. Unknown text is preserved until reviewed.",
+    "Unchanged observations are counted separately and are not translation suggestions.",
+    "More than one candidate means the reference is inconsistent; the field is not automatically selected.",
+    "Lighting OffAction had two untranslated observations. Power-supply OnText had both Uključeno and Isključeno; review this ambiguity.",
+    "Only parameters that exist in the loaded project are edited. XML attributes, including defaultValue and label, are not translated."
+  ],
+  "types": {
+    "de.gira.schema.functions.BinaryStatus": {
+      "label_hr": "Binarni status",
+      "fields": {
+        "OffText": {
+          "label_hr": "Tekst statusa — isključeno"
+        },
+        "OnText": {
+          "label_hr": "Tekst statusa — uključeno"
+        }
+      },
+      "icons": {
+        "269": {
+          "fields": {
+            "OffText": {
+              "Absence": {
+                "candidates": [
+                  {
+                    "text": "Odsutnost",
+                    "count": 5
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "Presence": {
+                "candidates": [
+                  {
+                    "text": "Prisutnost",
+                    "count": 5
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "287": {
+          "fields": {
+            "OffText": {
+              "Inactive": {
+                "candidates": [
+                  {
+                    "text": "Neaktivan",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "Active": {
+                "candidates": [
+                  {
+                    "text": "Aktivan",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "346": {
+          "fields": {
+            "OffText": {
+              "Inactive": {
+                "candidates": [
+                  {
+                    "text": "Neaktivan",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "Active": {
+                "candidates": [
+                  {
+                    "text": "Aktivan",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "5": {
+          "fields": {
+            "OffText": {
+              "Closed": {
+                "candidates": [
+                  {
+                    "text": "Vrata zatvorena",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "Opened": {
+                "candidates": [
+                  {
+                    "text": "Vrata otvorena",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "92": {
+          "fields": {
+            "OffText": {
+              "Off": {
+                "candidates": [
+                  {
+                    "text": "Neaktivno",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "On": {
+                "candidates": [
+                  {
+                    "text": "Aktivno",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "de.gira.schema.functions.KNX.Light": {
+      "label_hr": "Rasvjeta KNX",
+      "fields": {
+        "OffText": {
+          "label_hr": "Tekst statusa — isključeno"
+        },
+        "OnText": {
+          "label_hr": "Tekst statusa — uključeno"
+        }
+      },
+      "icons": {
+        "1": {
+          "fields": {
+            "OffText": {
+              "Off": {
+                "candidates": [
+                  {
+                    "text": "Ugašeno",
+                    "count": 8
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "On": {
+                "candidates": [
+                  {
+                    "text": "Upaljeno",
+                    "count": 8
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "de.gira.schema.functions.Switch": {
+      "label_hr": "Prekidač",
+      "fields": {
+        "OffAction": {
+          "label_hr": "Tekst radnje — isključeno"
+        },
+        "OffText": {
+          "label_hr": "Tekst statusa — isključeno"
+        },
+        "OnAction": {
+          "label_hr": "Tekst radnje — uključeno"
+        },
+        "OnText": {
+          "label_hr": "Tekst statusa — uključeno"
+        }
+      },
+      "icons": {
+        "1": {
+          "fields": {
+            "OffAction": {
+              "Turn off": {
+                "candidates": [
+                  {
+                    "text": "Ugasi",
+                    "count": 12
+                  }
+                ],
+                "unchanged_count": 2
+              }
+            },
+            "OffText": {
+              "Off": {
+                "candidates": [
+                  {
+                    "text": "Ugašeno",
+                    "count": 14
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnAction": {
+              "Turn on": {
+                "candidates": [
+                  {
+                    "text": "Upali",
+                    "count": 14
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "On": {
+                "candidates": [
+                  {
+                    "text": "Upaljeno",
+                    "count": 14
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "118": {
+          "fields": {
+            "OffAction": {
+              "Deactivate": {
+                "candidates": [
+                  {
+                    "text": "Deaktiviraj",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OffText": {
+              "Inactive": {
+                "candidates": [
+                  {
+                    "text": "Neaktivan",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnAction": {
+              "Activate": {
+                "candidates": [
+                  {
+                    "text": "Aktiviraj",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "Active": {
+                "candidates": [
+                  {
+                    "text": "Aktivan",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "120": {
+          "fields": {
+            "OffAction": {
+              "Deactivate": {
+                "candidates": [
+                  {
+                    "text": "Deaktiviraj",
+                    "count": 3
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OffText": {
+              "Inactive": {
+                "candidates": [
+                  {
+                    "text": "Neaktivan",
+                    "count": 3
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnAction": {
+              "Activate": {
+                "candidates": [
+                  {
+                    "text": "Aktiviraj",
+                    "count": 3
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "Active": {
+                "candidates": [
+                  {
+                    "text": "Aktivan",
+                    "count": 3
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "129": {
+          "fields": {
+            "OffAction": {
+              "Deactivate": {
+                "candidates": [
+                  {
+                    "text": "Deaktiviraj",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OffText": {
+              "Inactive": {
+                "candidates": [
+                  {
+                    "text": "Neaktivan",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnAction": {
+              "Activate": {
+                "candidates": [
+                  {
+                    "text": "Aktiviraj",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "Active": {
+                "candidates": [
+                  {
+                    "text": "Aktivan",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "131": {
+          "fields": {
+            "OffAction": {
+              "Deactivate": {
+                "candidates": [
+                  {
+                    "text": "Deaktiviraj",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OffText": {
+              "Inactive": {
+                "candidates": [
+                  {
+                    "text": "Neaktivan",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnAction": {
+              "Activate": {
+                "candidates": [
+                  {
+                    "text": "Aktiviraj",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "Active": {
+                "candidates": [
+                  {
+                    "text": "Aktivan",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "164": {
+          "fields": {
+            "OffAction": {
+              "Turn off": {
+                "candidates": [
+                  {
+                    "text": "Isključi",
+                    "count": 8
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OffText": {
+              "Off": {
+                "candidates": [
+                  {
+                    "text": "Isključeno",
+                    "count": 8
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnAction": {
+              "Turn on": {
+                "candidates": [
+                  {
+                    "text": "Uključi",
+                    "count": 8
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "On": {
+                "candidates": [
+                  {
+                    "text": "Uključeno",
+                    "count": 8
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "277": {
+          "fields": {
+            "OffAction": {
+              "Turn off": {
+                "candidates": [
+                  {
+                    "text": "Uskrati",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OffText": {
+              "Off": {
+                "candidates": [
+                  {
+                    "text": "Uskraćen",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnAction": {
+              "Turn on": {
+                "candidates": [
+                  {
+                    "text": "Dopusti",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "On": {
+                "candidates": [
+                  {
+                    "text": "Dopušten",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "3": {
+          "fields": {
+            "OffAction": {
+              "Turn off": {
+                "candidates": [
+                  {
+                    "text": "Isključi",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OffText": {
+              "Off": {
+                "candidates": [
+                  {
+                    "text": "Isključeno",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnAction": {
+              "Turn on": {
+                "candidates": [
+                  {
+                    "text": "Uključi",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "On": {
+                "candidates": [
+                  {
+                    "text": "Uključeno",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "324": {
+          "fields": {
+            "OffAction": {
+              "Turn off": {
+                "candidates": [
+                  {
+                    "text": "Uskrati",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OffText": {
+              "Off": {
+                "candidates": [
+                  {
+                    "text": "Uskraćen",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnAction": {
+              "Turn on": {
+                "candidates": [
+                  {
+                    "text": "Dopusti",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "On": {
+                "candidates": [
+                  {
+                    "text": "Dopušten",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "96": {
+          "fields": {
+            "OffAction": {
+              "Turn off": {
+                "candidates": [
+                  {
+                    "text": "Deaktiviraj",
+                    "count": 7
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OffText": {
+              "Off": {
+                "candidates": [
+                  {
+                    "text": "Neaktivan",
+                    "count": 7
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnAction": {
+              "Turn on": {
+                "candidates": [
+                  {
+                    "text": "Aktiviraj",
+                    "count": 7
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            },
+            "OnText": {
+              "On": {
+                "candidates": [
+                  {
+                    "text": "Aktivan",
+                    "count": 7
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

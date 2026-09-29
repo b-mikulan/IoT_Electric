@@ -1,0 +1,1837 @@
+{
+  "schema_version": 1,
+  "gpa_version": "6.0.0.9058",
+  "source_language": "en-GB",
+  "target_language": "hr",
+  "source": "Installed GPA: Kingfisher.Resources.dll / Icons.IconNames, with en-GB resource overrides",
+  "translation_status": "Project translations; not official Gira Croatian localization",
+  "icons": {
+    "1": {
+      "en": "Lighting",
+      "hr": "Rasvjeta"
+    },
+    "2": {
+      "en": "Sun",
+      "hr": "Sunce"
+    },
+    "3": {
+      "en": "Night",
+      "hr": "Noć"
+    },
+    "4": {
+      "en": "Favourites",
+      "hr": "Favoriti"
+    },
+    "5": {
+      "en": "Door",
+      "hr": "Vrata"
+    },
+    "6": {
+      "en": "Window",
+      "hr": "Prozor"
+    },
+    "7": {
+      "en": "Blind",
+      "hr": "Sjenilo"
+    },
+    "8": {
+      "en": "Open lock",
+      "hr": "Otključano"
+    },
+    "9": {
+      "en": "Closed lock",
+      "hr": "Zaključano"
+    },
+    "10": {
+      "en": "Open door",
+      "hr": "Otvori vrata"
+    },
+    "11": {
+      "en": "Heating",
+      "hr": "Grijanje"
+    },
+    "12": {
+      "en": "Gas heating",
+      "hr": "Plinsko grijanje"
+    },
+    "13": {
+      "en": "Gas flame",
+      "hr": "Plamen plina"
+    },
+    "14": {
+      "en": "Temperature",
+      "hr": "Temperatura"
+    },
+    "15": {
+      "en": "Socket-outlet",
+      "hr": "Utičnica"
+    },
+    "16": {
+      "en": "Dining room",
+      "hr": "Blagovaonica"
+    },
+    "17": {
+      "en": "Kitchen",
+      "hr": "Kuhinja"
+    },
+    "18": {
+      "en": "Hall",
+      "hr": "Hodnik"
+    },
+    "19": {
+      "en": "Children's room",
+      "hr": "Dječja soba"
+    },
+    "20": {
+      "en": "Playroom",
+      "hr": "Igraonica"
+    },
+    "21": {
+      "en": "Baby change",
+      "hr": "Prematanje bebe"
+    },
+    "22": {
+      "en": "Wine cellar",
+      "hr": "Vinski podrum"
+    },
+    "23": {
+      "en": "Bathroom",
+      "hr": "Kupaonica"
+    },
+    "24": {
+      "en": "Living room",
+      "hr": "Boravak"
+    },
+    "25": {
+      "en": "Library",
+      "hr": "Knjižnica"
+    },
+    "26": {
+      "en": "Balcony",
+      "hr": "Balkon"
+    },
+    "27": {
+      "en": "Bathtub",
+      "hr": "Kada"
+    },
+    "28": {
+      "en": "Shower",
+      "hr": "Tuš"
+    },
+    "29": {
+      "en": "Home office",
+      "hr": "Radna soba"
+    },
+    "30": {
+      "en": "Bedroom",
+      "hr": "Spavaća"
+    },
+    "31": {
+      "en": "Hotel",
+      "hr": "Hotel"
+    },
+    "32": {
+      "en": "Exercise room",
+      "hr": "Vježbaonica"
+    },
+    "33": {
+      "en": "Workshop",
+      "hr": "Radionica"
+    },
+    "34": {
+      "en": "Garage",
+      "hr": "Garaža"
+    },
+    "35": {
+      "en": "Loading ramp",
+      "hr": "Utovarna rampa"
+    },
+    "36": {
+      "en": "Garden",
+      "hr": "Vrt"
+    },
+    "37": {
+      "en": "Flower",
+      "hr": "Cvijet"
+    },
+    "38": {
+      "en": "Tool",
+      "hr": "Alat"
+    },
+    "39": {
+      "en": "Swimming pool",
+      "hr": "Bazen"
+    },
+    "40": {
+      "en": "Whirlpool",
+      "hr": "Hidromasažna kada"
+    },
+    "41": {
+      "en": "Sauna",
+      "hr": "Sauna"
+    },
+    "42": {
+      "en": "Stairway",
+      "hr": "Stubište"
+    },
+    "43": {
+      "en": "Billiard room",
+      "hr": "Biljarska soba"
+    },
+    "44": {
+      "en": "Laundry",
+      "hr": "Praonica"
+    },
+    "45": {
+      "en": "Hot plate",
+      "hr": "Ploča za kuhanje"
+    },
+    "46": {
+      "en": "Watering",
+      "hr": "Navodnjavanje"
+    },
+    "47": {
+      "en": "Watering can",
+      "hr": "Kanta za zalijevanje"
+    },
+    "48": {
+      "en": "WC Male",
+      "hr": "Muški WC"
+    },
+    "49": {
+      "en": "WC Female",
+      "hr": "Ženski WC"
+    },
+    "50": {
+      "en": "WC",
+      "hr": "WC"
+    },
+    "51": {
+      "en": "Heating",
+      "hr": "Grijanje"
+    },
+    "52": {
+      "en": "Cooling",
+      "hr": "Hlađenje"
+    },
+    "53": {
+      "en": "Faucet",
+      "hr": "Slavina"
+    },
+    "54": {
+      "en": "Ground plan",
+      "hr": "Tlocrt"
+    },
+    "55": {
+      "en": "Floor",
+      "hr": "Kat"
+    },
+    "56": {
+      "en": "Adjoining building",
+      "hr": "Pomoćna zgrada"
+    },
+    "57": {
+      "en": "Parking deck",
+      "hr": "Parkirna etaža"
+    },
+    "58": {
+      "en": "Parking place",
+      "hr": "Parkirno mjesto"
+    },
+    "59": {
+      "en": "Wardrobe",
+      "hr": "Garderoba"
+    },
+    "60": {
+      "en": "Conference room",
+      "hr": "Konferencijska soba"
+    },
+    "61": {
+      "en": "Lift",
+      "hr": "Dizalo"
+    },
+    "62": {
+      "en": "Solar collector",
+      "hr": "Solarni kolektor"
+    },
+    "63": {
+      "en": "House",
+      "hr": "Kuća"
+    },
+    "64": {
+      "en": "Plant",
+      "hr": "Biljka"
+    },
+    "65": {
+      "en": "Office building",
+      "hr": "Poslovna zgrada"
+    },
+    "66": {
+      "en": "Weather station",
+      "hr": "Meteorološka stanica"
+    },
+    "67": {
+      "en": "Level-crossing",
+      "hr": "Željeznički prijelaz"
+    },
+    "68": {
+      "en": "Shopping cart",
+      "hr": "Košarica"
+    },
+    "69": {
+      "en": "Bell 2",
+      "hr": "Zvono 2"
+    },
+    "70": {
+      "en": "Eye",
+      "hr": "Oko"
+    },
+    "71": {
+      "en": "Film",
+      "hr": "Film"
+    },
+    "72": {
+      "en": "Music",
+      "hr": "Glazba"
+    },
+    "73": {
+      "en": "Media",
+      "hr": "Mediji"
+    },
+    "74": {
+      "en": "Scene",
+      "hr": "Scena"
+    },
+    "75": {
+      "en": "Candle",
+      "hr": "Svijeća"
+    },
+    "76": {
+      "en": "Heart",
+      "hr": "Srce"
+    },
+    "77": {
+      "en": "Party",
+      "hr": "Zabava"
+    },
+    "78": {
+      "en": "Comfort",
+      "hr": "Udobnost"
+    },
+    "79": {
+      "en": "Standby",
+      "hr": "Pripravnost"
+    },
+    "80": {
+      "en": "Presentation",
+      "hr": "Prezentacija"
+    },
+    "81": {
+      "en": "RGB-Colorpicker",
+      "hr": "Odabir RGB boje"
+    },
+    "82": {
+      "en": "Electric iron",
+      "hr": "Glačalo"
+    },
+    "83": {
+      "en": "Forklift",
+      "hr": "Viličar"
+    },
+    "84": {
+      "en": "Car",
+      "hr": "Automobil"
+    },
+    "85": {
+      "en": "Helicopter",
+      "hr": "Helikopter"
+    },
+    "86": {
+      "en": "Camera",
+      "hr": "Kamera"
+    },
+    "87": {
+      "en": "Emergency exit",
+      "hr": "Izlaz u nuždi"
+    },
+    "88": {
+      "en": "Escape",
+      "hr": "Evakuacija"
+    },
+    "89": {
+      "en": "Holiday",
+      "hr": "Odmor"
+    },
+    "90": {
+      "en": "Consumption values",
+      "hr": "Vrijednosti potrošnje"
+    },
+    "91": {
+      "en": "Diagrams",
+      "hr": "Dijagrami"
+    },
+    "92": {
+      "en": "Bell",
+      "hr": "Zvono"
+    },
+    "93": {
+      "en": "Clock",
+      "hr": "Sat"
+    },
+    "94": {
+      "en": "Timer",
+      "hr": "Vremenski programator"
+    },
+    "95": {
+      "en": "Calendar",
+      "hr": "Kalendar"
+    },
+    "96": {
+      "en": "Settings",
+      "hr": "Postavke"
+    },
+    "97": {
+      "en": "Antifreeze",
+      "hr": "Zaštita od smrzavanja"
+    },
+    "98": {
+      "en": "Cooling/Heating",
+      "hr": "Klima"
+    },
+    "99": {
+      "en": "Ground heat",
+      "hr": "Podno grijanje"
+    },
+    "100": {
+      "en": "Tablet",
+      "hr": "Tablet"
+    },
+    "101": {
+      "en": "TV",
+      "hr": "TV"
+    },
+    "102": {
+      "en": "Displays",
+      "hr": "Zasloni"
+    },
+    "103": {
+      "en": "Internet",
+      "hr": "Internet"
+    },
+    "104": {
+      "en": "Globe",
+      "hr": "Globus"
+    },
+    "105": {
+      "en": "Memory card",
+      "hr": "Memorijska kartica"
+    },
+    "106": {
+      "en": "E-mail",
+      "hr": "E-pošta"
+    },
+    "107": {
+      "en": "User profile",
+      "hr": "Korisnički profil"
+    },
+    "108": {
+      "en": "Information",
+      "hr": "Informacije"
+    },
+    "109": {
+      "en": "Save",
+      "hr": "Spremi"
+    },
+    "110": {
+      "en": "Calculator",
+      "hr": "Kalkulator"
+    },
+    "111": {
+      "en": "Dog",
+      "hr": "Pas"
+    },
+    "112": {
+      "en": "Cow",
+      "hr": "Krava"
+    },
+    "113": {
+      "en": "Warning",
+      "hr": "Upozorenje"
+    },
+    "114": {
+      "en": "High rack",
+      "hr": "Visoki regal"
+    },
+    "115": {
+      "en": "Message",
+      "hr": "Poruka"
+    },
+    "116": {
+      "en": "Smoking area",
+      "hr": "Prostor za pušenje"
+    },
+    "117": {
+      "en": "Smoking ban",
+      "hr": "Zabrana pušenja"
+    },
+    "118": {
+      "en": "Manual function",
+      "hr": "Ručna funkcija"
+    },
+    "119": {
+      "en": "Manual operation",
+      "hr": "Ručno upravljanje"
+    },
+    "120": {
+      "en": "Ventilator",
+      "hr": "Ventilator"
+    },
+    "121": {
+      "en": "Folder of functions",
+      "hr": "Mapa funkcija"
+    },
+    "122": {
+      "en": "Room functions",
+      "hr": "Funkcije prostorije"
+    },
+    "123": {
+      "en": "Watchlist",
+      "hr": "Popis za praćenje"
+    },
+    "124": {
+      "en": "Funnel",
+      "hr": "Lijevak"
+    },
+    "125": {
+      "en": "Magnifier",
+      "hr": "Povećalo"
+    },
+    "126": {
+      "en": "Clouded",
+      "hr": "Oblačno"
+    },
+    "127": {
+      "en": "Rain",
+      "hr": "Kiša"
+    },
+    "128": {
+      "en": "Eco mode",
+      "hr": "Eko režim"
+    },
+    "129": {
+      "en": "Automation",
+      "hr": "Automatizacija"
+    },
+    "130": {
+      "en": "Handset",
+      "hr": "Slušalica"
+    },
+    "131": {
+      "en": "On-off switch",
+      "hr": "Prekidač za uključivanje/isključivanje"
+    },
+    "132": {
+      "en": "Outdoor area",
+      "hr": "Vanjski prostor"
+    },
+    "133": {
+      "en": "Building part",
+      "hr": "Dio zgrade"
+    },
+    "134": {
+      "en": "Control cabinet",
+      "hr": "Razvodni ormar"
+    },
+    "135": {
+      "en": "Basement",
+      "hr": "Podrum"
+    },
+    "136": {
+      "en": "Ground floor",
+      "hr": "Prizemlje"
+    },
+    "137": {
+      "en": "Floor",
+      "hr": "Kat"
+    },
+    "138": {
+      "en": "Attic",
+      "hr": "Potkrovlje"
+    },
+    "139": {
+      "en": "Room",
+      "hr": "Prostorija"
+    },
+    "140": {
+      "en": "Break room",
+      "hr": "Prostorija za odmor"
+    },
+    "141": {
+      "en": "Kitchenette",
+      "hr": "Čajna kuhinja"
+    },
+    "142": {
+      "en": "Reception",
+      "hr": "Recepcija"
+    },
+    "143": {
+      "en": "Canteen",
+      "hr": "Kantina"
+    },
+    "144": {
+      "en": "Entry",
+      "hr": "Ulaz"
+    },
+    "145": {
+      "en": "Keywords",
+      "hr": "Ključne riječi"
+    },
+    "146": {
+      "en": "Patio",
+      "hr": "Terasa"
+    },
+    "147": {
+      "en": "Telephone",
+      "hr": "Telefon"
+    },
+    "148": {
+      "en": "Mobile phone",
+      "hr": "Mobitel"
+    },
+    "149": {
+      "en": "Fax",
+      "hr": "Faks"
+    },
+    "150": {
+      "en": "Point",
+      "hr": "Točka"
+    },
+    "151": {
+      "en": "Winter garden",
+      "hr": "Zimski vrt"
+    },
+    "152": {
+      "en": "Close",
+      "hr": "Zatvori"
+    },
+    "153": {
+      "en": "Reset",
+      "hr": "Resetiraj"
+    },
+    "154": {
+      "en": "Plus sign",
+      "hr": "Znak plus"
+    },
+    "155": {
+      "en": "Link",
+      "hr": "Poveznica"
+    },
+    "156": {
+      "en": "Caps Lock key",
+      "hr": "Tipka Caps Lock"
+    },
+    "157": {
+      "en": "LED, signal light",
+      "hr": "LED, signalna lampica"
+    },
+    "158": {
+      "en": "REG",
+      "hr": "Uređaj za DIN šinu"
+    },
+    "159": {
+      "en": "I/O module",
+      "hr": "Ulazno-izlazni modul"
+    },
+    "160": {
+      "en": "I/O module input",
+      "hr": "Ulaz ulazno-izlaznog modula"
+    },
+    "161": {
+      "en": "I/O module output",
+      "hr": "Izlaz ulazno-izlaznog modula"
+    },
+    "162": {
+      "en": "Motion detector",
+      "hr": "Detektor pokreta"
+    },
+    "163": {
+      "en": "Motion detector with camera",
+      "hr": "Detektor pokreta s kamerom"
+    },
+    "164": {
+      "en": "Power supply",
+      "hr": "Napajanje"
+    },
+    "165": {
+      "en": "Remote control",
+      "hr": "Daljinski upravljač"
+    },
+    "166": {
+      "en": "Repeater",
+      "hr": "Ponavljač signala"
+    },
+    "167": {
+      "en": "Room actuator",
+      "hr": "Sobni aktuator"
+    },
+    "168": {
+      "en": "Technical contact",
+      "hr": "Tehnički kontakt"
+    },
+    "169": {
+      "en": "Door module",
+      "hr": "Modul vrata"
+    },
+    "170": {
+      "en": "Glass-breakage detector",
+      "hr": "Detektor loma stakla"
+    },
+    "171": {
+      "en": "Operating unit",
+      "hr": "Upravljačka jedinica"
+    },
+    "172": {
+      "en": "Alarm control unit",
+      "hr": "Alarmna centrala"
+    },
+    "173": {
+      "en": "Indoor siren",
+      "hr": "Unutarnja sirena"
+    },
+    "174": {
+      "en": "Outdoor siren",
+      "hr": "Vanjska sirena"
+    },
+    "175": {
+      "en": "Magnetic contact",
+      "hr": "Magnetski kontakt"
+    },
+    "176": {
+      "en": "Hand-held wireless transmitter",
+      "hr": "Ručni bežični odašiljač"
+    },
+    "177": {
+      "en": "Error",
+      "hr": "Greška"
+    },
+    "178": {
+      "en": "Change history",
+      "hr": "Povijest promjena"
+    },
+    "179": {
+      "en": "Checked, selected",
+      "hr": "Označeno, odabrano"
+    },
+    "180": {
+      "en": "Change colour",
+      "hr": "Promijeni boju"
+    },
+    "181": {
+      "en": "Note",
+      "hr": "Napomena"
+    },
+    "182": {
+      "en": "Important information",
+      "hr": "Važna informacija"
+    },
+    "183": {
+      "en": "Main menu",
+      "hr": "Glavni izbornik"
+    },
+    "184": {
+      "en": "Context menu",
+      "hr": "Kontekstni izbornik"
+    },
+    "185": {
+      "en": "Change order",
+      "hr": "Promijeni redoslijed"
+    },
+    "186": {
+      "en": "Project scope",
+      "hr": "Opseg projekta"
+    },
+    "187": {
+      "en": "Rename",
+      "hr": "Preimenuj"
+    },
+    "188": {
+      "en": "Delete",
+      "hr": "Izbriši"
+    },
+    "189": {
+      "en": "Full page width",
+      "hr": "Puna širina stranice"
+    },
+    "190": {
+      "en": "Motion arrow",
+      "hr": "Strelica pomicanja"
+    },
+    "191": {
+      "en": "Selection / Jump to first entry",
+      "hr": "Odabir / idi na prvi unos"
+    },
+    "192": {
+      "en": "Selection / Jump to last entry",
+      "hr": "Odabir / idi na zadnji unos"
+    },
+    "193": {
+      "en": "Selection / forwards, play",
+      "hr": "Odabir / naprijed, reproduciraj"
+    },
+    "194": {
+      "en": "Selection / Backwards",
+      "hr": "Odabir / natrag"
+    },
+    "195": {
+      "en": "Channel",
+      "hr": "Kanal"
+    },
+    "196": {
+      "en": "Data point",
+      "hr": "Podatkovna točka"
+    },
+    "197": {
+      "en": "Source",
+      "hr": "Izvor"
+    },
+    "198": {
+      "en": "Checked, OK",
+      "hr": "Provjereno, u redu"
+    },
+    "199": {
+      "en": "Draft",
+      "hr": "Nacrt"
+    },
+    "200": {
+      "en": "Note",
+      "hr": "Napomena"
+    },
+    "201": {
+      "en": "Fast",
+      "hr": "Brzo"
+    },
+    "202": {
+      "en": "Slow",
+      "hr": "Sporo"
+    },
+    "203": {
+      "en": "Keyboard",
+      "hr": "Tipkovnica"
+    },
+    "204": {
+      "en": "Logic",
+      "hr": "Logika"
+    },
+    "205": {
+      "en": "AND",
+      "hr": "Logički I"
+    },
+    "206": {
+      "en": "Type converter",
+      "hr": "Pretvornik tipa"
+    },
+    "207": {
+      "en": "Counter",
+      "hr": "Brojač"
+    },
+    "208": {
+      "en": "Telegram delayer",
+      "hr": "Odgoda telegrama"
+    },
+    "209": {
+      "en": "Demultiplexer",
+      "hr": "Demultiplekser"
+    },
+    "210": {
+      "en": "Lock",
+      "hr": "Blokada"
+    },
+    "211": {
+      "en": "Edge detector",
+      "hr": "Detektor brida"
+    },
+    "212": {
+      "en": "Heating/Cooling",
+      "hr": "Grijanje/hlađenje"
+    },
+    "213": {
+      "en": "Operating hours counter",
+      "hr": "Brojač radnih sati"
+    },
+    "214": {
+      "en": "Hysteresis",
+      "hr": "Histereza"
+    },
+    "215": {
+      "en": "Output selector switch",
+      "hr": "Izlazni selektor"
+    },
+    "216": {
+      "en": "Inverter",
+      "hr": "Invertor"
+    },
+    "217": {
+      "en": "Comparator",
+      "hr": "Komparator"
+    },
+    "218": {
+      "en": "Switch-on/off delay",
+      "hr": "Odgoda uključivanja/isključivanja"
+    },
+    "219": {
+      "en": "OR gate",
+      "hr": "Logički ILI"
+    },
+    "220": {
+      "en": "Oscillator",
+      "hr": "Oscilator"
+    },
+    "221": {
+      "en": "PI controller",
+      "hr": "PI regulator"
+    },
+    "222": {
+      "en": "PID controller",
+      "hr": "PID regulator"
+    },
+    "223": {
+      "en": "Random generator",
+      "hr": "Generator slučajnih vrijednosti"
+    },
+    "224": {
+      "en": "Room divider",
+      "hr": "Pregrada prostorije"
+    },
+    "225": {
+      "en": "Send-By-Change",
+      "hr": "Slanje pri promjeni"
+    },
+    "226": {
+      "en": "Shading",
+      "hr": "Zasjenjivanje"
+    },
+    "227": {
+      "en": "Timer folder",
+      "hr": "Mapa vremenskih programa"
+    },
+    "228": {
+      "en": "Stairway light",
+      "hr": "Stubišna rasvjeta"
+    },
+    "229": {
+      "en": "Value generator",
+      "hr": "Generator vrijednosti"
+    },
+    "230": {
+      "en": "XOR",
+      "hr": "Logički isključivo ILI"
+    },
+    "231": {
+      "en": "Sunrise",
+      "hr": "Izlazak sunca"
+    },
+    "232": {
+      "en": "Press, Touch",
+      "hr": "Pritisak, dodir"
+    },
+    "233": {
+      "en": "User",
+      "hr": "Korisnik"
+    },
+    "234": {
+      "en": "User group",
+      "hr": "Korisnička grupa"
+    },
+    "235": {
+      "en": "Administrator",
+      "hr": "Administrator"
+    },
+    "236": {
+      "en": "Installer",
+      "hr": "Instalater"
+    },
+    "237": {
+      "en": "Safety area 1, main safety area",
+      "hr": "Sigurnosno područje 1, glavno sigurnosno područje"
+    },
+    "238": {
+      "en": "Security area 2",
+      "hr": "Sigurnosno područje 2"
+    },
+    "239": {
+      "en": "Security area 3",
+      "hr": "Sigurnosno područje 3"
+    },
+    "240": {
+      "en": "Security area 4",
+      "hr": "Sigurnosno područje 4"
+    },
+    "241": {
+      "en": "Safety area 1",
+      "hr": "Sigurnosno područje 1"
+    },
+    "242": {
+      "en": "Security area 2",
+      "hr": "Sigurnosno područje 2"
+    },
+    "243": {
+      "en": "Safety area 3",
+      "hr": "Sigurnosno područje 3"
+    },
+    "244": {
+      "en": "Security area 4",
+      "hr": "Sigurnosno područje 4"
+    },
+    "245": {
+      "en": "I/O module contact open",
+      "hr": "Otvoren kontakt ulazno-izlaznog modula"
+    },
+    "246": {
+      "en": "Message / Mobile telephone",
+      "hr": "Poruka / mobitel"
+    },
+    "247": {
+      "en": "Message / Screen",
+      "hr": "Poruka / zaslon"
+    },
+    "248": {
+      "en": "Message / Telephone",
+      "hr": "Poruka / telefon"
+    },
+    "249": {
+      "en": "Message / Text message",
+      "hr": "Poruka / SMS"
+    },
+    "250": {
+      "en": "Message / Voice message",
+      "hr": "Poruka / glasovna poruka"
+    },
+    "251": {
+      "en": "External active",
+      "hr": "Vanjska zaštita aktivna"
+    },
+    "252": {
+      "en": "Internal active",
+      "hr": "Unutarnja zaštita aktivna"
+    },
+    "253": {
+      "en": "Internal and external active",
+      "hr": "Unutarnja i vanjska zaštita aktivne"
+    },
+    "254": {
+      "en": "Alarm",
+      "hr": "Alarm"
+    },
+    "255": {
+      "en": "Outgoing call",
+      "hr": "Odlazni poziv"
+    },
+    "256": {
+      "en": "External active event",
+      "hr": "Događaj aktivne vanjske zaštite"
+    },
+    "257": {
+      "en": "Internal active event",
+      "hr": "Događaj aktivne unutarnje zaštite"
+    },
+    "258": {
+      "en": "External alarm",
+      "hr": "Vanjski alarm"
+    },
+    "259": {
+      "en": "Bell",
+      "hr": "Zvono"
+    },
+    "260": {
+      "en": "Fire",
+      "hr": "Požar"
+    },
+    "261": {
+      "en": "Service call",
+      "hr": "Servisni poziv"
+    },
+    "262": {
+      "en": "Alarm for internal active",
+      "hr": "Alarm pri aktivnoj unutarnjoj zaštiti"
+    },
+    "263": {
+      "en": "Alarm forwarding",
+      "hr": "Prosljeđivanje alarma"
+    },
+    "264": {
+      "en": "Panic alarm",
+      "hr": "Panik alarm"
+    },
+    "265": {
+      "en": "Alerting rule",
+      "hr": "Pravilo alarmiranja"
+    },
+    "266": {
+      "en": "Tampering alarm",
+      "hr": "Alarm sabotaže"
+    },
+    "267": {
+      "en": "Device monitoring alarm",
+      "hr": "Alarm nadzora uređaja"
+    },
+    "268": {
+      "en": "Technical alarm",
+      "hr": "Tehnički alarm"
+    },
+    "269": {
+      "en": "Presence",
+      "hr": "Prisutnost"
+    },
+    "270": {
+      "en": "Technical error",
+      "hr": "Tehnička greška"
+    },
+    "271": {
+      "en": "Print",
+      "hr": "Ispis"
+    },
+    "272": {
+      "en": "Bookmark",
+      "hr": "Knjižna oznaka"
+    },
+    "273": {
+      "en": "Page",
+      "hr": "Stranica"
+    },
+    "274": {
+      "en": "Export document",
+      "hr": "Izvoz dokumenta"
+    },
+    "275": {
+      "en": "Medal",
+      "hr": "Medalja"
+    },
+    "276": {
+      "en": "Manual alarm",
+      "hr": "Ručni alarm"
+    },
+    "277": {
+      "en": "Security guard",
+      "hr": "Zaštitar"
+    },
+    "278": {
+      "en": "Device in building",
+      "hr": "Uređaj u zgradi"
+    },
+    "279": {
+      "en": "Alarm devices",
+      "hr": "Alarmni uređaji"
+    },
+    "280": {
+      "en": "Help video",
+      "hr": "Videoupute"
+    },
+    "281": {
+      "en": "Marked corner",
+      "hr": "Označeni kut"
+    },
+    "282": {
+      "en": "Alarm system settings",
+      "hr": "Postavke alarmnog sustava"
+    },
+    "283": {
+      "en": "Logic Editor",
+      "hr": "Uređivač logike"
+    },
+    "284": {
+      "en": "Security areas",
+      "hr": "Sigurnosna područja"
+    },
+    "285": {
+      "en": "Timers and scenes",
+      "hr": "Vremenski programi i scene"
+    },
+    "286": {
+      "en": "Visualization",
+      "hr": "Vizualizacija"
+    },
+    "287": {
+      "en": "Commissioning",
+      "hr": "Puštanje u rad"
+    },
+    "288": {
+      "en": "Help / Question",
+      "hr": "Pomoć / pitanje"
+    },
+    "289": {
+      "en": "Left arrow",
+      "hr": "Strelica lijevo"
+    },
+    "290": {
+      "en": "Right arrow",
+      "hr": "Strelica desno"
+    },
+    "291": {
+      "en": "Arrow / Restore",
+      "hr": "Strelica / ponovi"
+    },
+    "292": {
+      "en": "Arrow / Undo",
+      "hr": "Strelica / poništi"
+    },
+    "293": {
+      "en": "Scene set",
+      "hr": "Skup scena"
+    },
+    "294": {
+      "en": "Information, message",
+      "hr": "Informacija, poruka"
+    },
+    "295": {
+      "en": "Trades",
+      "hr": "Struke"
+    },
+    "296": {
+      "en": "Percent",
+      "hr": "Postotak"
+    },
+    "297": {
+      "en": "Roof window",
+      "hr": "Krovni prozor"
+    },
+    "298": {
+      "en": "Server",
+      "hr": "Poslužitelj"
+    },
+    "299": {
+      "en": "Bluetooth",
+      "hr": "Bluetooth"
+    },
+    "300": {
+      "en": "CD",
+      "hr": "CD"
+    },
+    "303": {
+      "en": "Input",
+      "hr": "Ulaz"
+    },
+    "304": {
+      "en": "Input jack",
+      "hr": "Ulazni priključak"
+    },
+    "305": {
+      "en": "Lower volume",
+      "hr": "Smanji glasnoću"
+    },
+    "306": {
+      "en": "Network folder",
+      "hr": "Mrežna mapa"
+    },
+    "307": {
+      "en": "MP3 player",
+      "hr": "MP3 reproduktor"
+    },
+    "308": {
+      "en": "Radio",
+      "hr": "Radio"
+    },
+    "309": {
+      "en": "Speaker",
+      "hr": "Zvučnik"
+    },
+    "310": {
+      "en": "User 1",
+      "hr": "Korisnik 1"
+    },
+    "311": {
+      "en": "User 2",
+      "hr": "Korisnik 2"
+    },
+    "312": {
+      "en": "Maintenance",
+      "hr": "Održavanje"
+    },
+    "313": {
+      "en": "Changeover switch",
+      "hr": "Preklopni prekidač"
+    },
+    "314": {
+      "en": "NC contact",
+      "hr": "Normalno zatvoreni kontakt (NC)"
+    },
+    "315": {
+      "en": "NO contact",
+      "hr": "Normalno otvoreni kontakt (NO)"
+    },
+    "316": {
+      "en": "12V output",
+      "hr": "Izlaz 12 V"
+    },
+    "317": {
+      "en": "0V output",
+      "hr": "Izlaz 0 V"
+    },
+    "318": {
+      "en": "Gira G1",
+      "hr": "Gira G1"
+    },
+    "319": {
+      "en": "Technical alarm (urgent)",
+      "hr": "Tehnički alarm (hitno)"
+    },
+    "320": {
+      "en": "Green tick",
+      "hr": "Zelena kvačica"
+    },
+    "321": {
+      "en": "Question",
+      "hr": "Pitanje"
+    },
+    "322": {
+      "en": "Download",
+      "hr": "Preuzmi"
+    },
+    "323": {
+      "en": "Alarm system 2",
+      "hr": "Alarmni sustav 2"
+    },
+    "324": {
+      "en": "Remote access",
+      "hr": "Udaljeni pristup"
+    },
+    "325": {
+      "en": "Call button off",
+      "hr": "Pozivna tipka isključena"
+    },
+    "326": {
+      "en": "Deactivated",
+      "hr": "Deaktivirano"
+    },
+    "327": {
+      "en": "Placeholder",
+      "hr": "Rezervirano mjesto"
+    },
+    "328": {
+      "en": "Arrow up",
+      "hr": "Strelica gore"
+    },
+    "329": {
+      "en": "Arrow down",
+      "hr": "Strelica dolje"
+    },
+    "330": {
+      "en": "Camera off",
+      "hr": "Kamera isključena"
+    },
+    "331": {
+      "en": "Increase volume",
+      "hr": "Povećaj glasnoću"
+    },
+    "332": {
+      "en": "Volume off",
+      "hr": "Zvuk isključen"
+    },
+    "333": {
+      "en": "Image",
+      "hr": "Slika"
+    },
+    "334": {
+      "en": "Microphone",
+      "hr": "Mikrofon"
+    },
+    "335": {
+      "en": "Microphone off",
+      "hr": "Mikrofon isključen"
+    },
+    "336": {
+      "en": "Incoming call",
+      "hr": "Dolazni poziv"
+    },
+    "337": {
+      "en": "Exclamation point",
+      "hr": "Uskličnik"
+    },
+    "338": {
+      "en": "List: left arrow",
+      "hr": "Popis: strelica lijevo"
+    },
+    "339": {
+      "en": "List: right arrow",
+      "hr": "Popis: strelica desno"
+    },
+    "340": {
+      "en": "List: up arrow",
+      "hr": "Popis: strelica gore"
+    },
+    "341": {
+      "en": "List: down arrow",
+      "hr": "Popis: strelica dolje"
+    },
+    "342": {
+      "en": "Back / left arrow",
+      "hr": "Natrag / strelica lijevo"
+    },
+    "343": {
+      "en": "Forward / right key",
+      "hr": "Naprijed / tipka desno"
+    },
+    "344": {
+      "en": "Up arrow",
+      "hr": "Strelica gore"
+    },
+    "345": {
+      "en": "Down arrow",
+      "hr": "Strelica dolje"
+    },
+    "346": {
+      "en": "Cloud backup",
+      "hr": "Sigurnosna kopija u oblaku"
+    },
+    "347": {
+      "en": "Cloud backup upload",
+      "hr": "Prijenos sigurnosne kopije u oblak"
+    },
+    "348": {
+      "en": "Cloud backup download",
+      "hr": "Preuzimanje sigurnosne kopije iz oblaka"
+    },
+    "349": {
+      "en": "Memory card backup",
+      "hr": "Sigurnosna kopija na memorijskoj kartici"
+    },
+    "350": {
+      "en": "Memory card backup upload",
+      "hr": "Prijenos sigurnosne kopije na memorijsku karticu"
+    },
+    "351": {
+      "en": "Memory card backup download",
+      "hr": "Preuzimanje sigurnosne kopije s memorijske kartice"
+    },
+    "352": {
+      "en": "Menu",
+      "hr": "Izbornik"
+    },
+    "353": {
+      "en": "List",
+      "hr": "Popis"
+    },
+    "354": {
+      "en": "Checkmark, Checked, Selected",
+      "hr": "Kvačica, označeno, odabrano"
+    },
+    "355": {
+      "en": "Enter key",
+      "hr": "Tipka Enter"
+    },
+    "356": {
+      "en": "Shift key",
+      "hr": "Tipka Shift"
+    },
+    "357": {
+      "en": "Contrast",
+      "hr": "Kontrast"
+    },
+    "358": {
+      "en": "End call",
+      "hr": "Završi poziv"
+    },
+    "359": {
+      "en": "Incoming call",
+      "hr": "Dolazni poziv"
+    },
+    "360": {
+      "en": "Outgoing door call",
+      "hr": "Odlazni portafonski poziv"
+    },
+    "361": {
+      "en": "Internal call",
+      "hr": "Interni poziv"
+    },
+    "362": {
+      "en": "Incoming internal call",
+      "hr": "Dolazni interni poziv"
+    },
+    "363": {
+      "en": "Outgoing internal call",
+      "hr": "Odlazni interni poziv"
+    },
+    "364": {
+      "en": "Floor call",
+      "hr": "Etažni poziv"
+    },
+    "365": {
+      "en": "Call door station",
+      "hr": "Pozovi vanjsku portafonsku jedinicu"
+    },
+    "366": {
+      "en": "Automatic internal call",
+      "hr": "Automatski interni poziv"
+    },
+    "367": {
+      "en": "Automatic door opener",
+      "hr": "Automatsko otvaranje vrata"
+    },
+    "368": {
+      "en": "Call unavailable",
+      "hr": "Poziv nije dostupan"
+    },
+    "369": {
+      "en": "Camera unavailable",
+      "hr": "Kamera nije dostupna"
+    },
+    "370": {
+      "en": "Built-in speaker",
+      "hr": "Ugrađeni zvučnik"
+    },
+    "371": {
+      "en": "Call button extension",
+      "hr": "Proširenje pozivnih tipki"
+    },
+    "372": {
+      "en": "Call button 1-gang",
+      "hr": "Pozivna tipka, jednostruka"
+    },
+    "373": {
+      "en": "Call button 3-gang",
+      "hr": "Pozivna tipka, trostruka"
+    },
+    "374": {
+      "en": "Call button 4-gang",
+      "hr": "Pozivna tipka, četverostruka"
+    },
+    "375": {
+      "en": "Camera module",
+      "hr": "Modul kamere"
+    },
+    "376": {
+      "en": "Display module",
+      "hr": "Modul zaslona"
+    },
+    "377": {
+      "en": "Home station",
+      "hr": "Unutarnja portafonska jedinica"
+    },
+    "378": {
+      "en": "Home station receiver",
+      "hr": "Slušalica unutarnje portafonske jedinice"
+    },
+    "379": {
+      "en": "Surface-mounted home station video",
+      "hr": "Nadžbukna unutarnja videoportafonska jedinica"
+    },
+    "380": {
+      "en": "TFT colour display",
+      "hr": "TFT zaslon u boji"
+    },
+    "381": {
+      "en": "Surface mounted home station",
+      "hr": "Nadžbukna unutarnja portafonska jedinica"
+    },
+    "382": {
+      "en": "Video door station",
+      "hr": "Vanjska videoportafonska jedinica"
+    },
+    "383": {
+      "en": "Door station",
+      "hr": "Vanjska portafonska jedinica"
+    },
+    "384": {
+      "en": "Door station TX_44",
+      "hr": "Vanjska portafonska jedinica TX_44"
+    },
+    "385": {
+      "en": "Line segment 1",
+      "hr": "Segment linije 1"
+    },
+    "386": {
+      "en": "Line segment 2",
+      "hr": "Segment linije 2"
+    },
+    "387": {
+      "en": "Main line",
+      "hr": "Glavna linija"
+    },
+    "388": {
+      "en": "Ancillary line 1",
+      "hr": "Pomoćna linija 1"
+    },
+    "389": {
+      "en": "Ancillary line 2",
+      "hr": "Pomoćna linija 2"
+    },
+    "390": {
+      "en": "Apartment",
+      "hr": "Stan"
+    },
+    "391": {
+      "en": "Mailbox",
+      "hr": "Poštanski sandučić"
+    },
+    "392": {
+      "en": "Energy profile / light profile",
+      "hr": "Energetski stup / rasvjetni stup"
+    },
+    "393": {
+      "en": "DRA 1",
+      "hr": "Adapter za DIN šinu 1"
+    },
+    "394": {
+      "en": "DRA 2",
+      "hr": "Adapter za DIN šinu 2"
+    },
+    "395": {
+      "en": "DRA 3",
+      "hr": "Adapter za DIN šinu 3"
+    },
+    "396": {
+      "en": "Flush-mounted actuator/button interface",
+      "hr": "Podžbukni aktuator / sučelje tipkala"
+    },
+    "397": {
+      "en": "Ancillary line 3",
+      "hr": "Pomoćna linija 3"
+    },
+    "398": {
+      "en": "Ancillary line 4",
+      "hr": "Pomoćna linija 4"
+    },
+    "399": {
+      "en": "Ancillary line 5",
+      "hr": "Pomoćna linija 5"
+    },
+    "400": {
+      "en": "Play occupancy simulation",
+      "hr": "Pokreni simulaciju prisutnosti"
+    },
+    "401": {
+      "en": "Record occupancy simulation",
+      "hr": "Snimi simulaciju prisutnosti"
+    },
+    "402": {
+      "en": "Software update",
+      "hr": "Ažuriranje softvera"
+    },
+    "403": {
+      "en": "Door call forwarding",
+      "hr": "Prosljeđivanje portafonskog poziva"
+    },
+    "404": {
+      "en": "Door call forwarding off",
+      "hr": "Prosljeđivanje portafonskog poziva isključeno"
+    },
+    "405": {
+      "en": "Ancillary line 3",
+      "hr": "Pomoćna linija 3"
+    },
+    "406": {
+      "en": "Call button 2-gang",
+      "hr": "Pozivna tipka, dvostruka"
+    },
+    "407": {
+      "en": "Multiple Alarms",
+      "hr": "Višestruki alarmi"
+    },
+    "408": {
+      "en": "Minus sign",
+      "hr": "Znak minus"
+    },
+    "409": {
+      "en": "Cleaning",
+      "hr": "Čišćenje"
+    },
+    "410": {
+      "en": "Button vibration",
+      "hr": "Vibracija tipke"
+    },
+    "411": {
+      "en": "New picture",
+      "hr": "Nova slika"
+    },
+    "412": {
+      "en": "Awning",
+      "hr": "Tenda"
+    },
+    "413": {
+      "en": "Single row stainless steel door station",
+      "hr": "Jednoredna vanjska portafonska jedinica od nehrđajućeg čelika"
+    },
+    "414": {
+      "en": "Single row stainless steel door station video",
+      "hr": "Jednoredna vanjska videoportafonska jedinica od nehrđajućeg čelika"
+    },
+    "415": {
+      "en": "Door station video TX_44",
+      "hr": "Vanjska videoportafonska jedinica TX_44"
+    },
+    "416": {
+      "en": "2-row stainless steel door station",
+      "hr": "Dvoredna vanjska portafonska jedinica od nehrđajućeg čelika"
+    },
+    "417": {
+      "en": "2-row stainless steel door station video",
+      "hr": "Dvoredna vanjska videoportafonska jedinica od nehrđajućeg čelika"
+    },
+    "418": {
+      "en": "Surface-mounted home station video 7",
+      "hr": "Nadžbukna unutarnja videoportafonska jedinica 7"
+    },
+    "419": {
+      "en": "Battery",
+      "hr": "Baterija"
+    },
+    "420": {
+      "en": "Battery Alert",
+      "hr": "Upozorenje baterije"
+    },
+    "421": {
+      "en": "Signal strength",
+      "hr": "Jačina signala"
+    },
+    "422": {
+      "en": "Screwdriver",
+      "hr": "Odvijač"
+    },
+    "423": {
+      "en": "Scene 1",
+      "hr": "Scena 1"
+    },
+    "424": {
+      "en": "Scene 2",
+      "hr": "Scena 2"
+    },
+    "425": {
+      "en": "Scene 3",
+      "hr": "Scena 3"
+    },
+    "426": {
+      "en": "Scene 4",
+      "hr": "Scena 4"
+    },
+    "427": {
+      "en": "Sliding element",
+      "hr": "Klizni element"
+    },
+    "428": {
+      "en": "Window (drive)",
+      "hr": "Prozor (pogon)"
+    },
+    "429": {
+      "en": "End customer",
+      "hr": "Krajnji korisnik"
+    },
+    "430": {
+      "en": "Tradesperson",
+      "hr": "Majstor"
+    },
+    "431": {
+      "en": "Keyless in",
+      "hr": "Ulaz bez ključa"
+    },
+    "432": {
+      "en": "Colour",
+      "hr": "Boja"
+    },
+    "433": {
+      "en": "Material",
+      "hr": "Materijal"
+    },
+    "434": {
+      "en": "Switch",
+      "hr": "Prekidač"
+    },
+    "435": {
+      "en": "Upload",
+      "hr": "Prenesi"
+    },
+    "436": {
+      "en": "Copy",
+      "hr": "Kopiraj"
+    },
+    "437": {
+      "en": "Edit",
+      "hr": "Uredi"
+    },
+    "644": {
+      "en": "Dome light/roof window/roof hatch",
+      "hr": "Svjetlosna kupola / krovni prozor / krovni otvor"
+    },
+    "659": {
+      "en": "Garage gate",
+      "hr": "Garažna vrata"
+    },
+    "833": {
+      "en": "Light group control",
+      "hr": "Grupno upravljanje rasvjetom"
+    },
+    "834": {
+      "en": "Blind group control",
+      "hr": "Grupno upravljanje sjenilima"
+    },
+    "835": {
+      "en": "Boost group",
+      "hr": "Grupa pojačanog rada"
+    },
+    "836": {
+      "en": "Switch/button 1-gang LED",
+      "hr": "Prekidač/tipkalo, jednostruko, LED"
+    },
+    "837": {
+      "en": "Switch/button 2-gang",
+      "hr": "Prekidač/tipkalo, dvostruko"
+    },
+    "838": {
+      "en": "Switch/button 2-gang LED",
+      "hr": "Prekidač/tipkalo, dvostruko, LED"
+    },
+    "844": {
+      "en": "Flush-mounted actuator",
+      "hr": "Podžbukni aktuator"
+    },
+    "850": {
+      "en": "Concierge",
+      "hr": "Portir"
+    },
+    "857": {
+      "en": "Pushbutton sensor 4 Komfort 1-gang System 55",
+      "hr": "Tipkalo sa senzorom 4 Komfort, jednostruko, System 55"
+    },
+    "858": {
+      "en": "Pushbutton sensor 4 Komfort 2-gang System 55",
+      "hr": "Tipkalo sa senzorom 4 Komfort, dvostruko, System 55"
+    },
+    "859": {
+      "en": "Pushbutton sensor 4 Komfort 3-gang System 55",
+      "hr": "Tipkalo sa senzorom 4 Komfort, trostruko, System 55"
+    },
+    "860": {
+      "en": "Pushbutton sensor 4 Komfort 1-gang",
+      "hr": "Tipkalo sa senzorom 4 Komfort, jednostruko"
+    },
+    "861": {
+      "en": "Pushbutton sensor 4 Komfort 2-gang",
+      "hr": "Tipkalo sa senzorom 4 Komfort, dvostruko"
+    },
+    "862": {
+      "en": "Pushbutton sensor 4 Komfort 4-gang",
+      "hr": "Tipkalo sa senzorom 4 Komfort, četverostruko"
+    },
+    "866": {
+      "en": "Motion detector 1.10 m",
+      "hr": "Detektor pokreta 1,10 m"
+    },
+    "868": {
+      "en": "Gira G1 (2nd generation)",
+      "hr": "Gira G1 (2. generacija)"
+    },
+    "869": {
+      "en": "Gira IP video home station",
+      "hr": "Gira IP unutarnja videoportafonska jedinica"
+    },
+    "891": {
+      "en": "Button interface 8-gang",
+      "hr": "Sučelje tipkala, osmerostruko"
+    }
+  },
+  "scope": "All named Icon_<ID> entries in the installed GPA 6.0 icon-name catalog, including editor and system icons; not every entry is suitable for naming a visualization function.",
+  "notes": [
+    "Croatian values are editable proposed translations, not official Gira translations.",
+    "Use the numeric IconId from project XML as the lookup key.",
+    "Do not infer circuit identity or ceiling/wall placement from a generic lighting icon.",
+    "Unknown IDs must be flagged for review, not silently assigned a translation."
+  ]
+}
