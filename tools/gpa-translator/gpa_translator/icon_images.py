@@ -10,6 +10,7 @@ import tkinter as tk
 
 
 from .paths import ICON_DIRECTORY, SCRIPT_DIRECTORY
+from .name_rules import name_rule_for
 
 
 def icon_cache_ready(directory: Path = ICON_DIRECTORY) -> bool:
@@ -70,8 +71,10 @@ class IconImages:
 
 
 def proposal_uses_icon(proposal, session) -> bool:
-    """Sensor codes use a dedicated naming rule, not their displayed GPA icon."""
-    if proposal.kind != "function" or re.fullmatch(r"S\d+", proposal.old, re.I):
+    """Show an icon only when it supplies the proposed function name."""
+    if proposal.kind != "function" or name_rule_for(proposal.old, proposal.room) is not None:
+        return False
+    if session.edits[proposal.entity_id].strategy == "default":
         return False
     if proposal.icon_id not in session.icons or session.suggested_name(proposal) is None:
         return False

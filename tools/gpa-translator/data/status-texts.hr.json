@@ -3,16 +3,147 @@
   "source_language": "en-GB",
   "target_language": "hr",
   "source": "reference_project_pair",
-  "scope": "Existing Visu OnAction, OffAction, OnText and OffText string parameters, grouped by function type and icon.",
+  "scope": "Existing Visu OnAction, OffAction, OnText, OffText, Text and Description string parameters, grouped by room, function type, icon and description role.",
   "notes": [
     "Mappings were extracted by matching stable channel-view IDs in the reference pair; project IDs and names are not stored.",
-    "Keys are exact original parameter texts. Unknown text is preserved until reviewed.",
+    "Icon mappings use exact original parameter texts. Field-level room rules take precedence; other unknown text is preserved until reviewed.",
     "Unchanged observations are counted separately and are not translation suggestions.",
     "More than one candidate means the reference is inconsistent; the field is not automatically selected.",
-    "Lighting OffAction had two untranslated observations. Power-supply OnText had both Uključeno and Isključeno; review this ambiguity.",
-    "Only parameters that exist in the loaded project are edited. XML attributes, including defaultValue and label, are not translated."
+    "Lighting OffAction had two untranslated observations. The reference power-supply OnText had seven Uključeno and one contradictory Isključeno; the configured translation is corrected to Uključeno.",
+    "Only parameters that exist in the loaded project are edited. XML attributes, including defaultValue and label, are not translated.",
+    "Trigger Text and NumericFloatStatus Description translations were confirmed in the reference pair. Description groups keep Button, Average, Sensor, Sensor (VOC) and Sensor (CO2) separate within each room.",
+    "NumericFloatStatus Description containing srednja (case-insensitive), or equal to Average (case-insensitive), becomes Srednja plus the current applied room name. Room numbers and WC capitalization are preserved; an unresolved room gives plain Srednja. The rule examines Description, not the object name or number of functions.",
+    "The room rule can normalize mixed Average and Srednja descriptions in the same room. Other mixed groups remain unselected for review. Automatic descriptions follow room-name changes; manual description edits and unchecked changes are preserved."
   ],
   "types": {
+    "de.gira.schema.functions.Trigger": {
+      "label_hr": "Tipka / okidač",
+      "fields": {
+        "Text": {
+          "label_hr": "Tekst gumba (Display text)"
+        }
+      },
+      "icons": {
+        "10": {
+          "fields": {
+            "Text": {
+              "Unlock": {
+                "candidates": [
+                  {
+                    "text": "Otključaj",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "de.gira.schema.functions.NumericFloatStatus": {
+      "label_hr": "Brojčani prikaz",
+      "fields": {
+        "Description": {
+          "label_hr": "Opis (Description)",
+          "group_by_value": true,
+          "room_rule": {
+            "contains_ci": "srednja",
+            "equals_ci": ["Average"],
+            "prefix_hr": "Srednja"
+          }
+        }
+      },
+      "icons": {
+        "2": {
+          "fields": {
+            "Description": {
+              "Sensor": {
+                "candidates": [
+                  {
+                    "text": "Senzor",
+                    "count": 5
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "14": {
+          "fields": {
+            "Description": {
+              "Button": {
+                "candidates": [
+                  {
+                    "text": "Tipkalo",
+                    "count": 5
+                  }
+                ],
+                "unchanged_count": 0
+              },
+              "Average": {
+                "candidates": [
+                  {
+                    "text": "Srednja",
+                    "count": 4
+                  }
+                ],
+                "unchanged_count": 0
+              },
+              "Sensor": {
+                "candidates": [
+                  {
+                    "text": "Senzor",
+                    "count": 5
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "46": {
+          "fields": {
+            "Description": {
+              "Sensor": {
+                "candidates": [
+                  {
+                    "text": "Senzor",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        },
+        "120": {
+          "fields": {
+            "Description": {
+              "Sensor (VOC)": {
+                "candidates": [
+                  {
+                    "text": "Senzor (VOC)",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              },
+              "Sensor (CO2)": {
+                "candidates": [
+                  {
+                    "text": "Senzor (CO2)",
+                    "count": 1
+                  }
+                ],
+                "unchanged_count": 0
+              }
+            }
+          }
+        }
+      }
+    },
     "de.gira.schema.functions.BinaryStatus": {
       "label_hr": "Binarni status",
       "fields": {

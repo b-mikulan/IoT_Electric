@@ -48,8 +48,19 @@ class StatusTextTests(unittest.TestCase):
         self.assertEqual(first.fields[0].suggested, "Upaljeno")
         self.assertTrue(first.fields[0].selected)
 
-    def test_reference_ambiguity_and_custom_or_mixed_text_are_not_selected(self):
-        ambiguous = self.groups(files_for(channel(icon="164")))[0].fields[0]
+    def test_configured_power_supply_status_uses_corrected_translation(self):
+        current = self.groups(files_for(channel(icon="164")))[0].fields[0]
+        self.assertEqual(current.suggested, "Uključeno")
+        self.assertTrue(current.selected)
+
+    def test_ambiguity_and_custom_or_mixed_text_are_not_selected(self):
+        dictionary = deepcopy(self.dictionary)
+        dictionary["types"][URN]["icons"]["164"]["fields"]["OnText"]["On"]["candidates"] = [
+            {"text": "Uključeno", "count": 7},
+            {"text": "Isključeno", "count": 1},
+        ]
+        ambiguous = build_status_groups(files_for(channel(icon="164")),
+                                        {"a": "room"}, dictionary)[0].fields[0]
         self.assertIsNone(ambiguous.suggested)
         self.assertFalse(ambiguous.selected)
         self.assertEqual(set(ambiguous.candidates), {"Uključeno", "Isključeno"})

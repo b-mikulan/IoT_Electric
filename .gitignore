@@ -1,6 +1,8 @@
 /node_modules
 /dist
 /output
+/projects/
+/docs/local/
 *.zip
 *.log
 *.knxproj

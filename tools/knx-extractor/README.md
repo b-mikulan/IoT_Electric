@@ -8,7 +8,7 @@ Run it from the repository root:
 npm run knx:extract -- path/to/project.knxproj
 ```
 
-The default destination is the ignored root `output/` folder. An alternative output parent can be supplied as the second argument:
+The default destination is the ignored `output/knx-extractor/` folder. An alternative output parent can be supplied as the second argument:
 
 ```sh
 npm run knx:extract -- path/to/project.knxproj path/to/output

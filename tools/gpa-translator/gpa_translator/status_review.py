@@ -7,15 +7,31 @@ from .status_texts import StatusEdit
 
 class StatusReview:
     def __init__(self, groups):
+        self.edits = {}
+        self.manual = set()
+        self.selection_overrides = set()
+        self.refresh(groups)
+
+    def refresh(self, groups):
+        """Refresh room-dependent suggestions while retaining the user's choices."""
+        previous = self.edits
         self.groups = groups
         self.by_room = defaultdict(list)
         self.edits = {}
-        self.manual = set()
         for group in groups:
             self.by_room[group.room_id].append(group)
             for field in group.fields:
                 key = group.key + (field.key,)
-                self.edits[key] = self._initial(field)
+                edit = self._initial(field)
+                if key in previous:
+                    old = previous[key]
+                    if key in self.manual:
+                        edit = StatusEdit(field, old.text, old.selected)
+                    elif key in self.selection_overrides:
+                        edit.selected = old.selected
+                self.edits[key] = edit
+        self.manual.intersection_update(self.edits)
+        self.selection_overrides.intersection_update(self.edits)
 
     @staticmethod
     def _initial(field):
@@ -28,14 +44,17 @@ class StatusReview:
         edit = self.edits[key]
         self.edits[key] = StatusEdit(edit.field, value, any(t.old != value for t in edit.field.targets))
         self.manual.add(key)
+        self.selection_overrides.discard(key)
 
     def set_selected(self, key, selected):
         edit = self.edits[key]
         self.edits[key] = StatusEdit(edit.field, edit.text, selected)
+        self.selection_overrides.add(key)
 
     def reset(self, key):
         self.edits[key] = self._initial(self.edits[key].field)
         self.manual.discard(key)
+        self.selection_overrides.discard(key)
 
     def unresolved(self, key):
         edit = self.edits[key]

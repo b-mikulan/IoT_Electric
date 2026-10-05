@@ -1,4 +1,4 @@
-"""Review and byte-preserving edits for existing GPA operation/status texts."""
+"""Review and byte-preserving edits for existing GPA display/status texts."""
 
 from __future__ import annotations
 
@@ -11,10 +11,12 @@ import xml.etree.ElementTree as ET
 from xml.parsers import expat
 from xml.sax.saxutils import escape
 
+from .name_rules import with_room
 from .translate import NS, text
 
 
-FIELDS = ("OnAction", "OffAction", "OnText", "OffText")
+FIELDS = ("OnAction", "OffAction", "OnText", "OffText", "Text", "Description")
+GroupKey = tuple[str | None, str, str] | tuple[str | None, str, str, str]
 
 
 @dataclass(frozen=True)
@@ -42,13 +44,14 @@ class StatusField:
 
 @dataclass
 class StatusGroup:
-    key: tuple[str | None, str, str]
+    key: GroupKey
     room_id: str | None
     urn: str
     icon_id: str
     type_label: str
     fields: list[StatusField] = field(default_factory=list)
     entity_ids: list[str] = field(default_factory=list)
+    variant: str | None = None
 
 
 @dataclass
@@ -69,6 +72,26 @@ def load_status_dictionary(path: Path) -> dict:
             for name, definition in entry["fields"].items():
                 if name not in FIELDS or not isinstance(definition["label_hr"], str):
                     raise ValueError
+                if type(definition.get("group_by_value", False)) is not bool:
+                    raise ValueError
+                rule = definition.get("room_rule")
+                if rule is not None:
+                    if (name != "Description" or not definition.get("group_by_value")
+                            or not isinstance(rule, dict)):
+                        raise ValueError
+                    validate_status_text(rule["prefix_hr"])
+                    if not rule["prefix_hr"].strip():
+                        raise ValueError
+                    contains = rule.get("contains_ci")
+                    equals = rule.get("equals_ci", [])
+                    if (contains is not None and (not isinstance(contains, str) or not contains.strip())
+                            or not isinstance(equals, list)
+                            or any(not isinstance(value, str) or not value.strip() for value in equals)
+                            or not contains and not equals):
+                        raise ValueError
+            if sum(definition.get("group_by_value", False)
+                   for definition in entry["fields"].values()) > 1:
+                raise ValueError
             for icon, icon_entry in entry["icons"].items():
                 if not isinstance(icon, str):
                     raise ValueError
@@ -87,22 +110,42 @@ def load_status_dictionary(path: Path) -> dict:
     return data
 
 
-def _suggest_field(status_field: StatusField, translations: dict) -> None:
+def _room_rule_prefix(old: str, rule: dict | None) -> str | None:
+    if rule is None:
+        return None
+    value = old.casefold()
+    contains = rule.get("contains_ci")
+    if ((contains and contains.casefold() in value)
+            or any(value == source.casefold() for source in rule.get("equals_ci", []))):
+        return rule["prefix_hr"]
+    return None
+
+
+def _suggest_field(
+    status_field: StatusField, translations: dict, room_rule: dict | None = None,
+    room_name: str | None = None,
+) -> None:
     status_field.old_values = dict(Counter(target.old for target in status_field.targets))
     known_hr = {candidate["text"] for entry in translations.values()
                 for candidate in entry["candidates"]}
     possible = []
     choices = []
+    rule_matches = []
     for old in status_field.old_values:
-        entry = translations.get(old)
-        candidates = list(dict.fromkeys(c["text"] for c in entry["candidates"])) if entry else []
+        prefix = _room_rule_prefix(old, room_rule)
+        rule_matches.append(prefix is not None)
+        if prefix is not None:
+            candidates = [with_room(prefix, room_name) if room_name else prefix]
+        else:
+            entry = translations.get(old)
+            candidates = list(dict.fromkeys(c["text"] for c in entry["candidates"])) if entry else []
         choices.extend(candidates)
-        # Recognise already translated values, but never infer from substrings.
+        # Other dictionary values still require an exact match.
         if not candidates and old in known_hr:
             candidates = [old]
         possible.append(candidates[0] if len(candidates) == 1 else None)
     status_field.candidates = list(dict.fromkeys(choices))
-    if len(status_field.old_values) > 1:
+    if len(status_field.old_values) > 1 and not all(rule_matches):
         status_field.reason = "Različiti izvorni tekstovi u grupi — odaberite zajednički tekst ručno."
     elif any(value is None for value in possible):
         status_field.reason = (
@@ -112,19 +155,28 @@ def _suggest_field(status_field: StatusField, translations: dict) -> None:
     elif len(set(possible)) == 1:
         status_field.suggested = possible[0]
         status_field.selected = any(t.old != status_field.suggested for t in status_field.targets)
-        status_field.reason = ("Prijevod iz primjera prema tipu funkcije, ikoni i izvornom tekstu."
-                               if status_field.selected else "Tekst je već preveden.")
+        if all(rule_matches) and status_field.selected:
+            status_field.reason = (
+                f"Pravilo opisa prema izvornom tekstu + soba: {room_name}."
+                if room_name else "Pravilo opisa prema izvornom tekstu; nema jednoznačne sobe."
+            )
+        else:
+            status_field.reason = ("Prijevod iz rječnika prema tipu funkcije, ikoni i izvornom tekstu."
+                                   if status_field.selected else "Tekst je već preveden.")
 
 
 def build_status_groups(
     files: dict[str, bytes], function_rooms: dict[str, str | None], dictionary: dict,
+    room_names: dict[str, str] | None = None,
 ) -> list[StatusGroup]:
     """Group supported existing text fields by room, function type and icon.
 
-    Mixed source values are always left for explicit review, including a mix of
-    English and already translated values. Unrelated string fields are ignored.
+    Mixed dictionary values are left for explicit review. Values matching an
+    explicit room rule share its generated suggestion. A description discriminator
+    keeps Button, Average, CO2 and VOC descriptions in separate groups. Unrelated
+    string fields are ignored; no role is inferred from object counts or names.
     """
-    groups: dict[tuple[str | None, str, str], StatusGroup] = {}
+    groups: dict[GroupKey, StatusGroup] = {}
     for path, raw in files.items():
         if not re.search(r"/channelviews/\$[^/]+\.xml$", path):
             continue
@@ -149,8 +201,22 @@ def build_status_groups(
         if not found:
             continue
         room_id = function_rooms.get(uid)
-        key = room_id, urn, icon
-        group = groups.setdefault(key, StatusGroup(key, room_id, urn, icon, definition["label_hr"]))
+        mappings = definition["icons"].get(icon, {}).get("fields", {})
+        key: GroupKey = room_id, urn, icon
+        variant = None
+        for name, target in found:
+            if definition["fields"][name].get("group_by_value", False):
+                translations = mappings.get(name, {})
+                entry = translations.get(target.old)
+                candidates = list(dict.fromkeys(c["text"] for c in entry["candidates"])) if entry else []
+                # Recognise the same role before and after translation. Unknown
+                # descriptions retain their exact value as a separate group.
+                variant = (_room_rule_prefix(target.old, definition["fields"][name].get("room_rule"))
+                           or (candidates[0] if len(candidates) == 1 else target.old))
+                key = room_id, urn, icon, f"{name}:{variant}"
+                break
+        group = groups.setdefault(key, StatusGroup(key, room_id, urn, icon,
+                                                   definition["label_hr"], variant=variant))
         group.entity_ids.append(uid)
         for name, target in found:
             item = next((f for f in group.fields if f.key == name), None)
@@ -162,7 +228,9 @@ def build_status_groups(
         mappings = dictionary["types"][group.urn]["icons"].get(group.icon_id, {}).get("fields", {})
         group.fields.sort(key=lambda f: FIELDS.index(f.key))
         for item in group.fields:
-            _suggest_field(item, mappings.get(item.key, {}))
+            field_definition = dictionary["types"][group.urn]["fields"][item.key]
+            _suggest_field(item, mappings.get(item.key, {}), field_definition.get("room_rule"),
+                           (room_names or {}).get(group.room_id))
     return list(groups.values())
 
 

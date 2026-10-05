@@ -1,0 +1,704 @@
+{
+  "schema_version": 1,
+  "source_language": "en-GB",
+  "target_language": "hr",
+  "scope": "Exact known original display names used after conventional AC/FH/T/S rules and before automatic room/icon suggestions.",
+  "notes": [
+    "Source names match whole strings exactly; a code such as 1.1 does not match 11.1 or part of a longer name.",
+    "Optional icon_id and urn restrict a rule. expected_room describes the reference convention and does not restrict matching.",
+    "These defaults describe the supplied reference and Marin's convention. A different project may assign a code to a different room; review or choose the automatic alternative.",
+    "Numbered room variants are omitted; the room dictionary handles room numbers separately.",
+    "Sensor Mode and Night Mode have different reference translations with identical icon/type selectors across rooms. Their current manual rules preserve the chosen translations.",
+    "The reference contains 36.39 for Ogledalo kupaonica 2; Marin also specifies 35.39. Both exact source names are retained.",
+    "Only entity display names and translated room labels are included. Project identifiers and credentials are not stored.",
+    "Numbered AC, FH, T and S function names are omitted: shared naming rules use Klima, Podno grijanje, Temperatura and Senzor plus the actual associated room. FH also matches without a number.",
+    "The supplied R1 apartment block adds confirmed numeric aliases 2.9 (Switch only) and 32.36 (Trigger only). Existing source-name entries are preserved; conflicted or unconfirmed block codes are left to automatic suggestions and manual review.",
+    "5.19-20 is labelled Sjenilo boravak after reviewing 11 matching block occurrences: Blind icon 7, Covering function, Living room. This generic HR label is derived from the consistent icon/type/room context, not a directly matched translated reference entity; no facade or window orientation is inferred."
+  ],
+  "rules": [
+    {
+      "source_name": "1.1",
+      "target_hr": "Rasvjeta ulaz",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Ulaz",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "1.2",
+      "target_hr": "Rasvjeta hodnik",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Hodnik",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "1.3",
+      "target_hr": "Stropna blagovaonica",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Boravak",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "1.4",
+      "target_hr": "Stropna otok",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kuhinja",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "1.5",
+      "target_hr": "Stropna kuhinja",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kuhinja",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "1.6",
+      "target_hr": "Stropna boravak",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Boravak",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "2.10",
+      "target_hr": "Stropna loggia",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Loggia",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "2.11",
+      "target_hr": "Rasvjeta ormara",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Opći",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "2.12",
+      "target_hr": "LED kuhinja",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kuhinja",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "2.13",
+      "target_hr": "Spavaća zid desno",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Spavaća",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "2.14",
+      "target_hr": "Spavaća zid lijevo",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Spavaća",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "2.8-9",
+      "target_hr": "Stropna spavaća",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Spavaća",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "3.15",
+      "target_hr": "Utičnica boravak",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Boravak",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "3.16",
+      "target_hr": "Utičnica spavaća",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Spavaća",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "35.37",
+      "target_hr": "Stropna kupaonica 2",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kupaonica 2",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "35.38",
+      "target_hr": "Indirektna kupaonica 2",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kupaonica 2",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "35.39",
+      "target_hr": "Ogledalo kupaonica 2",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kupaonica 2",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "36.39",
+      "target_hr": "Ogledalo kupaonica 2",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kupaonica 2",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "36.40",
+      "target_hr": "Radijator kupaonica 2",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kupaonica 2",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "38.42",
+      "target_hr": "Stropna dječja 1",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Dječja soba 1",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "38.43",
+      "target_hr": "Stropna dječja 2",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Dječja soba 2",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "38.45",
+      "target_hr": "Zidna dječja 1",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Dječja soba 1",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "38.46",
+      "target_hr": "Zidna dječja 2",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Dječja soba 2",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "39.47-48",
+      "target_hr": "Sjenilo dječja 1",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Dječja soba 1",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "39.49-50",
+      "target_hr": "Sjenilo dječja 2 jug",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Dječja soba 2",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "39.51-52",
+      "target_hr": "Sjenilo dječja 2 istok",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Dječja soba 2",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "5.17-18",
+      "target_hr": "Sjenilo loggia",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Loggia",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "5.21-22",
+      "target_hr": "Sjenilo spavaća",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Spavaća",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "6.25",
+      "target_hr": "Stropna WC",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "WC",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "6.26",
+      "target_hr": "Ogledalo WC",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "WC",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "6.27",
+      "target_hr": "Stropna kupaonica 1",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kupaonica 1",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "6.28",
+      "target_hr": "Indirektna kupaonica 1",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kupaonica 1",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "6.29",
+      "target_hr": "Ogledalo kupaonica 1",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kupaonica 1",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "7.30",
+      "target_hr": "Radijator kupaonica 1",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Kupaonica 1",
+      "provenance": "marin_email_2026-09-30"
+    },
+    {
+      "source_name": "8.31",
+      "target_hr": "Utičnica loggia",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Loggia",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "9.32",
+      "target_hr": "Opća",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Ulaz",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Auto Sensor",
+      "target_hr": "Auto Senzor",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Rekuperator",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Building Mode",
+      "target_hr": "Senzor loggia",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Loggia",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "E1",
+      "target_hr": "Vrata status",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Ulaz",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "E2",
+      "target_hr": "Zvono",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Ulaz",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "EB",
+      "target_hr": "Otvori vrata",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Ulaz",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Error",
+      "target_hr": "Greška",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Rekuperator",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Exhaust",
+      "target_hr": "Odsisni",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Rekuperator",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "F",
+      "target_hr": "Scena F",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Boravak",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "GDP Enable",
+      "target_hr": "Gira Cloud omogućen",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Dopuštenja",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "GDP Status",
+      "target_hr": "Gira Cloud status",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Dopuštenja",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "INST Active",
+      "target_hr": "Integrator status",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Dopuštenja",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "INST Enable",
+      "target_hr": "Integrator pristup omogućen",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Dopuštenja",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Inlet",
+      "target_hr": "Svježi",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Rekuperator",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Intensive",
+      "target_hr": "Intenzivno",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Rekuperator",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Lights Off",
+      "target_hr": "Gasi rasvjetu",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Opći",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Night Active",
+      "target_hr": "Noćni režim aktivan",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Opći",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Night Level",
+      "target_hr": "Noćna razina",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Opći",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Nominal",
+      "target_hr": "Nominalno",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Rekuperator",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Normal Level",
+      "target_hr": "Normalna razina",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Opći",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Off",
+      "target_hr": "Isključi",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Rekuperator",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Outgoing",
+      "target_hr": "Otpadni",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Rekuperator",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Reduced",
+      "target_hr": "Smanjeno",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Rekuperator",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Supply",
+      "target_hr": "Dobavni",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": "Rekuperator",
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Apartment",
+      "target_hr": "Stan",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Bedroom",
+      "target_hr": "Spavaća",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Common",
+      "target_hr": "Opći",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Corridor",
+      "target_hr": "Degažman",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Entrance",
+      "target_hr": "Ulaz",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Kitchen",
+      "target_hr": "Kuhinja",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Living room",
+      "target_hr": "Boravak",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Outside",
+      "target_hr": "Zgrada",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Permissions",
+      "target_hr": "Dopuštenja",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Recuperator",
+      "target_hr": "Rekuperator",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "reference_project_pair"
+    },
+    {
+      "source_name": "Sensor Mode",
+      "target_hr": "Senzor režim",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "manual"
+    },
+    {
+      "source_name": "Night Mode",
+      "target_hr": "Noćni režim",
+      "kind": "function",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "manual"
+    },
+    {
+      "source_name": "2.9",
+      "target_hr": "Stropna spavaća",
+      "kind": "function",
+      "icon_id": null,
+      "urn": "de.gira.schema.functions.Switch",
+      "expected_room": "Spavaća",
+      "provenance": "block_r1_2026-10-01_stable_entity_id"
+    },
+    {
+      "source_name": "32.36",
+      "target_hr": "Otvori vrata",
+      "kind": "function",
+      "icon_id": null,
+      "urn": "de.gira.schema.functions.Trigger",
+      "expected_room": "Ulaz",
+      "provenance": "block_r1_2026-10-01_datapoint_association"
+    },
+    {
+      "source_name": "5.19-20",
+      "target_hr": "Sjenilo boravak",
+      "kind": "function",
+      "icon_id": "7",
+      "urn": "de.gira.schema.functions.Covering",
+      "expected_room": "Boravak",
+      "provenance": "block_r1_2026-10-02_icon_type_room_review"
+    },
+    {
+      "source_name": "Roof",
+      "target_hr": "Krov",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "manual"
+    },
+    {
+      "source_name": "Atrium",
+      "target_hr": "Atrij",
+      "kind": "room",
+      "icon_id": null,
+      "urn": null,
+      "expected_room": null,
+      "provenance": "manual"
+    }
+  ]
+}

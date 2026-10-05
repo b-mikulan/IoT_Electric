@@ -6,7 +6,7 @@ const { XMLParser } = require("fast-xml-parser");
 const args = process.argv.slice(2);
 const INPUT_FILE = args[0] ? path.resolve(args[0]) : null;
 const INPUT_BASE = INPUT_FILE ? path.parse(INPUT_FILE).name : null;
-const OUTPUT_PARENT_DIR = path.resolve(args[1] || "output");
+const OUTPUT_PARENT_DIR = path.resolve(args[1] || path.join("output", "knx-extractor"));
 const OUTPUT_DIR = INPUT_BASE
   ? path.join(OUTPUT_PARENT_DIR, `${INPUT_BASE}_extracted`)
   : null;

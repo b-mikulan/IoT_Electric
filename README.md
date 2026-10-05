@@ -21,14 +21,30 @@ The middleware exposes public health and Swagger pages at `/health` and `/api-do
 ├── scripts/                     # Repository maintenance helpers
 ├── tools/
 │   ├── ews-sandbox/             # Manual EWS experiments; not used by the application
+│   ├── gpa-translator/           # Gira project name/status translator and review UI
 │   └── knx-extractor/            # KNX project extraction utility and legacy fixtures
+├── projects/                    # Ignored local GPA/KNX input projects
+├── output/                      # Ignored generated files, grouped by tool
+├── docs/local/                  # Ignored local guides
 ├── .github/workflows/           # Test and Docker image automation
 ├── Dockerfile                   # Middleware image
 ├── docker-compose.yml           # Local/test build
 └── docker-compose.portainer.yml # Deployment with published images
 ```
 
-Local `.env`, `*.knxproj`, `output/`, and dependency folders are intentionally ignored. They contain credentials, local project data, generated files, or installed packages and should not be committed.
+Local `.env`, `projects/`, `docs/local/`, `*.knxproj`, `output/`, and dependency folders are intentionally ignored. They contain credentials, local project data, generated files, or installed packages and should not be committed.
+
+Local project inputs are organized as follows:
+
+- `projects/gpa/reference/`: original R1-13 English/Croatian reference archives.
+- `projects/gpa/blocks/R1/`: the supplied apartment block archives.
+- `projects/gpa/extracted/`: previously unpacked reference projects.
+- `projects/knx/`: KNX source projects.
+- `output/gpa-translator/`: `releases/`, `translated/`, `tests/`, and `reports/`.
+- `output/knx-extractor/`: extracted KNX XML and settings.
+- `docs/local/UPUTE.html`: local setup and release guide.
+
+See [tools/gpa-translator/README.md](tools/gpa-translator/README.md) for the GPA tool.
 
 ## Start locally with Docker
 
@@ -76,7 +92,7 @@ The dashboard needs the middleware's plaintext password because it is an API cli
 | `npm run test:tools` | Run only development-tool tests |
 | `npm run test:dashboard` | Run only dashboard tests |
 | `npm run auth:generate` | Generate middleware login credentials |
-| `npm run knx:extract -- project.knxproj` | Extract a KNX project into ignored `output/` |
+| `npm run knx:extract -- project.knxproj` | Extract a KNX project into ignored `output/knx-extractor/` |
 
 For a non-Docker dashboard preview, install its dependencies with `npm ci --prefix dashboard` and run `npm start --prefix dashboard`.
 

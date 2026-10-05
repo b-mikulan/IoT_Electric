@@ -15,6 +15,8 @@ import zipfile
 
 
 from .paths import DATA_DIRECTORY
+from .defaults import default_rule_for, default_target_rule_for, load_defaults
+from .name_rules import name_rule_for, with_room
 
 HERE = DATA_DIRECTORY
 NS = "{http://service.schema.gira.de/configuration}"
@@ -32,6 +34,13 @@ class Proposal:
     room: str | None = None
     icon_id: str | None = None
     room_id: str | None = None
+    urn: str | None = None
+    automatic_new: str | None = None
+    automatic_status: str | None = None
+    automatic_reason: str | None = None
+    default_new: str | None = None
+    default_room: str | None = None
+    default_source: str | None = None
 
 
 def load_dictionary(path: Path, key: str) -> dict:
@@ -82,6 +91,7 @@ def propose_names(
     files: dict[str, bytes],
     rooms: dict[str, dict[str, str]],
     icons: dict[str, dict[str, str]],
+    defaults=(),
 ) -> list[Proposal]:
     locations = {}
     functions = []
@@ -119,23 +129,24 @@ def propose_names(
         room = locations.get(room_id)
         entry = icons.get(icon)
         new, status, reason = None, "unknown", "unknown_icon"
-        # Explicit sensor convention takes precedence over the icon label.
-        if re.fullmatch(r"S\d+", old, re.I):
+        # Standard function codes use the actual room, independently of icons.
+        naming_rule = name_rule_for(old, room)
+        if naming_rule is not None:
             if room is None:
                 status, reason = "unknown", "missing_ambiguous_or_unknown_room"
             else:
-                new = f"Senzor {room[:1].lower() + room[1:]}"
-                status, reason = ("unchanged" if new == old else "ready"), "sensor_and_room"
+                new = naming_rule.room_name(room)
+                status, reason = ("unchanged" if new == old else "ready"), naming_rule.reason
         else:
             if entry is None:
                 status, reason = "unknown", "unknown_icon"
             elif room is None:
                 status, reason = "unknown", "missing_ambiguous_or_unknown_room"
             else:
-                new = f"{entry['hr']} {room[:1].lower() + room[1:]}"
+                new = with_room(entry['hr'], room)
                 status, reason = ("unchanged" if new == old else "ready"), "icon_and_room"
         proposals.append(Proposal(path, uid, "function", old, new, status, reason,
-                                  room, icon, room_id))
+                                  room, icon, room_id, urn=text(node, "Urn")))
 
     # Generic icons can produce identical names for several lights in one room.
     counts = Counter((p.room_id, p.new if p.status == "ready" else p.old)
@@ -144,6 +155,24 @@ def propose_names(
         if p.kind == "function" and p.status == "ready":
             if counts[(p.room_id, p.new)] > 1:
                 p.status, p.reason = "review", "duplicate_name_in_room"
+    for p in proposals:
+        p.automatic_new, p.automatic_status, p.automatic_reason = p.new, p.status, p.reason
+        uses_name_rule = p.kind == "function" and name_rule_for(p.old, p.room) is not None
+        rule = None if uses_name_rule else (
+            default_rule_for(p.old, p.kind, p.icon_id, p.urn, defaults)
+            or default_target_rule_for(p.old, p.kind, p.icon_id, p.urn, defaults))
+        if rule is not None:
+            p.default_new, p.default_room, p.default_source = rule.target_hr, rule.expected_room, rule.provenance
+            p.new = rule.target_hr
+            p.status = "unchanged" if p.new == p.old else "ready"
+            p.reason = "priority_dictionary"
+        p.status = "unknown" if p.new is None else "unchanged" if p.new == p.old else "ready"
+    # Check the final priority proposals, which may resolve earlier icon collisions.
+    counts = Counter((p.room_id, p.new if p.status == "ready" else p.old)
+                     for p in proposals if p.kind == "function")
+    for p in proposals:
+        if p.kind == "function" and p.status == "ready" and counts[(p.room_id, p.new)] > 1:
+            p.status = "review"
     return proposals
 
 
@@ -242,6 +271,7 @@ def main() -> int:
     parser.add_argument("project", type=Path)
     parser.add_argument("--rooms", type=Path, default=HERE / "rooms.hr.json")
     parser.add_argument("--icons", type=Path, default=HERE / "icons.hr.json")
+    parser.add_argument("--defaults", type=Path, default=HERE / "defaults.hr.json")
     parser.add_argument("--report", type=Path, help="Spremi JSON prijedloge u novu datoteku.")
     parser.add_argument("--output", type=Path, help="Primijeni samo ready prijedloge u novi GPA arhiv.")
     args = parser.parse_args()
@@ -251,7 +281,7 @@ def main() -> int:
             raise ValueError("Izlazi moraju biti različite, nove datoteke.")
         files = read_archive(args.project)
         proposals = propose_names(files, load_dictionary(args.rooms, "translations"),
-                                  load_dictionary(args.icons, "icons"))
+                                  load_dictionary(args.icons, "icons"), load_defaults(args.defaults))
         report = {"schema_version": 1, "input": str(args.project),
                   "summary": dict(Counter(p.status for p in proposals)),
                   "proposals": [asdict(p) for p in proposals]}

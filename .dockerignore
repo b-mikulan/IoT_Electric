@@ -16,6 +16,8 @@ README.md
 UPUTE.html
 docker-compose*.yml
 output
+projects
+docs/local
 *.crt
 *.cer
 *.pem

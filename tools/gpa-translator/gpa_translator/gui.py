@@ -10,7 +10,10 @@ from threading import Thread
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from .defaults import load_defaults
+from .defaults_editor import DefaultsEditor
 from .icon_images import IconImages, icon_cache_ready, prepare_icon_cache, proposal_uses_icon
+from .name_rules import name_rule_for
 from .review import ReviewSession
 from .status_review import StatusReview
 from .status_texts import apply_status_edits, build_status_groups, load_status_dictionary
@@ -33,11 +36,15 @@ class TranslatorApp:
         style.configure("Warning.TLabel", foreground="#9c5800")
         self.session: ReviewSession | None = None
         self.status_review: StatusReview | None = None
+        self.status_dictionary: dict | None = None
+        self.status_function_rooms: dict[str, str | None] = {}
+        self.status_room_names: dict[str, str] = {}
         self.files: dict[str, bytes] = {}
         self.source: Path | None = None
         self.dirty = False
         self._syncing = False
         self.rows = {}
+        self.strategy_controls = {}
         self.icon_labels = {}
         self.status_rows = {}
         self.status_icon_labels = []
@@ -46,6 +53,7 @@ class TranslatorApp:
         self.file_label = tk.StringVar(value="Odaberite GPA projekt za pregled naziva.")
         self.summary = tk.StringVar(value="Sve se obrađuje lokalno na ovom računalu.")
         self.icon_status = tk.StringVar()
+        self.allow_duplicates = tk.BooleanVar(master=root, value=False)
         self._build()
         if not icon_cache_ready():
             self.icon_status.set("Pripremam slike ikona iz lokalne instalacije GPA-a…")
@@ -92,15 +100,21 @@ class TranslatorApp:
         self.tabs.pack(fill="both", expand=True)
         names_page = ttk.Frame(self.tabs)
         statuses_page = ttk.Frame(self.tabs)
+        self.defaults_editor = DefaultsEditor(self.tabs, HERE / "defaults.hr.json", self._defaults_saved)
         self.tabs.add(names_page, text="Nazivi")
-        self.tabs.add(statuses_page, text="Statusni tekstovi")
+        self.tabs.add(statuses_page, text="Tekstovi i opisi")
+        self.tabs.add(self.defaults_editor, text="Prioritetni rječnik")
+        self.duplicates_toggle = ttk.Checkbutton(
+            names_page, text="Dopusti duplikatne nazive", variable=self.allow_duplicates,
+            command=self._toggle_duplicates)
+        self.duplicates_toggle.pack(anchor="w", padx=12, pady=(10, 6))
         self.canvas, self.content = self._scroll_page(names_page)
         self.status_canvas, self.status_content = self._scroll_page(statuses_page)
         self.root.bind_all("<MouseWheel>", self._wheel)
         self.empty_label = ttk.Label(self.content, text="Otvorite .gpa datoteku kako biste vidjeli prijedloge.",
                                     padding=(20, 30), style="Muted.TLabel")
         self.empty_label.pack(anchor="w")
-        ttk.Label(self.status_content, text="Otvorite projekt za pregled tekstova po sobi i tipu funkcije.",
+        ttk.Label(self.status_content, text="Otvorite projekt za pregled statusnih tekstova, teksta gumba i opisa po sobi.",
                   padding=(20, 30), style="Muted.TLabel").pack(anchor="w")
         ttk.Separator(self.root).pack(fill="x", padx=22, pady=(12, 0))
         ttk.Label(self.root, textvariable=self.summary, padding=(22, 12)).pack(fill="x")
@@ -148,12 +162,13 @@ class TranslatorApp:
             files = read_archive(path)
             rooms = load_dictionary(HERE / "rooms.hr.json", "translations")
             icons = load_dictionary(HERE / "icons.hr.json", "icons")
-            proposals = propose_names(files, rooms, icons)
-            session = ReviewSession(proposals, icons)
+            proposals = propose_names(files, rooms, icons, load_defaults(HERE / "defaults.hr.json"))
+            session = ReviewSession(proposals, icons, allow_duplicates=self.allow_duplicates.get())
             status_dictionary = load_status_dictionary(HERE / "status-texts.hr.json")
             function_rooms = {p.entity_id: (p.room_id if p.room_id in session.by_id else None)
                               for p in proposals if p.kind == "function"}
-            statuses = StatusReview(build_status_groups(files, function_rooms, status_dictionary))
+            room_names = self._applied_room_names(session)
+            statuses = StatusReview(build_status_groups(files, function_rooms, status_dictionary, room_names))
         except Exception as error:
             messagebox.showerror("Projekt nije učitan", str(error), parent=self.root)
             return False
@@ -161,6 +176,9 @@ class TranslatorApp:
             self.root.configure(cursor="")
         self.source, self.files, self.session = path, files, session
         self.status_review = statuses
+        self.status_dictionary = status_dictionary
+        self.status_function_rooms = function_rooms
+        self.status_room_names = room_names
         self.dirty = False
         self.file_label.set(path.name)
         self.group_ids = [p.entity_id for p in session.rooms]
@@ -173,6 +191,7 @@ class TranslatorApp:
             self.show_group()
         else:
             self.rows = {}
+            self.strategy_controls = {}
             self.icon_labels = {}
             self.status_rows = {}
             for child in self.content.winfo_children():
@@ -182,6 +201,23 @@ class TranslatorApp:
             self._show_status_groups(None)
         self._summary()
         return True
+
+    @staticmethod
+    def _applied_room_names(session):
+        return {room.entity_id: (session.edits[room.entity_id].name
+                                if session.edits[room.entity_id].selected else room.old)
+                for room in session.rooms}
+
+    def _refresh_status_proposals(self):
+        if self.session is None or self.status_review is None or self.status_dictionary is None:
+            return
+        room_names = self._applied_room_names(self.session)
+        if room_names == self.status_room_names:
+            return
+        self.status_review.refresh(build_status_groups(
+            self.files, self.status_function_rooms, self.status_dictionary, room_names))
+        self.status_room_names = room_names
+        self._sync_status_rows()
 
     def _refresh_room_list(self):
         if self.session is None:
@@ -200,6 +236,7 @@ class TranslatorApp:
             return
         uid = self.group_ids[self.room_list.curselection()[0]]
         self.rows = {}
+        self.strategy_controls = {}
         self.icon_labels = {}
         for child in self.content.winfo_children():
             child.destroy()
@@ -232,11 +269,13 @@ class TranslatorApp:
                   wraplength=650, padding=(12, 14), style="Muted.TLabel").pack(fill="x")
         groups = self.status_review.by_room[room_id] if self.status_review else []
         if not groups:
-            ttk.Label(self.status_content, text="U ovoj sobi nema podržanih ON/OFF statusnih tekstova.",
+            ttk.Label(self.status_content, text="U ovoj sobi nema podržanih statusnih tekstova, teksta gumba ni opisa.",
                       padding=12, style="Muted.TLabel").pack(anchor="w")
         for group in groups:
             icon = self.session.icons.get(group.icon_id, {})
             label = group.type_label + " · " + icon.get("hr", f"Ikona {group.icon_id}")
+            if group.variant is not None:
+                label += " · Opis: " + (group.variant or "(prazno)")
             card = ttk.LabelFrame(self.status_content, text=label, padding=12)
             card.pack(fill="x", padx=10, pady=(0, 16))
             members = [self.session.by_id[uid].old for uid in group.entity_ids if uid in self.session.by_id]
@@ -267,7 +306,7 @@ class TranslatorApp:
                 ttk.Button(row, text="Vrati", width=6, command=lambda k=key: self._status_reset(k)).grid(row=1, column=4, padx=(8, 0))
                 reason = ttk.Label(row, wraplength=600, style="Muted.TLabel")
                 reason.grid(row=2, column=1, columnspan=4, sticky="w")
-                self.status_rows[key] = (value, selected, reason)
+                self.status_rows[key] = (value, selected, reason, entry)
                 value.trace_add("write", lambda *_, k=key, v=value: self._status_edit(k, v.get()))
         self.status_canvas.yview_moveto(0)
         self._sync_status_rows()
@@ -281,8 +320,9 @@ class TranslatorApp:
             for label, icon_id in self.status_icon_labels:
                 image = self.icon_images.get(icon_id)
                 label.configure(image=image if image is not None else "")
-            for key, (value, selected, reason) in self.status_rows.items():
+            for key, (value, selected, reason, entry) in self.status_rows.items():
                 edit = self.status_review.edits[key]
+                entry.configure(values=edit.field.candidates)
                 if value.get() != edit.text:
                     value.set(edit.text)
                 selected.set(edit.selected)
@@ -337,6 +377,17 @@ class TranslatorApp:
         reason.pack(side="left", fill="x", expand=True)
         self.icon_labels[p.entity_id] = icon_label
         self.rows[p.entity_id] = (name, checked, reason, entry)
+        if p.default_new is not None:
+            controls = ttk.Frame(frame)
+            controls.grid(row=3, column=1, columnspan=4, sticky="w", pady=(7, 0))
+            ttk.Label(controls, text="Način prijevoda:", style="Muted.TLabel").pack(side="left", padx=(0, 8))
+            strategy = tk.StringVar(value="Poznati prijevod" if edit.strategy == "default" else "Automatika")
+            choice = ttk.Combobox(controls, textvariable=strategy,
+                                  values=("Poznati prijevod", "Automatika"), state="readonly", width=23)
+            choice.pack(side="left")
+            choice.bind("<<ComboboxSelected>>", lambda _, uid=p.entity_id, var=strategy:
+                        self._strategy(uid, "default" if var.get() == "Poznati prijevod" else "automatic"))
+            self.strategy_controls[p.entity_id] = strategy
         name.trace_add("write", lambda *_: self._edit(p.entity_id, name.get()))
 
     def _reason(self, p, duplicates):
@@ -346,26 +397,39 @@ class TranslatorApp:
             if proposal_uses_icon(p, self.session):
                 icon = self.session.icons.get(p.icon_id, {})
                 detail += f" Početni prijedlog prema ikoni {icon.get('en', p.icon_id)} → {icon.get('hr', '?')}."
+        elif edit.strategy == "default":
+            detail = "Poznati prijevod iz prioritetnog rječnika."
         elif p.kind == "room":
             detail = "Prijevod naziva iz rječnika soba; broj se zadržava." if p.new is not None else "Naziv nije u rječniku. Unesite prijevod ručno."
         else:
             suggested = self.session.suggested_name(p)
-            if suggested is None or (p.status == "unknown" and edit.name == p.old):
+            naming_rule = name_rule_for(p.old, p.room)
+            if naming_rule is not None:
+                detail = (f"{naming_rule.label} → {naming_rule.prefix} + soba: {self.session.room_name(p)}."
+                          if suggested is not None else
+                          f"{naming_rule.label} → {naming_rule.prefix}; nema jednoznačne sobe. Unesite naziv ručno.")
+            elif suggested is None or (p.status == "unknown" and edit.name == p.old):
                 detail = "Nema poznate ikone ili jednoznačne sobe. Unesite naziv ručno."
-            elif p.reason == "sensor_and_room" or (p.old[:1].lower() == "s" and p.old[1:].isdigit()):
-                detail = f"Oznaka senzora + soba: {self.session.room_name(p)}."
             else:
                 icon = self.session.icons.get(p.icon_id, {})
                 detail = f"Ikona {icon.get('en', p.icon_id)} → {icon.get('hr', '?')} + soba {self.session.room_name(p)}."
+        if p.default_new is not None:
+            automatic = self.session.automatic_name(p)
+            detail += f" Poznati: {p.default_new}. Automatika: {automatic or 'nije dostupna'}."
+            actual_room = self.session.room_name(p) if p.kind == "function" else None
+            if p.default_room and actual_room and p.default_room.strip().casefold() != actual_room.strip().casefold():
+                detail += f" Različita soba: rječnik očekuje {p.default_room}, projekt je u sobi {actual_room}."
         if not edit.selected and edit.name != p.old:
             detail += " Prijedlog nije označen za spremanje."
         if p.entity_id in duplicates:
-            detail += " Više funkcija u ovoj sobi spremilo bi se pod istim nazivom."
-        elif p.status == "review" and not edit.manual:
+            detail += (" Duplikatni naziv dopušten je za spremanje." if self.session.allow_duplicates else
+                       " Više funkcija u ovoj sobi spremilo bi se pod istim nazivom.")
+        elif p.status == "review" and not edit.manual and not self.session.allow_duplicates:
             detail += " Početni prijedlog ponavlja se; pregledajte i označite željene promjene."
         return detail
 
     def _sync_rows(self):
+        self._refresh_status_proposals()
         self._syncing = True
         try:
             duplicates = self.session.duplicate_ids()
@@ -374,6 +438,8 @@ class TranslatorApp:
                 if name.get() != edit.name:
                     name.set(edit.name)
                 checked.set(edit.selected)
+                if uid in self.strategy_controls:
+                    self.strategy_controls[uid].set("Poznati prijevod" if edit.strategy == "default" else "Automatika")
                 p = self.session.by_id[uid]
                 icon_label = self.icon_labels[uid]
                 if proposal_uses_icon(p, self.session):
@@ -383,7 +449,10 @@ class TranslatorApp:
                     icon_label.pack(side="left", before=reason, padx=(0, 10))
                 else:
                     icon_label.pack_forget()
-                warning = uid in duplicates or p.status in ("review", "unknown")
+                room = self.session.room_name(p) if p.kind == "function" else None
+                mismatch = bool(p.default_room and room and p.default_room.strip().casefold() != room.strip().casefold())
+                warning = (p.status == "unknown" or mismatch or
+                           (not self.session.allow_duplicates and (uid in duplicates or p.status == "review")))
                 reason.configure(text=self._reason(p, duplicates), style="Warning.TLabel" if warning else "Muted.TLabel")
         finally:
             self._syncing = False
@@ -395,6 +464,23 @@ class TranslatorApp:
         self.session.set_name(uid, name)
         self.dirty = True
         self._sync_rows()
+
+    def _toggle_duplicates(self):
+        if self.session is not None:
+            self.session.set_allow_duplicates(self.allow_duplicates.get())
+            self.dirty = True
+            self._sync_rows()
+
+    def _strategy(self, uid, strategy):
+        self.session.set_strategy(uid, strategy)
+        self.dirty = True
+        self._sync_rows()
+
+    def _defaults_saved(self, rules):
+        if self.session is not None:
+            self.session.refresh_defaults(rules)
+            self.dirty = True
+            self.show_group()
 
     def _toggle(self, uid, checked):
         self.session.set_selected(uid, checked)
@@ -416,6 +502,7 @@ class TranslatorApp:
     def save(self):
         if self.session is None:
             return
+        self._refresh_status_proposals()
         try:
             reviewed = self.session.reviewed()
             status_files, status_count = apply_status_edits(self.files, self.status_review.reviewed())
@@ -443,7 +530,7 @@ class TranslatorApp:
         messagebox.showinfo("Projekt spremljen", f"Spremljeno {count} naziva i {status_count} statusnih tekstova u:\n{filename}", parent=self.root)
 
     def close(self):
-        if self._discard_ok():
+        if self._discard_ok() and self.defaults_editor.confirm_discard():
             self.root.destroy()
 
 
