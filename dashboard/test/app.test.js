@@ -85,6 +85,13 @@ class FakePoller extends EventEmitter {
     this.emit("removed", { id });
     return { id };
   }
+
+  removeAllWidgets() {
+    const ids = this.getSnapshot().widgets.map((widget) => widget.id).filter((id) => !this.removedWidgets.includes(id));
+    this.removedWidgets.push(...ids);
+    this.emit("removed", { ids });
+    return { ids };
+  }
 }
 
 async function startApp(
@@ -98,6 +105,7 @@ async function startApp(
     visibilityUpdates: [],
     settingsUpdates: [],
     removed: [],
+    clearCalls: 0,
     async add(widget) {
       this.added.push(widget);
       return { ...widget };
@@ -113,6 +121,10 @@ async function startApp(
     async remove(id) {
       this.removed.push(id);
       return { id };
+    },
+    async clear() {
+      this.clearCalls += 1;
+      return { ids: [] };
     },
   };
   const config = {
@@ -152,6 +164,7 @@ async function startApp(
     baseUrl: `http://127.0.0.1:${server.address().port}`,
     poller,
     widgetStore,
+    config,
   };
 }
 
@@ -267,14 +280,14 @@ test("updates editable widget settings while keeping the controller id", async (
   });
 
   assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).widget, settings);
+  assert.deepEqual((await response.json()).widget, { ...settings, group: "PLC vrijednosti" });
   assert.deepEqual(widgetStore.settingsUpdates, [
     { id: "point-1", settings },
   ]);
   assert.deepEqual(poller.updatedWidgets, [settings]);
 
   const configResponse = await fetch(`${baseUrl}/api/config`);
-  assert.deepEqual((await configResponse.json()).widgets[0], settings);
+  assert.deepEqual((await configResponse.json()).widgets[0], { ...settings, group: "PLC vrijednosti" });
 
   const invalidResponse = await fetch(`${baseUrl}/api/widgets/settings`, {
     method: "POST",
@@ -428,6 +441,153 @@ test("deletes a widget, rejects invalid requests and retains configuration when 
   assert.equal((await fetch(`${readOnly.baseUrl}/api/widgets`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "point-1" }) })).status, 409);
 });
 
+test("bulk deletion keeps widgets when saving fails and blocks overlapping automatic discovery", async (t) => {
+  const { baseUrl, poller, widgetStore, config } = await startApp(t, { widgetStoreEnabled: true });
+  const clear = () => fetch(`${baseUrl}/api/widgets/all`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: "{}" });
+  assert.equal((await fetch(`${baseUrl}/api/widgets/all`, { method: "DELETE" })).status, 415);
+  widgetStore.clear = async () => { throw new Error("disk failure"); };
+  assert.equal((await clear()).status, 500);
+  assert.equal(config.widgets.length, 1);
+  assert.deepEqual(poller.removedWidgets, []);
+  let finishClear;
+  widgetStore.clear = () => new Promise((resolve) => { finishClear = resolve; });
+  const pending = clear();
+  while (!finishClear) await new Promise((resolve) => setImmediate(resolve));
+  const discovery = await fetch(`${baseUrl}/api/discovery/auto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  assert.equal(discovery.status, 409);
+  assert.equal((await discovery.json()).code, "WIDGET_CLEAR_IN_PROGRESS");
+  assert.equal((await clear()).status, 409);
+  finishClear({ ids: ["point-1"] });
+  assert.equal((await pending).status, 200);
+  assert.deepEqual(config.widgets, []);
+  const readOnly = await startApp(t);
+  assert.equal((await fetch(`${readOnly.baseUrl}/api/widgets/all`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: "{}" })).status, 409);
+  const demo = await startApp(t, { widgetStoreEnabled: true });
+  demo.config.demoMode = true;
+  assert.equal((await fetch(`${demo.baseUrl}/api/widgets/all`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: "{}" })).status, 409);
+});
+
+async function startPersistedDashboard(t, widgets) {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "dashboard-bulk-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const widgetFile = path.join(directory, "widgets.json");
+  await fs.writeFile(widgetFile, JSON.stringify(widgets));
+  const env = { DEMO_MODE: "false", MIDDLEWARE_USER: "client", MIDDLEWARE_PASSWORD: "secret", WIDGETS_FILE: widgetFile };
+  const config = loadConfig(env);
+  const poller = new PointPoller({ ...config, fetchImpl: async () => ({ ok: true, json: async () => ({ values: widgets.map(({ id }) => ({ id, value: 42 })) }) }) });
+  await poller.poll();
+  const store = new WidgetStore(widgetFile);
+  const server = createApp({ poller, config, widgetStore: store }).listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections?.(); }));
+  return { baseUrl: `http://127.0.0.1:${server.address().port}`, widgetFile, env, poller, config, store };
+}
+
+test("bulk removal persists an empty dashboard across restart and updates every SSE client", async (t) => {
+  const { baseUrl, widgetFile, env, poller } = await startPersistedDashboard(t, [{ id: "floor/one", writable: true }, { id: "floor/two", visible: false }]);
+  const readers = await Promise.all([1, 2].map(async () => {
+    const response = await fetch(`${baseUrl}/events`, { signal: AbortSignal.timeout(4_000) });
+    const reader = response.body.getReader();
+    await reader.read();
+    return reader;
+  }));
+  const clear = () => fetch(`${baseUrl}/api/widgets/all`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: "{}" });
+  const response = await clear();
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ids: ["floor/one", "floor/two"] });
+  for (const reader of readers) {
+    let events = "";
+    while (!events.includes("event: removed")) {
+      const chunk = await reader.read();
+      assert.equal(chunk.done, false);
+      events += new TextDecoder().decode(chunk.value);
+    }
+    assert.match(events, /"ids":\["floor\/one","floor\/two"\]/);
+    await reader.cancel();
+  }
+  assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), []);
+  assert.deepEqual((await (await fetch(`${baseUrl}/api/config`)).json()).widgets, []);
+  assert.deepEqual(poller.getSnapshot(), { status: "idle", syncedAt: null, error: null, widgets: [] });
+  assert.equal((await fetch(`${baseUrl}/ready`)).status, 503);
+  await assert.rejects(poller.writeValue("floor/one", 42), { code: "POINT_NOT_WRITABLE" });
+  assert.deepEqual(await (await clear()).json(), { ids: [] });
+  assert.deepEqual(createRuntime(env).config.widgets, []);
+});
+
+test("widget settings round-trip custom groups, preserve old clients and restore automatic grouping", async (t) => {
+  const { baseUrl, widgetFile, env, poller } = await startPersistedDashboard(t, [{ id: "floor/one", group: "Ured" }]);
+  const settings = { id: "floor/one", label: "One", description: "Office", unit: "°C", precision: 1, writable: false, visible: true };
+  const update = (group = {}) => fetch(`${baseUrl}/api/widgets/settings`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...settings, ...group }) });
+  assert.equal((await (await update()).json()).widget.group, "Ured");
+  assert.equal((await (await update({ group: "  Prizemlje  " })).json()).widget.group, "Prizemlje");
+  assert.equal(poller.getSnapshot().widgets[0].group, "Prizemlje");
+  assert.equal((await (await fetch(`${baseUrl}/api/config`)).json()).widgets[0].group, "Prizemlje");
+  assert.equal(createRuntime(env).config.widgets[0].group, "Prizemlje");
+  for (const group of [null, 1, "x".repeat(1_025)]) assert.equal((await update({ group })).status, 400);
+  assert.equal((await (await update({ group: " " })).json()).widget.group, "floor");
+  assert.equal(Object.hasOwn(JSON.parse(await fs.readFile(widgetFile, "utf8"))[0], "group"), false);
+  assert.equal(createRuntime(env).config.widgets[0].group, "floor");
+});
+
+test("group removal deletes hidden members, preserves equal labels in other groups and broadcasts the selected IDs", async (t) => {
+  const kept = { id: "other/one", label: "Temperature", group: "Other", custom: { retained: true }, visible: false, writable: true, precision: 3 };
+  const widgets = [{ id: "floor/one", label: "Temperature", group: "  Floor  ", visible: false }, kept, { id: "floor/two", label: "Humidity" }];
+  const { baseUrl, widgetFile, env, poller } = await startPersistedDashboard(t, widgets);
+  const events = await fetch(`${baseUrl}/events`, { signal: AbortSignal.timeout(4_000) });
+  const reader = events.body.getReader();
+  await reader.read();
+  const remove = (group) => fetch(`${baseUrl}/api/widgets/group`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group }) });
+  const response = await remove("  Floor  ");
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ids: ["floor/one"] });
+  let stream = "";
+  while (!stream.includes("event: removed")) stream += new TextDecoder().decode((await reader.read()).value);
+  assert.match(stream, /"ids":\["floor\/one"\]/);
+  await reader.cancel();
+  assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), [kept, widgets[2]]);
+  assert.deepEqual(poller.getSnapshot().widgets.map(({ id }) => id), [kept.id, "floor/two"]);
+  assert.deepEqual(createRuntime(env).config.widgets.map(({ id }) => id), [kept.id, "floor/two"]);
+  // The automatic parent-folder group remains independent of a custom group with a different case.
+  const automatic = await remove(" floor ");
+  assert.deepEqual(await automatic.json(), { ids: ["floor/two"] });
+  assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), [kept]);
+});
+
+test("group removal validates names, retains configuration on file failure and locks other bulk operations", async (t) => {
+  const original = [{ id: "floor/one", visible: false }, { id: "other/one" }];
+  const { baseUrl, widgetFile, poller, config, store } = await startPersistedDashboard(t, original);
+  const remove = (group) => fetch(`${baseUrl}/api/widgets/group`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group }) });
+  for (const group of ["", " ", null, 1, "x".repeat(1_025)]) assert.equal((await remove(group)).status, 400);
+  assert.equal((await fetch(`${baseUrl}/api/widgets/group`, { method: "DELETE" })).status, 415);
+  const missing = await remove("missing");
+  assert.equal(missing.status, 404);
+  assert.equal((await missing.json()).code, "WIDGET_GROUP_NOT_FOUND");
+  const realRemove = store.removeMany.bind(store);
+  store.removeMany = async () => { throw new Error("disk failure"); };
+  assert.equal((await remove("floor")).status, 500);
+  assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), original);
+  assert.equal(config.widgets.length, 2);
+  assert.equal(poller.getSnapshot().widgets.length, 2);
+  let finishRemoval;
+  store.removeMany = (ids) => new Promise((resolve) => { finishRemoval = async () => resolve(await realRemove(ids)); });
+  const pending = remove("floor");
+  while (!finishRemoval) await new Promise((resolve) => setImmediate(resolve));
+  for (const endpoint of ["/api/widgets/all", "/api/widgets/group"]) {
+    const blocked = await fetch(`${baseUrl}${endpoint}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group: "other" }) });
+    assert.equal(blocked.status, 409);
+    assert.equal((await blocked.json()).code, "WIDGET_CLEAR_IN_PROGRESS");
+  }
+  const discovery = await fetch(`${baseUrl}/api/discovery/auto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  assert.equal(discovery.status, 409);
+  await finishRemoval();
+  assert.equal((await pending).status, 200);
+  const readOnly = await startApp(t);
+  assert.equal((await fetch(`${readOnly.baseUrl}/api/widgets/group`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group: "PLC vrijednosti" }) })).status, 409);
+  const demo = await startApp(t, { widgetStoreEnabled: true });
+  demo.config.demoMode = true;
+  assert.equal((await fetch(`${demo.baseUrl}/api/widgets/group`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group: "PLC vrijednosti" }) })).status, 409);
+});
+
 test("last-widget deletion persists across restart and broadcasts removal to open clients", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "dashboard-delete-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
@@ -510,6 +670,13 @@ test("automatic discovery runs in the background, broadcasts additions, keeps ex
   await reader.read();
   assert.equal((await start()).status, 202);
   assert.equal((await start()).status, 409);
+  const clearWhileScanning = await fetch(`${baseUrl}/api/widgets/all`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: "{}" });
+  assert.equal(clearWhileScanning.status, 409);
+  assert.equal((await clearWhileScanning.json()).code, "DISCOVERY_IN_PROGRESS");
+  const removeGroupWhileScanning = await fetch(`${baseUrl}/api/widgets/group`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group: "PLC vrijednosti" }) });
+  assert.equal(removeGroupWhileScanning.status, 409);
+  assert.equal((await removeGroupWhileScanning.json()).code, "DISCOVERY_IN_PROGRESS");
+  assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), [existing]);
   releaseRoot();
   const result = await completed();
   assert.equal(result.state, "done");

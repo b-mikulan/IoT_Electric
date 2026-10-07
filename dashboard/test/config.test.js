@@ -102,6 +102,19 @@ test("prefers inline widget JSON over a configured file", () => {
   assert.equal(config.widgetsFile, "");
 });
 
+test("groups widgets by their parent folder, with trimmed custom overrides", () => {
+  const widgets = parseWidgets(JSON.stringify([
+    { id: "01/ES/Office/Temperature" },
+    { id: "01/ES/Office/Humidity", group: " Ured " },
+    { id: "01/ES/Power", group: " " },
+    { id: "opaque-point" },
+  ]), false);
+  assert.deepEqual(widgets.map((widget) => widget.group), ["01/ES/Office", "Ured", "01/ES", "PLC vrijednosti"]);
+  for (const group of [null, 1, "x".repeat(1_025)]) {
+    assert.throws(() => parseWidgets(JSON.stringify([{ id: "test", group }]), false), /invalid group/);
+  }
+});
+
 test("loads an empty real dashboard after the last widget is deleted", () => {
   const config = loadConfig({ DEMO_MODE: "false", WIDGETS_JSON: "[]", MIDDLEWARE_USER: "client", MIDDLEWARE_PASSWORD: "secret" });
   assert.deepEqual(config.widgets, []);

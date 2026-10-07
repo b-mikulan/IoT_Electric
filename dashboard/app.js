@@ -1,6 +1,7 @@
 const express = require("express");
 const path = require("node:path");
 const { TelemetryClient } = require("./lib/telemetry");
+const { widgetGroup } = require("./lib/config");
 
 const publicDirectory = path.join(__dirname, "public");
 const materializeDirectory = path.dirname(
@@ -20,6 +21,7 @@ function publicWidget(widget) {
     label,
     description,
     unit,
+    group: widgetGroup(widget),
     ...(precision === undefined ? {} : { precision }),
     writable: writable === true,
     visible: visible !== false,
@@ -51,6 +53,8 @@ function parseWidgetSettings(body) {
     typeof body?.description === "string" ? body.description.trim() : null;
   const unit = typeof body?.unit === "string" ? body.unit.trim() : null;
   const precision = body?.precision;
+  const hasGroup = Object.hasOwn(body || {}, "group");
+  const group = typeof body?.group === "string" ? body.group.trim() : null;
 
   if (
     !id ||
@@ -60,6 +64,7 @@ function parseWidgetSettings(body) {
     description.length > 500 ||
     unit === null ||
     unit.length > 32 ||
+    (hasGroup && (group === null || group.length > 1_024)) ||
     (precision !== null &&
       (!Number.isInteger(precision) || precision < 0 || precision > 6)) ||
     typeof body?.writable !== "boolean" ||
@@ -74,6 +79,7 @@ function parseWidgetSettings(body) {
     description,
     unit,
     precision,
+    ...(hasGroup ? { group } : {}),
     writable: body.writable,
     visible: body.visible,
   };
@@ -87,6 +93,7 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
   const eventClients = new Set();
   const discoveredById = new Map();
   let autoDiscovery = { state: "idle" };
+  let clearingWidgets = false;
   app.disable("x-powered-by");
 
   function broadcast(event, payload) {
@@ -409,11 +416,69 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
     if (autoDiscovery.state === "running") {
       return response.status(409).json({ error: "Automatic discovery is already running.", code: "DISCOVERY_IN_PROGRESS" });
     }
+    if (clearingWidgets) {
+      return response.status(409).json({ error: "Widget removal is still in progress.", code: "WIDGET_CLEAR_IN_PROGRESS" });
+    }
     autoDiscovery = { state: "running", phase: "scanning", containers: 0, pending: 1, found: 0, failedBranches: 0 };
     broadcast("discovery", autoDiscovery);
     // Long scans continue on the server after browser closure or proxy timeouts.
     void runAutoDiscovery();
     return response.status(202).json(autoDiscovery);
+  });
+
+  app.delete("/api/widgets/group", requireJson, express.json({ limit: "4kb" }), async (request, response) => {
+    const group = typeof request.body?.group === "string" ? request.body.group.trim() : "";
+    if (!group || group.length > 1_024) {
+      return response.status(400).json({ error: "group must be a non-empty string of at most 1024 characters.", code: "INVALID_WIDGET_GROUP" });
+    }
+    if (config.demoMode || !widgetStore?.enabled) {
+      return response.status(409).json({ error: "Widget deletion requires a writable WIDGETS_FILE.", code: "WIDGET_FILE_UNAVAILABLE" });
+    }
+    if (autoDiscovery.state === "running") {
+      return response.status(409).json({ error: "Wait for automatic discovery to finish before removing a group.", code: "DISCOVERY_IN_PROGRESS" });
+    }
+    if (clearingWidgets) {
+      return response.status(409).json({ error: "Widget removal is already in progress.", code: "WIDGET_CLEAR_IN_PROGRESS" });
+    }
+    const ids = config.widgets.filter((widget) => widgetGroup(widget) === group).map((widget) => widget.id);
+    if (ids.length === 0) {
+      return response.status(404).json({ error: "Widget group was not found.", code: "WIDGET_GROUP_NOT_FOUND" });
+    }
+    clearingWidgets = true;
+    try {
+      await widgetStore.removeMany(ids);
+      const removed = new Set(ids);
+      config.widgets = config.widgets.filter((widget) => !removed.has(widget.id));
+      for (const id of ids) discoveredById.delete(id);
+      return response.json(poller.removeWidgets(ids));
+    } catch (error) {
+      return sendOperationError(response, error, "WIDGET_DELETE_FAILED", "Dashboard could not remove the widget group.");
+    } finally {
+      clearingWidgets = false;
+    }
+  });
+
+  app.delete("/api/widgets/all", requireJson, express.json({ limit: "4kb" }), async (request, response) => {
+    if (config.demoMode || !widgetStore?.enabled) {
+      return response.status(409).json({ error: "Widget deletion requires a writable WIDGETS_FILE.", code: "WIDGET_FILE_UNAVAILABLE" });
+    }
+    if (autoDiscovery.state === "running") {
+      return response.status(409).json({ error: "Wait for automatic discovery to finish before removing all widgets.", code: "DISCOVERY_IN_PROGRESS" });
+    }
+    if (clearingWidgets) {
+      return response.status(409).json({ error: "Widget removal is already in progress.", code: "WIDGET_CLEAR_IN_PROGRESS" });
+    }
+    clearingWidgets = true;
+    try {
+      await widgetStore.clear();
+      config.widgets = [];
+      discoveredById.clear();
+      return response.json(poller.removeAllWidgets());
+    } catch (error) {
+      return sendOperationError(response, error, "WIDGET_DELETE_FAILED", "Dashboard could not remove all widgets.");
+    } finally {
+      clearingWidgets = false;
+    }
   });
 
   app.delete(

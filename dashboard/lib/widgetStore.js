@@ -70,6 +70,18 @@ class WidgetStore {
     return operation;
   }
 
+  async clear() {
+    const operation = this.#operation.then(() => this.#clear());
+    this.#operation = operation.catch(() => {});
+    return operation;
+  }
+
+  async removeMany(ids) {
+    const operation = this.#operation.then(() => this.#removeMany(ids));
+    this.#operation = operation.catch(() => {});
+    return operation;
+  }
+
   #assertEnabled() {
     if (!this.enabled) {
       throw new WidgetStoreError(
@@ -139,6 +151,7 @@ class WidgetStore {
       label: String(widget?.label || id),
       description: String(widget?.description || "PLC vrijednost"),
       unit: String(widget?.unit || ""),
+      ...(widget?.group === undefined ? {} : { group: widget.group }),
     };
     const nextWidgets = [...rawWidgets, storedWidget];
     await this.#writeWidgets(nextWidgets);
@@ -159,6 +172,7 @@ class WidgetStore {
         label: String(widget?.label || id),
         description: String(widget?.description || "PLC vrijednost"),
         unit: String(widget?.unit || ""),
+        ...(widget?.group === undefined ? {} : { group: widget.group }),
       });
     }
     if (added.length > 0) await this.#writeWidgets([...rawWidgets, ...added]);
@@ -212,6 +226,22 @@ class WidgetStore {
     return { id: widgetId };
   }
 
+  async #clear() {
+    this.#assertEnabled();
+    const rawWidgets = await this.#readWidgets();
+    await this.#writeWidgets([]);
+    return { ids: rawWidgets.map((widget) => String(widget?.id || "").trim()) };
+  }
+
+  async #removeMany(ids) {
+    this.#assertEnabled();
+    const removedIds = new Set(ids.map((id) => String(id || "").trim()));
+    const rawWidgets = await this.#readWidgets();
+    const removed = rawWidgets.filter((widget) => removedIds.has(String(widget?.id || "").trim()));
+    await this.#writeWidgets(rawWidgets.filter((widget) => !removedIds.has(String(widget?.id || "").trim())));
+    return { ids: removed.map((widget) => String(widget.id).trim()) };
+  }
+
   async #updateSettings(id, settings) {
     this.#assertEnabled();
     const widgetId = String(id || "").trim();
@@ -236,6 +266,14 @@ class WidgetStore {
       writable: settings.writable,
       visible: settings.visible,
     };
+    if (Object.hasOwn(settings, "group")) {
+      if (typeof settings.group !== "string") {
+        throw new WidgetStoreError("group must be a string.", 400, "INVALID_WIDGET_SETTINGS");
+      }
+      const group = settings.group.trim();
+      if (group) updated.group = group;
+      else delete updated.group;
+    }
     if (settings.precision === null) {
       delete updated.precision;
     } else {

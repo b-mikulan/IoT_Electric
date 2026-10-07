@@ -1,5 +1,6 @@
 const { EventEmitter } = require("node:events");
 const { isDeepStrictEqual } = require("node:util");
+const { widgetGroup } = require("./config");
 
 const NO_VALUE_ERROR = "No value returned by middleware";
 
@@ -40,6 +41,7 @@ function normalizeWidget(widget, index) {
   delete normalized.updatedAt;
   normalized.writable = normalized.writable === true;
   normalized.visible = normalized.visible !== false;
+  normalized.group = widgetGroup(normalized);
 
   return normalized;
 }
@@ -325,6 +327,20 @@ class PointPoller extends EventEmitter {
     if (this.#widgets.length === 0) this.#emptySnapshot();
     this.emit("removed", { id: widgetId });
     return { id: widgetId };
+  }
+
+  removeAllWidgets() {
+    return this.removeWidgets(this.#widgets.map((widget) => widget.id));
+  }
+
+  removeWidgets(ids) {
+    const removedIds = new Set(ids);
+    const removed = this.#widgets.filter((widget) => removedIds.has(widget.id)).map((widget) => widget.id);
+    this.#widgets = this.#widgets.filter((widget) => !removedIds.has(widget.id));
+    this.snapshot.widgets = this.snapshot.widgets.filter((widget) => !removedIds.has(widget.id));
+    if (this.#widgets.length === 0) this.#emptySnapshot();
+    this.emit("removed", { ids: removed });
+    return { ids: removed };
   }
 
   async discoverObjects(query = "") {
@@ -807,6 +823,7 @@ class PointPoller extends EventEmitter {
     if (batch.length > 0) batches.push(batch);
     const points = new Map();
     for (const ids of batches) {
+      if (this.#widgets.length === 0) break;
       for (const [id, point] of await this.#fetchPointBatch(ids)) points.set(id, point);
     }
     return points;

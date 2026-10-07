@@ -105,7 +105,7 @@
 
       <section aria-labelledby="widgets-heading">
         <h2 id="widgets-heading" class="visually-hidden">Mjerne točke</h2>
-        <div id="widget-grid" class="row widget-grid" aria-live="polite"></div>
+        <div id="widget-grid" class="widget-grid" aria-live="polite"></div>
       </section>
 
       <div id="empty-state" class="empty-state" hidden>
@@ -174,7 +174,7 @@
         <header class="discovery-header">
           <div>
             <p class="eyebrow">Prikaz dashboarda</p>
-            <h2 id="visibility-title">Odaberi vidljive widgete</h2>
+            <h2 id="visibility-title">Prikaz i widgeti</h2>
           </div>
           <button
             id="visibility-close"
@@ -187,8 +187,45 @@
         <p class="discovery-description">
           Skriveni widget ostaje spremljen u widgets.json i može se ponovno uključiti u bilo kojem trenutku.
         </p>
+        <div class="widgets-clear-controls">
+          <button id="widgets-clear" class="btn-flat danger-action" type="button">Obriši sve widgete</button>
+          <div class="group-management">
+            <div class="discovery-field">
+              <label for="widgets-group-select">Grupa za brisanje</label>
+              <select id="widgets-group-select" class="browser-default">
+                <option value="">Odaberi grupu</option>
+              </select>
+            </div>
+            <button id="widgets-group-clear" class="btn-flat danger-action" type="button" disabled>Obriši grupu</button>
+          </div>
+          <div id="widgets-clear-confirmation" class="settings-delete-confirmation" hidden>
+            <p id="widgets-clear-message"></p>
+            <p>Brišu se i skriveni widgeti. Vrijednosti možeš ponovno dodati kroz discovery; podaci na kontroleru ostaju sačuvani.</p>
+            <div class="settings-delete-actions">
+              <button id="widgets-clear-cancel" class="btn-flat" type="button">Zadrži widgete</button>
+              <button id="widgets-clear-confirm" class="btn" type="button">Da, obriši sve</button>
+            </div>
+          </div>
+          <p id="widgets-clear-status" class="discovery-status" role="status" aria-live="polite"></p>
+        </div>
         <div id="visibility-list" class="visibility-list"></div>
         <p id="visibility-status" class="discovery-status" role="status" aria-live="polite"></p>
+      </div>
+    </dialog>
+
+    <dialog id="group-clear-dialog" class="discovery-dialog" aria-labelledby="group-clear-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <h2 id="group-clear-title">Obriši grupu</h2>
+          <button id="group-clear-close" class="dialog-close" type="button" aria-label="Zatvori">×</button>
+        </header>
+        <p id="group-clear-message"></p>
+        <p>Brišu se svi widgeti iz ove grupe, uključujući skrivene. Ostale grupe i podaci na kontroleru ostaju sačuvani.</p>
+        <div class="settings-delete-actions">
+          <button id="group-clear-cancel" class="btn-flat" type="button">Zadrži grupu</button>
+          <button id="group-clear-confirm" class="btn" type="button">Da, obriši grupu</button>
+        </div>
+        <p id="group-clear-status" class="discovery-status" role="status" aria-live="polite"></p>
       </div>
     </dialog>
 
@@ -222,6 +259,12 @@
           <div class="settings-field">
             <label for="settings-description">Opis</label>
             <input id="settings-description" type="text" maxlength="500" />
+          </div>
+
+          <div class="settings-field settings-field-wide">
+            <label for="settings-group">Grupa</label>
+            <input id="settings-group" type="text" maxlength="1024" />
+            <small>Prazno polje grupira widget prema njegovoj EWS mapi.</small>
           </div>
 
           <div class="settings-field">

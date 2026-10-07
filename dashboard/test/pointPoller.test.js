@@ -589,6 +589,51 @@ test("deleting the last widget during a failed poll leaves a healthy empty confi
   assert.equal(poller.getSnapshot().error, null);
 });
 
+test("bulk deletion during an in-flight batched poll clears values and skips unread batches", async () => {
+  let finishRequest;
+  const requests = [];
+  const removed = [];
+  const widgets = Array.from({ length: 502 }, (_, index) => ({ id: `floor/point-${index}`, writable: true }));
+  const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets,
+    fetchImpl: async (_url, options) => {
+      requests.push(JSON.parse(options.body).ids);
+      return new Promise((resolve) => { finishRequest = resolve; });
+    } });
+  poller.on("removed", (event) => removed.push(event));
+  const pending = poller.poll();
+  assert.equal(poller.getSnapshot().widgets[0].group, "floor");
+  assert.deepEqual(poller.removeAllWidgets(), { ids: widgets.map(({ id }) => id) });
+  finishRequest(jsonResponse({ values: requests[0].map((id) => ({ id, value: 42 })) }));
+  await pending;
+  await poller.poll();
+  assert.equal(requests.length, 1);
+  assert.deepEqual(poller.getSnapshot(), { status: "idle", syncedAt: null, error: null, widgets: [] });
+  assert.deepEqual(removed, [{ ids: widgets.map(({ id }) => id) }]);
+  await assert.rejects(poller.writeValue(widgets[0].id, 42), { code: "POINT_NOT_WRITABLE" });
+  assert.deepEqual(poller.removeAllWidgets(), { ids: [] });
+});
+
+test("bulk selection removal keeps the remaining snapshot values and reads only retained widgets", async () => {
+  const requests = [];
+  const removed = [];
+  const widgets = [{ id: "floor/one", group: "Floor", visible: false }, { id: "other/one", group: "Other" }, { id: "floor/two", group: "Floor" }];
+  const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets,
+    fetchImpl: async (_url, options) => {
+      const ids = JSON.parse(options.body).ids;
+      requests.push(ids);
+      return jsonResponse({ values: ids.map((id) => ({ id, value: 42 })) });
+    } });
+  poller.on("removed", (event) => removed.push(event));
+  await poller.poll();
+  assert.deepEqual(poller.removeWidgets(["floor/one", "floor/two"]), { ids: ["floor/one", "floor/two"] });
+  const snapshot = poller.getSnapshot();
+  assert.equal(snapshot.status, "connected");
+  assert.deepEqual(snapshot.widgets.map(({ id, value }) => ({ id, value })), [{ id: "other/one", value: 42 }]);
+  await poller.poll();
+  assert.deepEqual(requests.at(-1), ["other/one"]);
+  assert.deepEqual(removed, [{ ids: ["floor/one", "floor/two"] }]);
+});
+
 test("automatic discovery traverses nested containers once and keeps all values beyond the manual limit", async () => {
   const requests = [];
   const progress = [];

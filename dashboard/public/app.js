@@ -34,6 +34,20 @@ const visibilityDialog = document.querySelector("#visibility-dialog");
 const visibilityClose = document.querySelector("#visibility-close");
 const visibilityList = document.querySelector("#visibility-list");
 const visibilityStatus = document.querySelector("#visibility-status");
+const widgetsClear = document.querySelector("#widgets-clear");
+const widgetsClearConfirmation = document.querySelector("#widgets-clear-confirmation");
+const widgetsClearMessage = document.querySelector("#widgets-clear-message");
+const widgetsClearCancel = document.querySelector("#widgets-clear-cancel");
+const widgetsClearConfirm = document.querySelector("#widgets-clear-confirm");
+const widgetsClearStatus = document.querySelector("#widgets-clear-status");
+const widgetsGroupSelect = document.querySelector("#widgets-group-select");
+const widgetsGroupClear = document.querySelector("#widgets-group-clear");
+const groupClearDialog = document.querySelector("#group-clear-dialog");
+const groupClearClose = document.querySelector("#group-clear-close");
+const groupClearCancel = document.querySelector("#group-clear-cancel");
+const groupClearConfirm = document.querySelector("#group-clear-confirm");
+const groupClearMessage = document.querySelector("#group-clear-message");
+const groupClearStatus = document.querySelector("#group-clear-status");
 const visibilityItemTemplate = document.querySelector("#visibility-item-template");
 const settingsDialog = document.querySelector("#settings-dialog");
 const settingsClose = document.querySelector("#settings-close");
@@ -42,6 +56,7 @@ const settingsForm = document.querySelector("#settings-form");
 const settingsId = document.querySelector("#settings-id");
 const settingsLabel = document.querySelector("#settings-label");
 const settingsDescription = document.querySelector("#settings-description");
+const settingsGroup = document.querySelector("#settings-group");
 const settingsUnit = document.querySelector("#settings-unit");
 const settingsPrecision = document.querySelector("#settings-precision");
 const settingsWritable = document.querySelector("#settings-writable");
@@ -58,11 +73,15 @@ const elementsById = new Map();
 const configById = new Map();
 const visibilityInputsById = new Map();
 const latestValuesById = new Map();
+const groupsByName = new Map();
+const groupByWidgetId = new Map();
 let widgetEditingEnabled = false;
 let settingsBusy = false;
 let lastDiscoveryPayload = null;
 let updatingWidgets = false;
 let automaticDiscoveryRunning = false;
+let widgetClearBusy = false;
+let groupClearTarget = "";
 
 function visualForUnit(unit = "") {
   const normalized = unit.trim().toLowerCase();
@@ -81,6 +100,101 @@ function visualForUnit(unit = "") {
   }
 
   return { icon: "●", color: "#00796b", soft: "#e4f4f1" };
+}
+
+function automaticWidgetGroup(widget) {
+  const slash = widget.id.lastIndexOf("/");
+  return slash > 0 ? widget.id.slice(0, slash) : "PLC vrijednosti";
+}
+
+function widgetGroupName(widget) {
+  return typeof widget.group === "string" && widget.group.trim()
+    ? widget.group.trim() : automaticWidgetGroup(widget);
+}
+
+function placeWidgetInGroup(widget, column) {
+  const name = widgetGroupName(widget);
+  let group = groupsByName.get(name);
+  if (!group) {
+    const section = document.createElement("details");
+    section.className = "widget-group";
+    section.open = true;
+    const summary = document.createElement("summary");
+    summary.className = "widget-group-summary";
+    const title = document.createElement("h2");
+    title.className = "widget-group-title";
+    title.textContent = name;
+    const count = document.createElement("span");
+    count.className = "widget-group-count";
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn-flat danger-action widget-group-delete";
+    remove.textContent = "Obriši grupu";
+    remove.hidden = !widgetEditingEnabled;
+    remove.setAttribute("aria-label", `Obriši grupu ${name}`);
+    remove.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openGroupClearDialog(name);
+    });
+    summary.append(title, count, remove);
+    const body = document.createElement("div");
+    body.className = "widget-group-body";
+    const cards = document.createElement("div");
+    cards.className = "row widget-group-grid";
+    body.appendChild(cards);
+    section.append(summary, body);
+    grid.appendChild(section);
+    group = { section, cards, count, remove };
+    groupsByName.set(name, group);
+  }
+  if (column.parentElement !== group.cards) group.cards.appendChild(column);
+  groupByWidgetId.set(widget.id, name);
+}
+
+function updateGroups() {
+  if (updatingWidgets) return;
+  const counts = new Map();
+  for (const widget of configById.values()) {
+    const name = groupByWidgetId.get(widget.id);
+    const count = counts.get(name) || { total: 0, visible: 0 };
+    count.total += 1;
+    if (widget.visible !== false) count.visible += 1;
+    counts.set(name, count);
+  }
+  for (const [name, group] of groupsByName) {
+    const count = counts.get(name);
+    if (!count) {
+      group.section.remove();
+      groupsByName.delete(name);
+    } else {
+      group.section.hidden = count.visible === 0;
+      group.count.textContent = `Točke: ${count.visible}${count.visible === count.total ? "" : ` / ${count.total}`}`;
+    }
+  }
+  const selection = widgetsGroupSelect.value;
+  widgetsGroupSelect.replaceChildren(new Option("Odaberi grupu", ""));
+  [...groupsByName.entries()].sort(([left], [right]) => left.localeCompare(right, "hr")).forEach(([name, group], index) => {
+    if (grid.children[index] !== group.section) grid.insertBefore(group.section, grid.children[index] || null);
+    widgetsGroupSelect.add(new Option(`${name} (${counts.get(name).total})`, name));
+  });
+  widgetsGroupSelect.value = groupsByName.has(selection) ? selection : "";
+}
+
+function updateClearButton() {
+  widgetsClear.disabled = widgetClearBusy || automaticDiscoveryRunning || configById.size === 0;
+  widgetsClearConfirm.disabled = widgetsClear.disabled;
+  widgetsClear.title = automaticDiscoveryRunning ? "Pričekaj završetak automatskog dodavanja." : "";
+  if (configById.size === 0 && !widgetClearBusy) widgetsClearConfirmation.hidden = true;
+  if (!widgetsClearConfirmation.hidden && !widgetClearBusy) widgetsClearMessage.textContent = `Obrisati sve widgete s dashboarda (${configById.size})?`;
+  widgetsGroupSelect.disabled = widgetClearBusy || automaticDiscoveryRunning;
+  widgetsGroupClear.disabled = widgetClearBusy || automaticDiscoveryRunning || !widgetsGroupSelect.value;
+  for (const group of groupsByName.values()) group.remove.disabled = widgetClearBusy || automaticDiscoveryRunning;
+  if (groupClearDialog.open) {
+    const count = [...configById.values()].filter((widget) => widgetGroupName(widget) === groupClearTarget).length;
+    groupClearMessage.textContent = count > 0 ? `Obrisati grupu „${groupClearTarget}” i sve njezine widgete (${count})?` : "Grupa više nema widgeta.";
+    groupClearConfirm.disabled = widgetClearBusy || automaticDiscoveryRunning || count === 0;
+  }
 }
 
 function createWidget(widget) {
@@ -105,7 +219,7 @@ function createWidget(widget) {
   settingsButton.setAttribute("aria-label", `Uredi ${widget.label}`);
   settingsButton.addEventListener("click", () => openSettingsDialog(widget.id));
 
-  grid.appendChild(fragment);
+  placeWidgetInGroup(widget, column);
   elementsById.set(widget.id, column);
   configById.set(widget.id, widget);
 }
@@ -189,6 +303,9 @@ function parseWriteValue() {
 }
 
 function updateEmptyState() {
+  if (updatingWidgets) return;
+  updateGroups();
+  updateClearButton();
   emptyState.hidden = [...configById.values()].some(
     (widget) => widget.visible !== false
   );
@@ -292,6 +409,7 @@ function applyConfiguredWidget(widget) {
 
   Object.assign(current, widget);
   const column = elementsById.get(widget.id);
+  placeWidgetInGroup(current, column);
   const card = column.querySelector(".widget-card");
   const visual = visualForUnit(current.unit);
   card.style.setProperty("--widget-color", visual.color);
@@ -318,6 +436,7 @@ function removeConfiguredWidget(id) {
   elementsById.get(id)?.remove();
   elementsById.delete(id);
   configById.delete(id);
+  groupByWidgetId.delete(id);
   if (configById.size === 0) showStatus({ state: "idle" });
   latestValuesById.delete(id);
   visibilityInputsById.get(id)?.closest(".visibility-item")?.remove();
@@ -334,9 +453,7 @@ function removeConfiguredWidget(id) {
 function reconcileSnapshot(payload) {
   const widgets = Array.isArray(payload.widgets) ? payload.widgets : [];
   const ids = new Set(widgets.map((widget) => widget.id));
-  for (const id of [...configById.keys()]) {
-    if (!ids.has(id)) removeConfiguredWidget(id);
-  }
+  removeConfiguredWidgets([...configById.keys()].filter((id) => !ids.has(id)));
   applyConfiguredWidgets(widgets);
   applyPayload(payload);
 }
@@ -600,6 +717,7 @@ function applyConfiguredWidgets(widgets) {
     widgets.forEach(applyConfiguredWidget);
   } finally {
     updatingWidgets = false;
+    updateEmptyState();
     refreshDiscoveryItems();
   }
 }
@@ -662,7 +780,8 @@ function renderDiscoveryTree(nodes) {
 function showAutomaticDiscovery(payload) {
   const warningCount = payload.failedBranches || 0;
   automaticDiscoveryRunning = payload.state === "running";
-  discoveryAuto.disabled = automaticDiscoveryRunning || !widgetEditingEnabled;
+  discoveryAuto.disabled = automaticDiscoveryRunning || widgetClearBusy || !widgetEditingEnabled;
+  updateClearButton();
   discoveryAuto.textContent = automaticDiscoveryRunning ? "Automatsko dodavanje u tijeku…" : "Automatski dodaj sve vrijednosti";
   discoveryAutoStatus.className = `discovery-status${payload.state === "error" ? " is-error" : warningCount > 0 ? " is-warning" : payload.state === "done" ? " is-success" : ""}`;
   if (automaticDiscoveryRunning) {
@@ -681,7 +800,7 @@ function showAutomaticDiscovery(payload) {
 }
 
 discoveryAuto.addEventListener("click", async () => {
-  if (automaticDiscoveryRunning) return;
+  if (automaticDiscoveryRunning || widgetClearBusy) return;
   showAutomaticDiscovery({ state: "running", containers: 0, found: 0, pending: 1 });
   try {
     const response = await fetch("/api/discovery/auto", {
@@ -717,12 +836,138 @@ discoveryForm.addEventListener("submit", (event) => {
 
 visibilityOpen.addEventListener("click", () => {
   showVisibilityStatus("");
+  if (!widgetClearBusy) {
+    widgetsClearConfirmation.hidden = true;
+    widgetsClearStatus.textContent = "";
+  }
+  updateClearButton();
   visibilityDialog.showModal();
 });
 
-visibilityClose.addEventListener("click", () => visibilityDialog.close());
+visibilityClose.addEventListener("click", () => { if (!widgetClearBusy) visibilityDialog.close(); });
 visibilityDialog.addEventListener("click", (event) => {
-  if (event.target === visibilityDialog) visibilityDialog.close();
+  if (event.target === visibilityDialog && !widgetClearBusy) visibilityDialog.close();
+});
+visibilityDialog.addEventListener("cancel", (event) => {
+  if (widgetClearBusy) event.preventDefault();
+});
+
+function removeConfiguredWidgets(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return;
+  updatingWidgets = true;
+  try {
+    ids.forEach(removeConfiguredWidget);
+  } finally {
+    updatingWidgets = false;
+    updateEmptyState();
+    refreshDiscoveryItems();
+  }
+}
+
+function setWidgetClearBusy(busy) {
+  widgetClearBusy = busy;
+  visibilityClose.disabled = busy;
+  widgetsClearConfirm.disabled = busy;
+  widgetsClearCancel.disabled = busy;
+  groupClearClose.disabled = busy;
+  groupClearCancel.disabled = busy;
+  for (const input of visibilityInputsById.values()) input.disabled = busy;
+  discoveryAuto.disabled = busy || automaticDiscoveryRunning || !widgetEditingEnabled;
+  updateClearButton();
+}
+
+widgetsClear.addEventListener("click", () => {
+  if (widgetClearBusy || automaticDiscoveryRunning || configById.size === 0) return;
+  widgetsClearMessage.textContent = `Obrisati sve widgete s dashboarda (${configById.size})?`;
+  widgetsClearConfirmation.hidden = false;
+  widgetsClearCancel.focus();
+});
+widgetsClearCancel.addEventListener("click", () => {
+  widgetsClearConfirmation.hidden = true;
+  widgetsClear.focus();
+});
+widgetsClearConfirm.addEventListener("click", async () => {
+  if (widgetClearBusy || widgetsClearConfirmation.hidden) return;
+  let removed = false;
+  setWidgetClearBusy(true);
+  widgetsClearStatus.className = "discovery-status";
+  widgetsClearStatus.textContent = "Brišem sve widgete…";
+  try {
+    const response = await fetch("/api/widgets/all", {
+      method: "DELETE", headers: { "Content-Type": "application/json" }, body: "{}",
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Brisanje nije uspjelo (${response.status}).`);
+    removeConfiguredWidgets(payload.ids);
+    widgetsClearConfirmation.hidden = true;
+    widgetsClearStatus.className = "discovery-status is-success";
+    widgetsClearStatus.textContent = "Svi widgeti su uklonjeni. Nove vrijednosti možeš dodati kroz discovery.";
+    removed = true;
+  } catch (error) {
+    widgetsClearStatus.className = "discovery-status is-error";
+    widgetsClearStatus.textContent = error.message || "Brisanje widgeta nije uspjelo.";
+  } finally {
+    setWidgetClearBusy(false);
+    if (removed) visibilityClose.focus();
+  }
+});
+
+function openGroupClearDialog(name) {
+  if (widgetClearBusy || automaticDiscoveryRunning || !groupsByName.has(name)) return;
+  groupClearTarget = name;
+  groupClearStatus.textContent = "";
+  groupClearDialog.showModal();
+  updateClearButton();
+  groupClearCancel.focus();
+}
+
+function closeGroupClearDialog() {
+  if (widgetClearBusy) return;
+  groupClearDialog.close();
+  if (visibilityDialog.open) widgetsGroupSelect.focus();
+  else visibilityOpen.focus();
+}
+
+widgetsGroupSelect.addEventListener("change", updateClearButton);
+widgetsGroupClear.addEventListener("click", () => openGroupClearDialog(widgetsGroupSelect.value));
+groupClearClose.addEventListener("click", closeGroupClearDialog);
+groupClearCancel.addEventListener("click", closeGroupClearDialog);
+groupClearDialog.addEventListener("click", (event) => {
+  if (event.target === groupClearDialog) closeGroupClearDialog();
+});
+groupClearDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeGroupClearDialog();
+});
+groupClearConfirm.addEventListener("click", async () => {
+  if (widgetClearBusy || automaticDiscoveryRunning || !groupsByName.has(groupClearTarget)) return;
+  let removed = false;
+  setWidgetClearBusy(true);
+  groupClearStatus.className = "discovery-status";
+  groupClearStatus.textContent = "Brišem grupu…";
+  try {
+    const response = await fetch("/api/widgets/group", {
+      method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group: groupClearTarget }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Brisanje nije uspjelo (${response.status}).`);
+    removeConfiguredWidgets(payload.ids);
+    groupClearDialog.close();
+    if (visibilityDialog.open) {
+      widgetsClearStatus.className = "discovery-status is-success";
+      widgetsClearStatus.textContent = `Grupa „${groupClearTarget}” je uklonjena.`;
+    }
+    removed = true;
+  } catch (error) {
+    groupClearStatus.className = "discovery-status is-error";
+    groupClearStatus.textContent = error.message || "Brisanje grupe nije uspjelo.";
+  } finally {
+    setWidgetClearBusy(false);
+    if (removed) {
+      if (visibilityDialog.open) widgetsGroupSelect.focus();
+      else visibilityOpen.focus();
+    }
+  }
 });
 
 function showSettingsStatus(message, state = "") {
@@ -732,12 +977,14 @@ function showSettingsStatus(message, state = "") {
 
 function openSettingsDialog(id) {
   const widget = configById.get(id);
-  if (!widget || !widgetEditingEnabled || settingsBusy) return;
+  if (!widget || !widgetEditingEnabled || settingsBusy || widgetClearBusy) return;
 
   settingsForm.reset();
   settingsId.value = widget.id;
   settingsLabel.value = widget.label;
   settingsDescription.value = widget.description;
+  settingsGroup.value = widget.group || "";
+  settingsGroup.placeholder = automaticWidgetGroup(widget);
   settingsUnit.value = widget.unit;
   settingsPrecision.value = Number.isInteger(widget.precision)
     ? String(widget.precision)
@@ -819,6 +1066,7 @@ settingsForm.addEventListener("submit", async (event) => {
     id: settingsId.value,
     label: settingsLabel.value.trim(),
     description: settingsDescription.value.trim(),
+    group: settingsGroup.value.trim(),
     unit: settingsUnit.value.trim(),
     precision,
     writable: settingsWritable.checked,
@@ -943,7 +1191,8 @@ async function boot() {
       setWidgetVisibility(payload.id, payload.visible === true);
     });
     events.addEventListener("removed", (event) => {
-      removeConfiguredWidget(JSON.parse(event.data).id);
+      const payload = JSON.parse(event.data);
+      removeConfiguredWidgets(Array.isArray(payload.ids) ? payload.ids : [payload.id]);
     });
     events.onopen = () => showStatus({ state: "connecting" });
     events.onerror = () => showStatus({

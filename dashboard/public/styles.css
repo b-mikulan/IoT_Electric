@@ -262,9 +262,42 @@ h1 {
 }
 
 .widget-grid {
-  margin-right: -10px;
-  margin-left: -10px;
+  display: grid;
+  gap: 22px;
+  margin-bottom: 22px;
 }
+
+.widget-group {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.widget-group-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.widget-group-summary::-webkit-details-marker { display: none; }
+.widget-group-summary::before { content: "▸"; color: var(--brand); }
+.widget-group[open] > .widget-group-summary::before { content: "▾"; }
+.widget-group-summary:focus-visible { outline: 3px solid rgba(0, 121, 107, 0.25); outline-offset: -3px; border-radius: 16px; }
+.widget-group-title { flex: 1; min-width: 0; margin: 0; color: var(--ink); font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; }
+.widget-group-count { flex: 0 0 auto; color: var(--muted); font-size: 0.78rem; }
+.widget-group-delete { flex: 0 0 auto; padding: 0 10px; font-size: 0.78rem; }
+.widget-group-body { padding: 0 20px; }
+.widget-group-grid.row { margin: 0 -10px; }
+.widgets-clear-controls { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.widgets-clear-controls .discovery-status:empty { display: none; }
+.danger-action { color: var(--error); }
+.settings-delete-actions .btn { color: #fff; }
+.group-management { display: flex; align-items: end; gap: 10px; margin-top: 14px; }
+.group-management .browser-default { border: 1px solid var(--border); border-radius: 6px; }
 
 .control-panel {
   margin-bottom: 28px;
@@ -1004,6 +1037,11 @@ h1 {
   .intro { align-items: flex-start; flex-direction: column; margin-bottom: 22px; }
   .intro-actions { width: 100%; justify-content: flex-end; }
   .widget-card { min-height: 245px; }
+  .widget-group-summary { padding: 16px 12px; flex-wrap: wrap; }
+  .widget-group-title { font-size: 0.9rem; }
+  .widget-group-body { padding: 0 12px; }
+  .widget-group-delete { margin-left: auto; }
+  .group-management { align-items: stretch; flex-direction: column; }
   .widget-card .card-content { padding: 21px 20px 17px; }
   .app-footer { align-items: flex-start; flex-direction: column; }
   .error-banner { flex-direction: column; }

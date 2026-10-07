@@ -1,5 +1,16 @@
 const fs = require("node:fs");
 
+function deriveWidgetGroup(id) {
+  const widgetId = String(id || "").trim();
+  const slash = widgetId.lastIndexOf("/");
+  return (slash > 0 ? widgetId.slice(0, slash).trim() : "") || "PLC vrijednosti";
+}
+
+function widgetGroup(widget) {
+  const customGroup = typeof widget?.group === "string" ? widget.group.trim() : "";
+  return customGroup || deriveWidgetGroup(widget?.id);
+}
+
 const DEFAULT_DEMO_WIDGETS = [
   {
     id: "demo-room-temperature",
@@ -115,11 +126,17 @@ function normalizeWidget(widget, index) {
     throw new Error(`Widget ${id} has an invalid visible flag.`);
   }
 
+  if (widget.group !== undefined &&
+      (typeof widget.group !== "string" || widget.group.trim().length > 1_024)) {
+    throw new Error(`Widget ${id} has an invalid group.`);
+  }
+
   return {
     id,
     label: String(widget.label || id),
     description: String(widget.description || "PLC vrijednost"),
     unit: String(widget.unit || ""),
+    group: widgetGroup(widget),
     ...(precision === undefined ? {} : { precision }),
     ...(widget.demoValue === undefined ? {} : { demoValue: widget.demoValue }),
     writable: widget.writable === true,
@@ -129,7 +146,7 @@ function normalizeWidget(widget, index) {
 
 function parseWidgets(rawWidgets, demoMode) {
   if (!rawWidgets) {
-    if (demoMode) return DEFAULT_DEMO_WIDGETS.map((widget) => ({ ...widget }));
+    if (demoMode) return DEFAULT_DEMO_WIDGETS.map(normalizeWidget);
 
     throw new Error(
       "WIDGETS_JSON or WIDGETS_FILE is required when DEMO_MODE is disabled."
@@ -201,4 +218,6 @@ module.exports = {
   loadConfig,
   parseWidgets,
   readWidgetConfiguration,
+  deriveWidgetGroup,
+  widgetGroup,
 };
