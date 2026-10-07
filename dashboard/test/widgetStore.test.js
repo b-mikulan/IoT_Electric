@@ -95,6 +95,7 @@ test("refuses persistence without WIDGETS_FILE", async () => {
   await assert.rejects(store.remove("new"), { code: "WIDGET_FILE_UNAVAILABLE" });
   await assert.rejects(store.clear(), { code: "WIDGET_FILE_UNAVAILABLE" });
   await assert.rejects(store.removeMany(["new"]), { code: "WIDGET_FILE_UNAVAILABLE" });
+  await assert.rejects(store.renameGroup("old", "new"), { code: "WIDGET_FILE_UNAVAILABLE" });
 });
 
 test("serializes deletion with additions and preserves other widgets, including custom fields", async (t) => {
@@ -186,4 +187,33 @@ test("bulk selection removal is serialized with additions and retains every raw 
   const saved = JSON.parse(await fs.readFile(filePath, "utf8"));
   assert.deepEqual(saved[0], kept);
   assert.equal(saved[1].id, "new/value");
+});
+
+test("renames default and custom group members in one serialized update while preserving raw fields", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "widget-rename-group-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, "widgets.json");
+  const initial = [
+    { id: "floor/temperature", label: "Temperature", visible: false, writable: true, precision: 3, custom: { note: "preserve" } },
+    { id: "opaque", group: "floor", custom: ["retain"] },
+    { id: "other/value", label: "Other", custom: true },
+  ];
+  await fs.writeFile(filePath, JSON.stringify(initial));
+  const store = new WidgetStore(filePath);
+  const results = await Promise.all([
+    store.add({ id: "floor/humidity", label: "Humidity" }),
+    store.renameGroup(" floor ", "  Prizemlje  "),
+  ]);
+  assert.deepEqual(results[1].map(({ id, group }) => ({ id, group })), [
+    { id: "floor/temperature", group: "Prizemlje" }, { id: "opaque", group: "Prizemlje" }, { id: "floor/humidity", group: "Prizemlje" },
+  ]);
+  const saved = JSON.parse(await fs.readFile(filePath, "utf8"));
+  assert.deepEqual(saved[0], { ...initial[0], group: "Prizemlje" });
+  assert.deepEqual(saved[1], { ...initial[1], group: "Prizemlje" });
+  assert.deepEqual(saved[2], initial[2]);
+  const before = await fs.readFile(filePath, "utf8");
+  await assert.rejects(store.renameGroup("Prizemlje", "other"), { status: 409, code: "WIDGET_GROUP_EXISTS" });
+  await assert.rejects(store.renameGroup("missing", "new"), { status: 404, code: "WIDGET_GROUP_NOT_FOUND" });
+  assert.equal((await store.renameGroup("Prizemlje", " Prizemlje ")).length, 3);
+  assert.equal(await fs.readFile(filePath, "utf8"), before);
 });

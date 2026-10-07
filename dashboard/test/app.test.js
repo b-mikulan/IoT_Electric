@@ -588,6 +588,106 @@ test("group removal validates names, retains configuration on file failure and l
   assert.equal((await fetch(`${demo.baseUrl}/api/widgets/group`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group: "PLC vrijednosti" }) })).status, 409);
 });
 
+test("group renaming includes hidden/default/custom members, persists settings and sends one batched SSE update", async (t) => {
+  const kept = { id: "other/value", label: "Temperature", custom: { retain: true }, writable: true };
+  const widgets = [{ id: "floor/one", label: "Temperature", writable: true, precision: 3, custom: true }, { id: "floor/two", visible: false }, { id: "opaque", group: "floor", visible: false }, kept];
+  const { baseUrl, widgetFile, env, poller } = await startPersistedDashboard(t, widgets);
+  const before = poller.getSnapshot();
+  const configEvents = [];
+  poller.on("config", (event) => configEvents.push(event));
+  const readers = await Promise.all([1, 2].map(async () => {
+    const response = await fetch(`${baseUrl}/events`, { signal: AbortSignal.timeout(4_000) });
+    const reader = response.body.getReader();
+    await reader.read();
+    return reader;
+  }));
+  const response = await fetch(`${baseUrl}/api/widgets/group`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group: " floor ", name: " Prizemlje " }) });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.group, "floor");
+  assert.equal(result.name, "Prizemlje");
+  assert.deepEqual(result.widgets.map(({ id, group }) => ({ id, group })), widgets.slice(0, 3).map(({ id }) => ({ id, group: "Prizemlje" })));
+  assert.equal(configEvents.length, 1);
+  assert.equal(configEvents[0].widgets.length, 3);
+  assert.deepEqual(configEvents[0].groupRename, { from: "floor", to: "Prizemlje" });
+  for (const reader of readers) {
+    let stream = "";
+    while (!stream.includes("event: config")) {
+      const chunk = await reader.read();
+      assert.equal(chunk.done, false);
+      stream += new TextDecoder().decode(chunk.value);
+    }
+    assert.match(stream, /"group":"Prizemlje"/);
+    assert.match(stream, /"id":"opaque"/);
+    assert.match(stream, /"groupRename":\{"from":"floor","to":"Prizemlje"\}/);
+    assert.equal(stream.match(/event: config/g).length, 1);
+    await reader.cancel();
+  }
+  assert.deepEqual(poller.getSnapshot(), { ...before, widgets: before.widgets.map((widget, index) => index < 3 ? { ...widget, group: "Prizemlje" } : widget) });
+  assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), widgets.map((widget, index) => index < 3 ? { ...widget, group: "Prizemlje" } : widget));
+  assert.deepEqual(createRuntime(env).config.widgets.map(({ group }) => group), ["Prizemlje", "Prizemlje", "Prizemlje", "other"]);
+  assert.equal((await (await fetch(`${baseUrl}/api/config`)).json()).widgets[1].visible, false);
+});
+
+test("group renaming rejects conflicts and bad names, is idempotent and keeps file/runtime state on failure", async (t) => {
+  const { baseUrl, widgetFile, poller, config, store } = await startPersistedDashboard(t, [{ id: "floor/one", visible: false }, { id: "other/value", group: "Custom" }]);
+  const rename = (body) => fetch(`${baseUrl}/api/widgets/group`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const before = await fs.readFile(widgetFile, "utf8");
+  const snapshot = poller.getSnapshot();
+  const events = [];
+  poller.on("config", (event) => events.push(event));
+  assert.equal((await fetch(`${baseUrl}/api/widgets/group`, { method: "PATCH" })).status, 415);
+  for (const invalid of ["", " ", null, 1, "x".repeat(1_025)]) {
+    assert.equal((await rename({ group: invalid, name: "New" })).status, 400);
+    assert.equal((await rename({ group: "floor", name: invalid })).status, 400);
+  }
+  assert.equal((await rename({ group: "floor" })).status, 400);
+  const conflict = await rename({ group: "floor", name: " Custom " });
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).code, "WIDGET_GROUP_EXISTS");
+  const missing = await rename({ group: "missing", name: "New" });
+  assert.equal(missing.status, 404);
+  const unchanged = await rename({ group: " floor ", name: "floor" });
+  assert.equal(unchanged.status, 200);
+  assert.equal((await unchanged.json()).widgets.length, 1);
+  assert.equal(events.length, 0);
+  store.renameGroup = async () => { throw new Error("disk failure"); };
+  const failed = await rename({ group: "floor", name: "New" });
+  assert.equal(failed.status, 500);
+  assert.equal((await failed.json()).code, "WIDGET_GROUP_RENAME_FAILED");
+  assert.equal(await fs.readFile(widgetFile, "utf8"), before);
+  assert.deepEqual(poller.getSnapshot(), snapshot);
+  assert.equal(config.widgets[0].group, "floor");
+  assert.equal(events.length, 0);
+  for (const demoMode of [false, true]) {
+    const unavailable = await startApp(t, { widgetStoreEnabled: demoMode });
+    unavailable.config.demoMode = demoMode;
+    const response = await fetch(`${unavailable.baseUrl}/api/widgets/group`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group: "PLC vrijednosti", name: "New" }) });
+    assert.equal(response.status, 409);
+  }
+});
+
+test("group renaming shares the bulk lock with deletions and automatic discovery", async (t) => {
+  const { baseUrl, store } = await startPersistedDashboard(t, [{ id: "floor/one" }, { id: "other/value" }]);
+  const realRename = store.renameGroup.bind(store);
+  let finishRename;
+  store.renameGroup = (group, name) => new Promise((resolve) => { finishRename = async () => resolve(await realRename(group, name)); });
+  const rename = (group, name) => fetch(`${baseUrl}/api/widgets/group`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group, name }) });
+  const pending = rename("floor", "Renamed");
+  while (!finishRename) await new Promise((resolve) => setImmediate(resolve));
+  const concurrentRename = await rename("other", "Other");
+  assert.equal(concurrentRename.status, 409);
+  assert.equal((await concurrentRename.json()).code, "WIDGET_CLEAR_IN_PROGRESS");
+  for (const endpoint of ["/api/widgets/all", "/api/widgets/group"]) {
+    const response = await fetch(`${baseUrl}${endpoint}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group: "other" }) });
+    assert.equal(response.status, 409);
+  }
+  const discovery = await fetch(`${baseUrl}/api/discovery/auto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  assert.equal(discovery.status, 409);
+  await finishRename();
+  assert.equal((await pending).status, 200);
+});
+
 test("last-widget deletion persists across restart and broadcasts removal to open clients", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "dashboard-delete-"));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
@@ -676,6 +776,9 @@ test("automatic discovery runs in the background, broadcasts additions, keeps ex
   const removeGroupWhileScanning = await fetch(`${baseUrl}/api/widgets/group`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group: "PLC vrijednosti" }) });
   assert.equal(removeGroupWhileScanning.status, 409);
   assert.equal((await removeGroupWhileScanning.json()).code, "DISCOVERY_IN_PROGRESS");
+  const renameWhileScanning = await fetch(`${baseUrl}/api/widgets/group`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ group: "PLC vrijednosti", name: "Renamed" }) });
+  assert.equal(renameWhileScanning.status, 409);
+  assert.equal((await renameWhileScanning.json()).code, "DISCOVERY_IN_PROGRESS");
   assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), [existing]);
   releaseRoot();
   const result = await completed();

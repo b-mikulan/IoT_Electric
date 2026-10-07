@@ -42,6 +42,15 @@ const widgetsClearConfirm = document.querySelector("#widgets-clear-confirm");
 const widgetsClearStatus = document.querySelector("#widgets-clear-status");
 const widgetsGroupSelect = document.querySelector("#widgets-group-select");
 const widgetsGroupClear = document.querySelector("#widgets-group-clear");
+const widgetsGroupRename = document.querySelector("#widgets-group-rename");
+const groupRenameDialog = document.querySelector("#group-rename-dialog");
+const groupRenameClose = document.querySelector("#group-rename-close");
+const groupRenameCancel = document.querySelector("#group-rename-cancel");
+const groupRenameForm = document.querySelector("#group-rename-form");
+const groupRenameName = document.querySelector("#group-rename-name");
+const groupRenameSave = document.querySelector("#group-rename-save");
+const groupRenameMessage = document.querySelector("#group-rename-message");
+const groupRenameStatus = document.querySelector("#group-rename-status");
 const groupClearDialog = document.querySelector("#group-clear-dialog");
 const groupClearClose = document.querySelector("#group-clear-close");
 const groupClearCancel = document.querySelector("#group-clear-cancel");
@@ -82,6 +91,7 @@ let updatingWidgets = false;
 let automaticDiscoveryRunning = false;
 let widgetClearBusy = false;
 let groupClearTarget = "";
+let groupRenameTarget = "";
 
 function visualForUnit(unit = "") {
   const normalized = unit.trim().toLowerCase();
@@ -126,6 +136,19 @@ function placeWidgetInGroup(widget, column) {
     title.textContent = name;
     const count = document.createElement("span");
     count.className = "widget-group-count";
+    const actions = document.createElement("div");
+    actions.className = "widget-group-actions";
+    const rename = document.createElement("button");
+    rename.type = "button";
+    rename.className = "btn-flat";
+    rename.textContent = "Preimenuj";
+    rename.hidden = !widgetEditingEnabled;
+    rename.setAttribute("aria-label", `Preimenuj grupu ${name}`);
+    rename.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openGroupRenameDialog(name);
+    });
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "btn-flat danger-action widget-group-delete";
@@ -137,7 +160,8 @@ function placeWidgetInGroup(widget, column) {
       event.stopPropagation();
       openGroupClearDialog(name);
     });
-    summary.append(title, count, remove);
+    actions.append(rename, remove);
+    summary.append(title, count, actions);
     const body = document.createElement("div");
     body.className = "widget-group-body";
     const cards = document.createElement("div");
@@ -145,7 +169,7 @@ function placeWidgetInGroup(widget, column) {
     body.appendChild(cards);
     section.append(summary, body);
     grid.appendChild(section);
-    group = { section, cards, count, remove };
+    group = { section, cards, count, remove, rename };
     groupsByName.set(name, group);
   }
   if (column.parentElement !== group.cards) group.cards.appendChild(column);
@@ -189,11 +213,20 @@ function updateClearButton() {
   if (!widgetsClearConfirmation.hidden && !widgetClearBusy) widgetsClearMessage.textContent = `Obrisati sve widgete s dashboarda (${configById.size})?`;
   widgetsGroupSelect.disabled = widgetClearBusy || automaticDiscoveryRunning;
   widgetsGroupClear.disabled = widgetClearBusy || automaticDiscoveryRunning || !widgetsGroupSelect.value;
-  for (const group of groupsByName.values()) group.remove.disabled = widgetClearBusy || automaticDiscoveryRunning;
+  widgetsGroupRename.disabled = widgetsGroupClear.disabled;
+  for (const group of groupsByName.values()) {
+    group.remove.disabled = widgetClearBusy || automaticDiscoveryRunning;
+    group.rename.disabled = group.remove.disabled;
+  }
   if (groupClearDialog.open) {
     const count = [...configById.values()].filter((widget) => widgetGroupName(widget) === groupClearTarget).length;
     groupClearMessage.textContent = count > 0 ? `Obrisati grupu „${groupClearTarget}” i sve njezine widgete (${count})?` : "Grupa više nema widgeta.";
     groupClearConfirm.disabled = widgetClearBusy || automaticDiscoveryRunning || count === 0;
+  }
+  if (groupRenameDialog.open) {
+    const count = [...configById.values()].filter((widget) => widgetGroupName(widget) === groupRenameTarget).length;
+    groupRenameMessage.textContent = count > 0 ? `Grupa „${groupRenameTarget}” · widgeta: ${count}` : "Grupa više nije dostupna. Zatvori dijalog i odaberi grupu ponovno.";
+    groupRenameSave.disabled = widgetClearBusy || automaticDiscoveryRunning || count === 0;
   }
 }
 
@@ -407,7 +440,12 @@ function applyConfiguredWidget(widget) {
     return;
   }
 
+  const previousGroup = widgetGroupName(current);
   Object.assign(current, widget);
+  if (settingsDialog.open && settingsId.value === current.id && widgetGroupName(current) !== previousGroup) {
+    if (settingsGroup.value.trim() === previousGroup) settingsGroup.value = widgetGroupName(current);
+    else showSettingsStatus(`Grupa je u međuvremenu preimenovana u „${widgetGroupName(current)}”. Spremanje će primijeniti naziv koji si upisao.`, "error");
+  }
   const column = elementsById.get(widget.id);
   placeWidgetInGroup(current, column);
   const card = column.querySelector(".widget-card");
@@ -711,13 +749,24 @@ async function searchObjects() {
   }
 }
 
-function applyConfiguredWidgets(widgets) {
+function applyConfiguredWidgets(widgets, groupRename = null) {
+  const previousGroup = groupsByName.get(groupRename?.from);
+  const previousOpen = previousGroup?.section.open;
+  const selectedGroupRenamed = previousGroup && widgetsGroupSelect.value === groupRename.from;
   updatingWidgets = true;
   try {
     widgets.forEach(applyConfiguredWidget);
   } finally {
     updatingWidgets = false;
+    if (previousOpen !== undefined && groupRename.from !== groupRename.to) {
+      const renamedGroup = groupsByName.get(groupRename.to);
+      if (renamedGroup) renamedGroup.section.open = previousOpen;
+    }
     updateEmptyState();
+    if (selectedGroupRenamed) {
+      widgetsGroupSelect.value = groupRename.to;
+      updateClearButton();
+    }
     refreshDiscoveryItems();
   }
 }
@@ -871,6 +920,9 @@ function setWidgetClearBusy(busy) {
   widgetsClearCancel.disabled = busy;
   groupClearClose.disabled = busy;
   groupClearCancel.disabled = busy;
+  groupRenameClose.disabled = busy;
+  groupRenameCancel.disabled = busy;
+  groupRenameName.disabled = busy;
   for (const input of visibilityInputsById.values()) input.disabled = busy;
   discoveryAuto.disabled = busy || automaticDiscoveryRunning || !widgetEditingEnabled;
   updateClearButton();
@@ -970,6 +1022,78 @@ groupClearConfirm.addEventListener("click", async () => {
   }
 });
 
+function focusGroupControl(name) {
+  if (visibilityDialog.open) widgetsGroupSelect.focus();
+  else if (groupsByName.has(name)) groupsByName.get(name).rename.focus();
+  else visibilityOpen.focus();
+}
+
+function openGroupRenameDialog(name) {
+  if (widgetClearBusy || automaticDiscoveryRunning || !widgetEditingEnabled || !groupsByName.has(name)) return;
+  groupRenameTarget = name;
+  groupRenameName.value = name;
+  groupRenameName.setCustomValidity("");
+  groupRenameStatus.textContent = "";
+  groupRenameDialog.showModal();
+  updateClearButton();
+  groupRenameName.focus();
+  groupRenameName.select();
+}
+
+function closeGroupRenameDialog() {
+  if (widgetClearBusy) return;
+  groupRenameDialog.close();
+  focusGroupControl(groupRenameTarget);
+}
+
+widgetsGroupRename.addEventListener("click", () => openGroupRenameDialog(widgetsGroupSelect.value));
+groupRenameClose.addEventListener("click", closeGroupRenameDialog);
+groupRenameCancel.addEventListener("click", closeGroupRenameDialog);
+groupRenameDialog.addEventListener("click", (event) => {
+  if (event.target === groupRenameDialog) closeGroupRenameDialog();
+});
+groupRenameDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeGroupRenameDialog();
+});
+groupRenameName.addEventListener("input", () => groupRenameName.setCustomValidity(""));
+groupRenameForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (widgetClearBusy || automaticDiscoveryRunning || !groupsByName.has(groupRenameTarget)) return;
+  const name = groupRenameName.value.trim();
+  groupRenameName.setCustomValidity(name ? "" : "Upiši naziv grupe.");
+  if (!groupRenameForm.reportValidity()) return;
+  let renamed = false;
+  setWidgetClearBusy(true);
+  groupRenameStatus.className = "discovery-status";
+  groupRenameStatus.textContent = "Spremam naziv grupe…";
+  try {
+    const response = await fetch("/api/widgets/group", {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ group: groupRenameTarget, name }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.code === "WIDGET_GROUP_EXISTS" ? "Grupa s tim nazivom već postoji. Odaberi drugi naziv." : payload.error || `Preimenovanje nije uspjelo (${response.status}).`);
+    }
+    applyConfiguredWidgets(payload.widgets, { from: payload.group, to: payload.name });
+    groupRenameTarget = payload.name;
+    widgetsGroupSelect.value = payload.name;
+    groupRenameDialog.close();
+    if (visibilityDialog.open) {
+      widgetsClearStatus.className = "discovery-status is-success";
+      widgetsClearStatus.textContent = `Naziv grupe je spremljen: „${payload.name}”.`;
+    }
+    renamed = true;
+  } catch (error) {
+    groupRenameStatus.className = "discovery-status is-error";
+    groupRenameStatus.textContent = error.message || "Preimenovanje grupe nije uspjelo.";
+  } finally {
+    setWidgetClearBusy(false);
+    if (renamed) focusGroupControl(groupRenameTarget);
+  }
+});
+
 function showSettingsStatus(message, state = "") {
   settingsStatus.className = `discovery-status${state ? ` is-${state}` : ""}`;
   settingsStatus.textContent = message;
@@ -1061,12 +1185,15 @@ settingsForm.addEventListener("submit", async (event) => {
     precisionIsValid ? "" : "Broj decimala mora biti cijeli broj od 0 do 6."
   );
   if (!settingsForm.reportValidity() || !precisionIsValid) return;
+  const currentWidget = configById.get(settingsId.value);
+  if (!currentWidget) return;
+  const group = settingsGroup.value.trim();
 
   const settings = {
     id: settingsId.value,
     label: settingsLabel.value.trim(),
     description: settingsDescription.value.trim(),
-    group: settingsGroup.value.trim(),
+    ...(group === widgetGroupName(currentWidget) ? {} : { group }),
     unit: settingsUnit.value.trim(),
     precision,
     writable: settingsWritable.checked,
@@ -1183,7 +1310,7 @@ async function boot() {
     });
     events.addEventListener("config", (event) => {
       const payload = JSON.parse(event.data);
-      applyConfiguredWidgets(payload.widgets || [payload.widget]);
+      applyConfiguredWidgets(payload.widgets || [payload.widget], payload.groupRename);
     });
     events.addEventListener("discovery", (event) => showAutomaticDiscovery(JSON.parse(event.data)));
     events.addEventListener("visibility", (event) => {

@@ -417,13 +417,50 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
       return response.status(409).json({ error: "Automatic discovery is already running.", code: "DISCOVERY_IN_PROGRESS" });
     }
     if (clearingWidgets) {
-      return response.status(409).json({ error: "Widget removal is still in progress.", code: "WIDGET_CLEAR_IN_PROGRESS" });
+      return response.status(409).json({ error: "A bulk widget change is still in progress.", code: "WIDGET_CLEAR_IN_PROGRESS" });
     }
     autoDiscovery = { state: "running", phase: "scanning", containers: 0, pending: 1, found: 0, failedBranches: 0 };
     broadcast("discovery", autoDiscovery);
     // Long scans continue on the server after browser closure or proxy timeouts.
     void runAutoDiscovery();
     return response.status(202).json(autoDiscovery);
+  });
+
+  app.patch("/api/widgets/group", requireJson, express.json({ limit: "8kb" }), async (request, response) => {
+    const group = typeof request.body?.group === "string" ? request.body.group.trim() : "";
+    const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+    if (!group || !name || group.length > 1_024 || name.length > 1_024) {
+      return response.status(400).json({ error: "group and name must be non-empty strings of at most 1024 characters.", code: "INVALID_WIDGET_GROUP" });
+    }
+    if (config.demoMode || !widgetStore?.enabled) {
+      return response.status(409).json({ error: "Group renaming requires a writable WIDGETS_FILE.", code: "WIDGET_FILE_UNAVAILABLE" });
+    }
+    if (autoDiscovery.state === "running") {
+      return response.status(409).json({ error: "Wait for automatic discovery to finish before renaming a group.", code: "DISCOVERY_IN_PROGRESS" });
+    }
+    if (clearingWidgets) {
+      return response.status(409).json({ error: "A bulk widget change is already in progress.", code: "WIDGET_CLEAR_IN_PROGRESS" });
+    }
+    const members = config.widgets.filter((widget) => widgetGroup(widget) === group);
+    if (members.length === 0) {
+      return response.status(404).json({ error: "Widget group was not found.", code: "WIDGET_GROUP_NOT_FOUND" });
+    }
+    if (group === name) return response.json({ group, name, widgets: members.map(publicWidget) });
+    if (config.widgets.some((widget) => widgetGroup(widget) === name)) {
+      return response.status(409).json({ error: "A widget group with this name already exists.", code: "WIDGET_GROUP_EXISTS" });
+    }
+    clearingWidgets = true;
+    try {
+      const stored = await widgetStore.renameGroup(group, name);
+      const updated = poller.updateWidgets(stored, { groupRename: { from: group, to: name } });
+      const byId = new Map(updated.map((widget) => [widget.id, widget]));
+      config.widgets = config.widgets.map((widget) => byId.get(widget.id) || widget);
+      return response.json({ group, name, widgets: updated.map(publicWidget) });
+    } catch (error) {
+      return sendOperationError(response, error, "WIDGET_GROUP_RENAME_FAILED", "Dashboard could not rename the widget group.");
+    } finally {
+      clearingWidgets = false;
+    }
   });
 
   app.delete("/api/widgets/group", requireJson, express.json({ limit: "4kb" }), async (request, response) => {
@@ -438,7 +475,7 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
       return response.status(409).json({ error: "Wait for automatic discovery to finish before removing a group.", code: "DISCOVERY_IN_PROGRESS" });
     }
     if (clearingWidgets) {
-      return response.status(409).json({ error: "Widget removal is already in progress.", code: "WIDGET_CLEAR_IN_PROGRESS" });
+      return response.status(409).json({ error: "A bulk widget change is already in progress.", code: "WIDGET_CLEAR_IN_PROGRESS" });
     }
     const ids = config.widgets.filter((widget) => widgetGroup(widget) === group).map((widget) => widget.id);
     if (ids.length === 0) {
@@ -466,7 +503,7 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
       return response.status(409).json({ error: "Wait for automatic discovery to finish before removing all widgets.", code: "DISCOVERY_IN_PROGRESS" });
     }
     if (clearingWidgets) {
-      return response.status(409).json({ error: "Widget removal is already in progress.", code: "WIDGET_CLEAR_IN_PROGRESS" });
+      return response.status(409).json({ error: "A bulk widget change is already in progress.", code: "WIDGET_CLEAR_IN_PROGRESS" });
     }
     clearingWidgets = true;
     try {

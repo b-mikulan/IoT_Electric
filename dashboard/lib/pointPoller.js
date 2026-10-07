@@ -314,6 +314,31 @@ class PointPoller extends EventEmitter {
     return clone(normalized);
   }
 
+  updateWidgets(widgets, { groupRename } = {}) {
+    const settingsById = new Map(widgets.map((widget) => [String(widget?.id || "").trim(), widget]));
+    const existingIds = new Set(this.#widgets.map((widget) => widget.id));
+    for (const id of settingsById.keys()) {
+      if (!existingIds.has(id)) {
+        throw new PointDiscoveryError("Widget was not found in the running dashboard.", 404, "WIDGET_NOT_FOUND");
+      }
+    }
+    const updated = new Map();
+    const nextWidgets = this.#widgets.map((widget, index) => {
+      const settings = settingsById.get(widget.id);
+      if (!settings) return widget;
+      const normalized = normalizeWidget({ ...widget, ...settings, id: widget.id }, index);
+      updated.set(widget.id, normalized);
+      return normalized;
+    });
+    this.#widgets = nextWidgets;
+    this.snapshot.widgets = this.snapshot.widgets.map((current) =>
+      updated.has(current.id) ? { ...current, ...clone(updated.get(current.id)) } : current
+    );
+    const result = [...updated.values()].map(clone);
+    if (result.length > 0) this.emit("config", { widgets: result, ...(groupRename ? { groupRename: clone(groupRename) } : {}) });
+    return clone(result);
+  }
+
   removeWidget(id) {
     const widgetId = typeof id === "string" ? id.trim() : "";
     const index = this.#widgets.findIndex((widget) => widget.id === widgetId);

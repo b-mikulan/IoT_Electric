@@ -634,6 +634,27 @@ test("bulk selection removal keeps the remaining snapshot values and reads only 
   assert.deepEqual(removed, [{ ids: ["floor/one", "floor/two"] }]);
 });
 
+test("batched group updates preserve point data and broadcast one configuration event", async () => {
+  const widgets = [{ id: "floor/one", writable: true, group: "floor" }, { id: "floor/two", visible: false }, { id: "other/value", group: "Other" }];
+  const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets,
+    now: () => new Date("2026-10-07T08:00:00Z"),
+    fetchImpl: async () => jsonResponse({ values: widgets.map(({ id }, value) => ({ id, value, state: "ok" })) }),
+  });
+  await poller.poll();
+  const before = poller.getSnapshot();
+  const events = [];
+  poller.on("config", (event) => events.push(event));
+  const groupRename = { from: "floor", to: "Prizemlje" };
+  const updated = poller.updateWidgets(widgets.slice(0, 2).map((widget) => ({ ...widget, group: "Prizemlje" })), { groupRename });
+  assert.deepEqual(updated.map(({ id }) => id), ["floor/one", "floor/two"]);
+  assert.deepEqual(events, [{ widgets: updated, groupRename }]);
+  const after = poller.getSnapshot();
+  assert.deepEqual(after, { ...before, widgets: before.widgets.map((widget, index) => index < 2 ? { ...widget, group: "Prizemlje" } : widget) });
+  assert.throws(() => poller.updateWidgets([{ id: "floor/one", group: "Bad" }, { id: "missing", group: "Bad" }]), { code: "WIDGET_NOT_FOUND" });
+  assert.deepEqual(poller.getSnapshot(), after);
+  assert.equal(events.length, 1);
+});
+
 test("automatic discovery traverses nested containers once and keeps all values beyond the manual limit", async () => {
   const requests = [];
   const progress = [];

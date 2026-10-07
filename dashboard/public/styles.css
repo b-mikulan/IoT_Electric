@@ -289,7 +289,8 @@ h1 {
 .widget-group-summary:focus-visible { outline: 3px solid rgba(0, 121, 107, 0.25); outline-offset: -3px; border-radius: 16px; }
 .widget-group-title { flex: 1; min-width: 0; margin: 0; color: var(--ink); font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; }
 .widget-group-count { flex: 0 0 auto; color: var(--muted); font-size: 0.78rem; }
-.widget-group-delete { flex: 0 0 auto; padding: 0 10px; font-size: 0.78rem; }
+.widget-group-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; }
+.widget-group-actions .btn-flat { padding: 0 10px; font-size: 0.78rem; }
 .widget-group-body { padding: 0 20px; }
 .widget-group-grid.row { margin: 0 -10px; }
 .widgets-clear-controls { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
@@ -297,7 +298,10 @@ h1 {
 .danger-action { color: var(--error); }
 .settings-delete-actions .btn { color: #fff; }
 .group-management { display: flex; align-items: end; gap: 10px; margin-top: 14px; }
-.group-management .browser-default { border: 1px solid var(--border); border-radius: 6px; }
+.group-management .discovery-field { flex: 1 1 0; }
+.group-management .browser-default { width: 100%; max-width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 6px; }
+.group-management > .btn-flat { flex: 0 0 auto; }
+.group-rename-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
 
 .control-panel {
   margin-bottom: 28px;
@@ -604,11 +608,13 @@ h1 {
 
 .visibility-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
 
 .visibility-item {
   display: flex;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
@@ -620,26 +626,27 @@ h1 {
 
 .visibility-copy {
   min-width: 0;
+  flex: 1 1 0;
 }
 
 .visibility-name,
 .visibility-id {
   display: block;
+  overflow-wrap: anywhere;
 }
 
 .visibility-id {
   max-width: 100%;
-  overflow: hidden;
   margin-top: 5px;
   color: #47615f;
   font-size: 0.76rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
+  white-space: normal;
 }
 
 .visibility-switch {
   position: relative;
-  flex: 0 0 auto;
+  flex: 0 0 48px;
   cursor: pointer;
 }
 
@@ -1040,7 +1047,7 @@ h1 {
   .widget-group-summary { padding: 16px 12px; flex-wrap: wrap; }
   .widget-group-title { font-size: 0.9rem; }
   .widget-group-body { padding: 0 12px; }
-  .widget-group-delete { margin-left: auto; }
+  .widget-group-actions { margin-left: auto; }
   .group-management { align-items: stretch; flex-direction: column; }
   .widget-card .card-content { padding: 21px 20px 17px; }
   .app-footer { align-items: flex-start; flex-direction: column; }

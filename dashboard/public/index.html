@@ -191,11 +191,12 @@
           <button id="widgets-clear" class="btn-flat danger-action" type="button">Obriši sve widgete</button>
           <div class="group-management">
             <div class="discovery-field">
-              <label for="widgets-group-select">Grupa za brisanje</label>
+              <label for="widgets-group-select">Grupa za uređivanje</label>
               <select id="widgets-group-select" class="browser-default">
                 <option value="">Odaberi grupu</option>
               </select>
             </div>
+            <button id="widgets-group-rename" class="btn-flat" type="button" disabled>Preimenuj</button>
             <button id="widgets-group-clear" class="btn-flat danger-action" type="button" disabled>Obriši grupu</button>
           </div>
           <div id="widgets-clear-confirmation" class="settings-delete-confirmation" hidden>
@@ -226,6 +227,28 @@
           <button id="group-clear-confirm" class="btn" type="button">Da, obriši grupu</button>
         </div>
         <p id="group-clear-status" class="discovery-status" role="status" aria-live="polite"></p>
+      </div>
+    </dialog>
+
+    <dialog id="group-rename-dialog" class="discovery-dialog" aria-labelledby="group-rename-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <h2 id="group-rename-title">Preimenuj grupu</h2>
+          <button id="group-rename-close" class="dialog-close" type="button" aria-label="Zatvori">×</button>
+        </header>
+        <p id="group-rename-message"></p>
+        <form id="group-rename-form" class="group-rename-form">
+          <div class="discovery-field">
+            <label for="group-rename-name">Novi naziv grupe</label>
+            <input id="group-rename-name" type="text" maxlength="1024" autocomplete="off" required />
+          </div>
+          <p>Novi naziv primjenjuje se na sve widgete u grupi, uključujući skrivene.</p>
+          <div class="group-rename-actions">
+            <button id="group-rename-cancel" class="btn-flat" type="button">Odustani</button>
+            <button id="group-rename-save" class="btn" type="submit">Spremi naziv</button>
+          </div>
+        </form>
+        <p id="group-rename-status" class="discovery-status" role="status" aria-live="polite"></p>
       </div>
     </dialog>
 

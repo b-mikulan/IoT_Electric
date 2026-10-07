@@ -1,7 +1,7 @@
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
 
-const { parseWidgets } = require("./config");
+const { parseWidgets, widgetGroup } = require("./config");
 
 class WidgetStoreError extends Error {
   constructor(message, status, code) {
@@ -78,6 +78,12 @@ class WidgetStore {
 
   async removeMany(ids) {
     const operation = this.#operation.then(() => this.#removeMany(ids));
+    this.#operation = operation.catch(() => {});
+    return operation;
+  }
+
+  async renameGroup(group, name) {
+    const operation = this.#operation.then(() => this.#renameGroup(group, name));
     this.#operation = operation.catch(() => {});
     return operation;
   }
@@ -240,6 +246,29 @@ class WidgetStore {
     const removed = rawWidgets.filter((widget) => removedIds.has(String(widget?.id || "").trim()));
     await this.#writeWidgets(rawWidgets.filter((widget) => !removedIds.has(String(widget?.id || "").trim())));
     return { ids: removed.map((widget) => String(widget.id).trim()) };
+  }
+
+  async #renameGroup(group, name) {
+    this.#assertEnabled();
+    const oldName = typeof group === "string" ? group.trim() : "";
+    const newName = typeof name === "string" ? name.trim() : "";
+    if (!oldName || !newName || oldName.length > 1_024 || newName.length > 1_024) {
+      throw new WidgetStoreError("Group names must be non-empty strings of at most 1024 characters.", 400, "INVALID_WIDGET_GROUP");
+    }
+    const rawWidgets = await this.#readWidgets();
+    const members = rawWidgets.filter((widget) => widgetGroup(widget) === oldName);
+    if (members.length === 0) {
+      throw new WidgetStoreError("Widget group was not found.", 404, "WIDGET_GROUP_NOT_FOUND");
+    }
+    if (oldName === newName) return parseWidgets(JSON.stringify(members), false);
+    if (rawWidgets.some((widget) => widgetGroup(widget) === newName)) {
+      throw new WidgetStoreError("A widget group with this name already exists.", 409, "WIDGET_GROUP_EXISTS");
+    }
+    const ids = new Set(members.map((widget) => String(widget.id).trim()));
+    const normalized = await this.#writeWidgets(rawWidgets.map((widget) =>
+      ids.has(String(widget?.id || "").trim()) ? { ...widget, group: newName } : widget
+    ));
+    return normalized.filter((widget) => ids.has(widget.id));
   }
 
   async #updateSettings(id, settings) {
