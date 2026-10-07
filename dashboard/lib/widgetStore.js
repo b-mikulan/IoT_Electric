@@ -42,6 +42,12 @@ class WidgetStore {
     return operation;
   }
 
+  async addMany(widgets) {
+    const operation = this.#operation.then(() => this.#addMany(widgets));
+    this.#operation = operation.catch(() => {});
+    return operation;
+  }
+
   async setVisibility(id, visible) {
     const operation = this.#operation.then(() =>
       this.#setVisibility(id, visible)
@@ -54,6 +60,12 @@ class WidgetStore {
     const operation = this.#operation.then(() =>
       this.#updateSettings(id, settings)
     );
+    this.#operation = operation.catch(() => {});
+    return operation;
+  }
+
+  async remove(id) {
+    const operation = this.#operation.then(() => this.#remove(id));
     this.#operation = operation.catch(() => {});
     return operation;
   }
@@ -133,6 +145,26 @@ class WidgetStore {
     return storedWidget;
   }
 
+  async #addMany(widgets) {
+    this.#assertEnabled();
+    const rawWidgets = await this.#readWidgets();
+    const ids = new Set(rawWidgets.map((widget) => String(widget?.id || "").trim()));
+    const added = [];
+    for (const widget of widgets) {
+      const id = String(widget?.id || "").trim();
+      if (ids.has(id)) continue;
+      ids.add(id);
+      added.push({
+        id,
+        label: String(widget?.label || id),
+        description: String(widget?.description || "PLC vrijednost"),
+        unit: String(widget?.unit || ""),
+      });
+    }
+    if (added.length > 0) await this.#writeWidgets([...rawWidgets, ...added]);
+    return added;
+  }
+
   async #setVisibility(id, visible) {
     this.#assertEnabled();
     if (typeof visible !== "boolean") {
@@ -159,6 +191,25 @@ class WidgetStore {
     rawWidgets[index] = { ...rawWidgets[index], visible };
     await this.#writeWidgets(rawWidgets);
     return { id: widgetId, visible };
+  }
+
+  async #remove(id) {
+    this.#assertEnabled();
+    const widgetId = String(id || "").trim();
+    const rawWidgets = await this.#readWidgets();
+    const index = rawWidgets.findIndex(
+      (widget) => String(widget?.id || "").trim() === widgetId
+    );
+    if (index < 0) {
+      throw new WidgetStoreError(
+        "This widget is not present in widgets.json.",
+        404,
+        "WIDGET_NOT_FOUND"
+      );
+    }
+    rawWidgets.splice(index, 1);
+    await this.#writeWidgets(rawWidgets);
+    return { id: widgetId };
   }
 
   async #updateSettings(id, settings) {

@@ -86,6 +86,7 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
   const app = express();
   const eventClients = new Set();
   const discoveredById = new Map();
+  let autoDiscovery = { state: "idle" };
   app.disable("x-powered-by");
 
   function broadcast(event, payload) {
@@ -103,9 +104,31 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
   }
 
   poller.on("update", (payload) => broadcast("update", payload));
+  function updateAutoDiscovery(update) {
+    autoDiscovery = { ...autoDiscovery, ...update };
+    broadcast("discovery", autoDiscovery);
+  }
+
+  async function runAutoDiscovery() {
+    try {
+      const { values, tree } = await poller.discoverAllValues({
+        onProgress: (progress) => updateAutoDiscovery(progress),
+      });
+      updateAutoDiscovery({ phase: "saving", pending: 0, found: values.length });
+      const stored = await widgetStore.addMany(values.map((item) => ({
+        id: item.id, label: item.name, description: item.description, unit: item.unit,
+      })));
+      const added = poller.addWidgets(stored);
+      config.widgets.push(...added);
+      updateAutoDiscovery({ state: "done", added: added.length, skipped: values.length - added.length, tree });
+    } catch (error) {
+      updateAutoDiscovery({ state: "error", error: error?.code ? error.message : "Automatsko dodavanje nije uspjelo. Provjeri vezu i mogućnost spremanja widgeta." });
+    }
+  }
   poller.on("status", (payload) => broadcast("status", payload));
   poller.on("sync", (payload) => broadcast("sync", payload));
   poller.on("config", (payload) => broadcast("config", payload));
+  poller.on("removed", (payload) => broadcast("removed", payload));
 
   app.get("/health", (request, response) => {
     const snapshot = poller.getSnapshot();
@@ -136,6 +159,7 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
       discoveryEnabled: !config.demoMode,
       widgetEditingEnabled:
         !config.demoMode && Boolean(widgetStore?.enabled),
+      autoDiscovery,
       widgets: config.widgets.map(publicWidget),
     });
   });
@@ -362,7 +386,9 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
           settings
         );
         const runtimeWidget = poller.updateWidget(settings.id, storedWidget);
-        config.widgets[index] = runtimeWidget;
+        // Other widgets can be removed while this file update is pending.
+        const currentIndex = config.widgets.findIndex((widget) => widget.id === settings.id);
+        config.widgets[currentIndex] = runtimeWidget;
         return response.json({ widget: publicWidget(runtimeWidget) });
       } catch (error) {
         return sendOperationError(
@@ -371,6 +397,48 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
           "WIDGET_SETTINGS_UPDATE_FAILED",
           "Dashboard could not update widget settings."
         );
+      }
+    }
+  );
+
+  app.get("/api/discovery/auto", (request, response) => response.json(autoDiscovery));
+  app.post("/api/discovery/auto", requireJson, express.json({ limit: "4kb" }), (request, response) => {
+    if (config.demoMode || !widgetStore?.enabled) {
+      return response.status(409).json({ error: "Automatic discovery requires a writable WIDGETS_FILE and a live EWS connection.", code: "WIDGET_FILE_UNAVAILABLE" });
+    }
+    if (autoDiscovery.state === "running") {
+      return response.status(409).json({ error: "Automatic discovery is already running.", code: "DISCOVERY_IN_PROGRESS" });
+    }
+    autoDiscovery = { state: "running", phase: "scanning", containers: 0, pending: 1, found: 0 };
+    broadcast("discovery", autoDiscovery);
+    // Long scans continue on the server after browser closure or proxy timeouts.
+    void runAutoDiscovery();
+    return response.status(202).json(autoDiscovery);
+  });
+
+  app.delete(
+    "/api/widgets",
+    requireJson,
+    express.json({ limit: "4kb" }),
+    async (request, response) => {
+      const id = typeof request.body?.id === "string" ? request.body.id.trim() : "";
+      if (!id) {
+        return response.status(400).json({ error: "id must be a non-empty string.", code: "INVALID_WIDGET_ID" });
+      }
+      if (config.demoMode || !widgetStore?.enabled) {
+        return response.status(409).json({ error: "Widget deletion requires a writable WIDGETS_FILE.", code: "WIDGET_FILE_UNAVAILABLE" });
+      }
+      if (!config.widgets.some((widget) => widget.id === id)) {
+        return response.status(404).json({ error: "Widget was not found.", code: "WIDGET_NOT_FOUND" });
+      }
+      try {
+        await widgetStore.remove(id);
+        config.widgets = config.widgets.filter((widget) => widget.id !== id);
+        discoveredById.delete(id);
+        poller.removeWidget(id);
+        return response.json({ id });
+      } catch (error) {
+        return sendOperationError(response, error, "WIDGET_DELETE_FAILED", "Dashboard could not delete the widget.");
       }
     }
   );
@@ -386,6 +454,7 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
     response.flushHeaders?.();
 
     sendEvent(response, "snapshot", poller.getSnapshot());
+    sendEvent(response, "discovery", autoDiscovery);
     eventClients.add(response);
     const heartbeat = setInterval(() => response.write(": heartbeat\n\n"), 25_000);
 

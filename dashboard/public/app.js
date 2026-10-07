@@ -23,6 +23,11 @@ const discoveryQuery = document.querySelector("#discovery-query");
 const discoverySearch = document.querySelector("#discovery-search");
 const discoveryStatus = document.querySelector("#discovery-status");
 const discoveryResults = document.querySelector("#discovery-results");
+const automaticDiscovery = document.querySelector("#automatic-discovery");
+const discoveryAuto = document.querySelector("#discovery-auto");
+const discoveryAutoStatus = document.querySelector("#discovery-auto-status");
+const discoveryTree = document.querySelector("#discovery-tree");
+const treeValuesById = new Map();
 const discoveryItemTemplate = document.querySelector("#discovery-item-template");
 const visibilityOpen = document.querySelector("#visibility-open");
 const visibilityDialog = document.querySelector("#visibility-dialog");
@@ -43,12 +48,21 @@ const settingsWritable = document.querySelector("#settings-writable");
 const settingsVisible = document.querySelector("#settings-visible");
 const settingsSave = document.querySelector("#settings-save");
 const settingsStatus = document.querySelector("#settings-status");
+const settingsDelete = document.querySelector("#settings-delete");
+const settingsDeleteConfirmation = document.querySelector("#settings-delete-confirmation");
+const settingsDeleteMessage = document.querySelector("#settings-delete-message");
+const settingsDeleteConfirm = document.querySelector("#settings-delete-confirm");
+const settingsDeleteCancel = document.querySelector("#settings-delete-cancel");
 
 const elementsById = new Map();
 const configById = new Map();
 const visibilityInputsById = new Map();
 const latestValuesById = new Map();
 let widgetEditingEnabled = false;
+let settingsBusy = false;
+let lastDiscoveryPayload = null;
+let updatingWidgets = false;
+let automaticDiscoveryRunning = false;
 
 function visualForUnit(unit = "") {
   const normalized = unit.trim().toLowerCase();
@@ -264,6 +278,7 @@ function addVisibilityControl(widget) {
 
 function applyConfiguredWidget(widget) {
   if (!widget || typeof widget.id !== "string") return;
+  updateTreeValue(widget.id, true);
 
   const current = configById.get(widget.id);
   if (!current) {
@@ -271,6 +286,7 @@ function applyConfiguredWidget(widget) {
     syncWriteOption(widget);
     addVisibilityControl(widget);
     updateEmptyState();
+    refreshDiscoveryItems();
     return;
   }
 
@@ -294,6 +310,35 @@ function applyConfiguredWidget(widget) {
 
   const latest = latestValuesById.get(current.id);
   if (latest) updateWidget(latest.widget, latest.syncedAt);
+  refreshDiscoveryItems();
+}
+
+function removeConfiguredWidget(id) {
+  updateTreeValue(id, false);
+  elementsById.get(id)?.remove();
+  elementsById.delete(id);
+  configById.delete(id);
+  if (configById.size === 0) showStatus({ state: "idle" });
+  latestValuesById.delete(id);
+  visibilityInputsById.get(id)?.closest(".visibility-item")?.remove();
+  visibilityInputsById.delete(id);
+  const wasSelected = writeWidget.value === id;
+  [...writeWidget.options].find((option) => option.value === id)?.remove();
+  if (wasSelected) configureWriteValueInput({ clear: true });
+  if (settingsDialog.open && settingsId.value === id) settingsDialog.close();
+  updateWritePanel();
+  updateEmptyState();
+  refreshDiscoveryItems();
+}
+
+function reconcileSnapshot(payload) {
+  const widgets = Array.isArray(payload.widgets) ? payload.widgets : [];
+  const ids = new Set(widgets.map((widget) => widget.id));
+  for (const id of [...configById.keys()]) {
+    if (!ids.has(id)) removeConfiguredWidget(id);
+  }
+  applyConfiguredWidgets(widgets);
+  applyPayload(payload);
 }
 
 function formatValue(value, precision) {
@@ -372,15 +417,18 @@ function showStatus(status = {}) {
       : status.state || status.status || "connecting";
   const isOnline = state === "connected" || state === "online";
   const isOffline = state === "error" || state === "offline";
+  const isEmpty = state === "idle" && configById.size === 0;
 
   connectionDot.className = `connection-dot ${
-    isOnline ? "is-online" : isOffline ? "is-offline" : "is-connecting"
+    isOnline ? "is-online" : isOffline ? "is-offline" : isEmpty ? "" : "is-connecting"
   }`;
   connectionLabel.textContent = isOnline
     ? "Podaci uživo"
     : isOffline
       ? "Veza prekinuta"
-      : "Povezivanje…";
+      : isEmpty ? "Nema konfiguriranih točaka" : "Povezivanje…";
+
+  if (isEmpty) lastSync.textContent = "Dodaj vrijednost kroz pretragu za početak praćenja";
 
   errorBanner.hidden = !isOffline;
   if (isOffline) {
@@ -449,6 +497,7 @@ async function addDiscoveredWidget(item, button) {
 }
 
 function renderDiscoveryItems(payload) {
+  lastDiscoveryPayload = payload;
   discoveryResults.replaceChildren();
   const items = Array.isArray(payload.items) ? payload.items : [];
 
@@ -461,6 +510,7 @@ function renderDiscoveryItems(payload) {
   }
 
   for (const item of items) {
+    if (item.kind === "value") item.alreadyAdded = configById.has(item.id);
     const fragment = discoveryItemTemplate.content.cloneNode(true);
     const article = fragment.querySelector(".discovery-item");
     const kind = fragment.querySelector(".discovery-kind");
@@ -504,8 +554,14 @@ function renderDiscoveryItems(payload) {
   }
 }
 
+function refreshDiscoveryItems() {
+  if (updatingWidgets) return;
+  if (lastDiscoveryPayload && discoveryDialog.open) renderDiscoveryItems(lastDiscoveryPayload);
+}
+
 async function searchObjects() {
   setDiscoveryBusy(true);
+  lastDiscoveryPayload = null;
   discoveryResults.replaceChildren();
   showDiscoveryStatus("Dohvaćam objekte iz middlewarea…");
 
@@ -538,6 +594,103 @@ async function searchObjects() {
   }
 }
 
+function applyConfiguredWidgets(widgets) {
+  updatingWidgets = true;
+  try {
+    widgets.forEach(applyConfiguredWidget);
+  } finally {
+    updatingWidgets = false;
+    refreshDiscoveryItems();
+  }
+}
+
+function updateTreeValue(id, added) {
+  const badge = treeValuesById.get(id);
+  if (badge) badge.textContent = added ? "Na dashboardu" : "Nije na dashboardu";
+}
+
+function renderDiscoveryTree(nodes) {
+  discoveryTree.replaceChildren();
+  treeValuesById.clear();
+  const childLists = new Map();
+  const fragment = document.createDocumentFragment();
+  // The scan returns parents before their children, so even deep trees need no recursion.
+  for (const node of nodes) {
+    const entry = document.createElement("li");
+    if (node.kind === "container") {
+      const folder = document.createElement("details");
+      folder.open = node.parentId === null;
+      const title = document.createElement("summary");
+      title.textContent = `📁 ${node.name}`;
+      title.title = node.id || "EWS root";
+      const children = document.createElement("ul");
+      folder.append(title, children);
+      entry.appendChild(folder);
+      childLists.set(node.id, children);
+    } else {
+      entry.className = "tree-value";
+      const title = document.createElement("span");
+      title.textContent = `◇ ${node.name}${node.unit ? ` (${node.unit})` : ""}`;
+      const badge = document.createElement("span");
+      badge.className = "tree-added";
+      treeValuesById.set(node.id, badge);
+      updateTreeValue(node.id, configById.has(node.id));
+      const id = document.createElement("span");
+      id.className = "tree-id";
+      id.textContent = node.id;
+      entry.append(title, badge, id);
+    }
+    if (node.parentId === null) {
+      const root = document.createElement("ul");
+      root.appendChild(entry);
+      fragment.appendChild(root);
+    } else {
+      childLists.get(node.parentId)?.appendChild(entry);
+    }
+  }
+  discoveryTree.appendChild(fragment);
+  discoveryTree.hidden = false;
+}
+
+function showAutomaticDiscovery(payload) {
+  automaticDiscoveryRunning = payload.state === "running";
+  discoveryAuto.disabled = automaticDiscoveryRunning || !widgetEditingEnabled;
+  discoveryAuto.textContent = automaticDiscoveryRunning ? "Automatsko dodavanje u tijeku…" : "Automatski dodaj sve vrijednosti";
+  discoveryAutoStatus.className = `discovery-status${payload.state === "error" ? " is-error" : payload.state === "done" ? " is-success" : ""}`;
+  if (automaticDiscoveryRunning) {
+    discoveryTree.hidden = true;
+    discoveryAutoStatus.textContent = payload.phase === "saving"
+      ? `Spremam pronađene vrijednosti: ${payload.found}.`
+      : `Pregledano mapa: ${payload.containers}. Pronađeno vrijednosti: ${payload.found}. Preostalo mapa: ${payload.pending}.`;
+  } else if (payload.state === "done") {
+    if (Array.isArray(payload.tree)) renderDiscoveryTree(payload.tree);
+    discoveryAutoStatus.textContent = `Dodano: ${payload.added}. Već postojeće: ${payload.skipped}. Pregledano mapa: ${payload.containers}.`;
+  } else if (payload.state === "error") {
+    discoveryAutoStatus.textContent = payload.error;
+  }
+}
+
+discoveryAuto.addEventListener("click", async () => {
+  if (automaticDiscoveryRunning) return;
+  showAutomaticDiscovery({ state: "running", containers: 0, found: 0, pending: 1 });
+  try {
+    const response = await fetch("/api/discovery/auto", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 409 && payload.code === "DISCOVERY_IN_PROGRESS") {
+      const statusResponse = await fetch("/api/discovery/auto", { cache: "no-store" });
+      if (!statusResponse.ok) throw new Error("Status automatskog dodavanja nije dostupan.");
+      showAutomaticDiscovery(await statusResponse.json());
+    } else if (!response.ok) {
+      throw new Error(payload.error || "Automatsko dodavanje nije uspjelo.");
+    }
+    // Progress and completion arrive through SSE, including after reconnecting.
+  } catch (error) {
+    showAutomaticDiscovery({ state: "error", error: error.message });
+  }
+});
+
 discoveryOpen.addEventListener("click", () => {
   discoveryDialog.showModal();
   requestAnimationFrame(() => discoveryQuery.focus());
@@ -569,7 +722,7 @@ function showSettingsStatus(message, state = "") {
 
 function openSettingsDialog(id) {
   const widget = configById.get(id);
-  if (!widget || !widgetEditingEnabled) return;
+  if (!widget || !widgetEditingEnabled || settingsBusy) return;
 
   settingsForm.reset();
   settingsId.value = widget.id;
@@ -583,18 +736,65 @@ function openSettingsDialog(id) {
   settingsVisible.checked = widget.visible !== false;
   settingsPrecision.setCustomValidity("");
   showSettingsStatus("");
+  settingsDeleteConfirmation.hidden = true;
   settingsDialog.showModal();
   requestAnimationFrame(() => settingsLabel.focus());
 }
 
-settingsClose.addEventListener("click", () => settingsDialog.close());
-settingsCancel.addEventListener("click", () => settingsDialog.close());
+function setSettingsBusy(busy) {
+  settingsBusy = busy;
+  for (const element of settingsForm.elements) element.disabled = busy;
+  settingsClose.disabled = busy;
+  settingsDeleteConfirm.disabled = busy;
+  settingsDeleteCancel.disabled = busy;
+}
+
+settingsClose.addEventListener("click", () => { if (!settingsBusy) settingsDialog.close(); });
+settingsCancel.addEventListener("click", () => { if (!settingsBusy) settingsDialog.close(); });
 settingsDialog.addEventListener("click", (event) => {
-  if (event.target === settingsDialog) settingsDialog.close();
+  if (event.target === settingsDialog && !settingsBusy) settingsDialog.close();
+});
+settingsDialog.addEventListener("cancel", (event) => {
+  if (settingsBusy) event.preventDefault();
+});
+
+settingsDelete.addEventListener("click", () => {
+  if (settingsBusy) return;
+  const widget = configById.get(settingsId.value);
+  if (!widget) return;
+  settingsDeleteMessage.textContent = `Obrisati „${widget.label}” s dashboarda?`;
+  settingsDeleteConfirmation.hidden = false;
+  settingsDeleteCancel.focus();
+});
+settingsDeleteCancel.addEventListener("click", () => {
+  settingsDeleteConfirmation.hidden = true;
+  settingsDelete.focus();
+});
+settingsDeleteConfirm.addEventListener("click", async () => {
+  if (settingsBusy || settingsDeleteConfirmation.hidden) return;
+  const id = settingsId.value;
+  setSettingsBusy(true);
+  showSettingsStatus("Brišem widget…");
+  try {
+    const response = await fetch("/api/widgets", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Brisanje nije uspjelo (${response.status}).`);
+    removeConfiguredWidget(id);
+    settingsDialog.close();
+  } catch (error) {
+    showSettingsStatus(error.message || "Brisanje widgeta nije uspjelo.", "error");
+  } finally {
+    setSettingsBusy(false);
+  }
 });
 
 settingsForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (settingsBusy) return;
   const rawPrecision = settingsPrecision.value.trim();
   const precision = rawPrecision === "" ? null : Number(rawPrecision);
   const precisionIsValid =
@@ -615,7 +815,8 @@ settingsForm.addEventListener("submit", async (event) => {
     visible: settingsVisible.checked,
   };
 
-  settingsSave.disabled = true;
+  setSettingsBusy(true);
+  settingsDeleteConfirmation.hidden = true;
   showSettingsStatus("Spremam postavke u widgets.json…");
   try {
     const response = await fetch("/api/widgets/settings", {
@@ -633,7 +834,7 @@ settingsForm.addEventListener("submit", async (event) => {
   } catch (error) {
     showSettingsStatus(error.message || "Spremanje postavki nije uspjelo.", "error");
   } finally {
-    settingsSave.disabled = false;
+    setSettingsBusy(false);
   }
 });
 
@@ -700,8 +901,10 @@ async function boot() {
     widgetEditingEnabled = config.widgetEditingEnabled === true;
     discoveryOpen.hidden = config.discoveryEnabled !== true;
     visibilityOpen.hidden = !widgetEditingEnabled;
+    automaticDiscovery.hidden = !widgetEditingEnabled;
     pollInterval.textContent = `Interval: ${Math.round(config.intervalMs / 1000)} s`;
     config.widgets.forEach(createWidget);
+    showAutomaticDiscovery(config.autoDiscovery || { state: "idle" });
     setupWriteControls(config.widgets);
     configureWriteValueInput();
     setupVisibilityControls(config.widgets);
@@ -709,7 +912,7 @@ async function boot() {
 
     const events = new EventSource("/events");
     events.addEventListener("snapshot", (event) => {
-      applyPayload(JSON.parse(event.data));
+      reconcileSnapshot(JSON.parse(event.data));
     });
     events.addEventListener("update", (event) => {
       applyPayload(JSON.parse(event.data));
@@ -721,11 +924,16 @@ async function boot() {
       applyPayload(JSON.parse(event.data));
     });
     events.addEventListener("config", (event) => {
-      applyConfiguredWidget(JSON.parse(event.data).widget);
+      const payload = JSON.parse(event.data);
+      applyConfiguredWidgets(payload.widgets || [payload.widget]);
     });
+    events.addEventListener("discovery", (event) => showAutomaticDiscovery(JSON.parse(event.data)));
     events.addEventListener("visibility", (event) => {
       const payload = JSON.parse(event.data);
       setWidgetVisibility(payload.id, payload.visible === true);
+    });
+    events.addEventListener("removed", (event) => {
+      removeConfiguredWidget(JSON.parse(event.data).id);
     });
     events.onopen = () => showStatus({ state: "connecting" });
     events.onerror = () => showStatus({

@@ -1,7 +1,14 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
+const fs = require("node:fs/promises");
+const os = require("node:os");
+const path = require("node:path");
 const { createApp } = require("../app");
+const { createRuntime } = require("../server");
+const { PointPoller } = require("../lib/pointPoller");
+const { WidgetStore } = require("../lib/widgetStore");
+const { loadConfig } = require("../lib/config");
 
 class FakePoller extends EventEmitter {
   constructor() {
@@ -10,6 +17,7 @@ class FakePoller extends EventEmitter {
     this.discoveryCalls = [];
     this.addedWidgets = [];
     this.updatedWidgets = [];
+    this.removedWidgets = [];
   }
 
   getSnapshot() {
@@ -71,6 +79,12 @@ class FakePoller extends EventEmitter {
     this.emit("config", { widget: updated });
     return updated;
   }
+
+  removeWidget(id) {
+    this.removedWidgets.push(id);
+    this.emit("removed", { id });
+    return { id };
+  }
 }
 
 async function startApp(
@@ -83,6 +97,7 @@ async function startApp(
     added: [],
     visibilityUpdates: [],
     settingsUpdates: [],
+    removed: [],
     async add(widget) {
       this.added.push(widget);
       return { ...widget };
@@ -94,6 +109,10 @@ async function startApp(
     async updateSettings(id, settings) {
       this.settingsUpdates.push({ id, settings });
       return { ...settings, id };
+    },
+    async remove(id) {
+      this.removed.push(id);
+      return { id };
     },
   };
   const config = {
@@ -164,7 +183,6 @@ test("serves the dashboard and exposes only public configuration", async (t) => 
   assert.match(page, /Čekam prvu uspješnu provjeru servera/);
   assert.match(page, /Promjena: —/);
   assert.match(page, /Osvježavanje podataka nije uspjelo/);
-  assert.match(page, /dashboard\/config\/widgets\.json/);
   assert.equal(materializeResponse.status, 200);
   assert.match(materializeResponse.headers.get("content-type"), /text\/css/);
   assert.equal(stylesResponse.status, 200);
@@ -385,4 +403,144 @@ test("starts an SSE stream with the current snapshot", async (t) => {
   assert.match(updateText, /"updatedAt":"2026-08-20T08:15:15.000Z"/);
   await reader.cancel();
   assert.equal(poller.listenerCount("update"), 1);
+});
+
+test("deletes a widget, rejects invalid requests and retains configuration when saving fails", async (t) => {
+  const { baseUrl, poller, widgetStore } = await startApp(t, { widgetStoreEnabled: true, writable: true });
+  const remove = (body) => fetch(`${baseUrl}/api/widgets`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  assert.equal((await remove({ id: "missing" })).status, 404);
+  assert.equal((await remove({ id: "" })).status, 400);
+  assert.equal((await fetch(`${baseUrl}/api/widgets`, { method: "DELETE" })).status, 415);
+  const originalRemove = widgetStore.remove;
+  widgetStore.remove = async () => { throw new Error("disk failure"); };
+  assert.equal((await remove({ id: "point-1" })).status, 500);
+  assert.equal((await (await fetch(`${baseUrl}/api/config`)).json()).widgets.length, 1);
+  assert.deepEqual(poller.removedWidgets, []);
+  widgetStore.remove = originalRemove;
+  const response = await remove({ id: "point-1" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { id: "point-1" });
+  assert.deepEqual(widgetStore.removed, ["point-1"]);
+  assert.deepEqual(poller.removedWidgets, ["point-1"]);
+  assert.deepEqual((await (await fetch(`${baseUrl}/api/config`)).json()).widgets, []);
+  assert.equal((await remove({ id: "point-1" })).status, 404);
+  const readOnly = await startApp(t);
+  assert.equal((await fetch(`${readOnly.baseUrl}/api/widgets`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "point-1" }) })).status, 409);
+});
+
+test("last-widget deletion persists across restart and broadcasts removal to open clients", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "dashboard-delete-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const widgetFile = path.join(directory, "widgets.json");
+  await fs.writeFile(widgetFile, JSON.stringify([{ id: "last", label: "Last", writable: true }]));
+  const env = { DEMO_MODE: "false", MIDDLEWARE_USER: "client", MIDDLEWARE_PASSWORD: "secret", WIDGETS_FILE: widgetFile };
+  const config = loadConfig(env);
+  const poller = new PointPoller({ ...config, fetchImpl: async () => ({ ok: true, json: async () => ({ values: [{ id: "last", value: 1 }] }) }) });
+  await poller.poll();
+  const app = createApp({ poller, config, widgetStore: new WidgetStore(widgetFile) });
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections?.(); }));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const readers = await Promise.all([1, 2].map(async () => {
+    const response = await fetch(`${baseUrl}/events`, { signal: AbortSignal.timeout(4000) });
+    const reader = response.body.getReader();
+    await reader.read();
+    return reader;
+  }));
+  const deletion = await fetch(`${baseUrl}/api/widgets`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "last" }) });
+  assert.equal(deletion.status, 200);
+  for (const reader of readers) {
+    let events = "";
+    while (!events.includes("event: removed")) {
+      const chunk = await reader.read();
+      assert.equal(chunk.done, false);
+      events += new TextDecoder().decode(chunk.value);
+    }
+    assert.match(events, /"id":"last"/);
+    await reader.cancel();
+  }
+  assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), []);
+  assert.deepEqual((await (await fetch(`${baseUrl}/api/snapshot`)).json()).widgets, []);
+  assert.equal((await fetch(`${baseUrl}/ready`)).status, 503);
+  const writeResponse = await fetch(`${baseUrl}/api/write`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ widgetId: "last", value: 42 }) });
+  assert.equal(writeResponse.status, 403);
+  const restarted = createRuntime(env);
+  assert.deepEqual(restarted.config.widgets, []);
+  assert.equal((await restarted.poller.poll()).status, "idle");
+  assert.equal(restarted.widgetStore.enabled, true);
+});
+
+test("automatic discovery runs in the background, broadcasts additions, keeps existing settings and returns a tree", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "dashboard-auto-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const widgetFile = path.join(directory, "widgets.json");
+  const existing = { id: "existing", label: "Custom name", precision: 2, visible: false, writable: true };
+  await fs.writeFile(widgetFile, JSON.stringify([existing]));
+  const config = loadConfig({ DEMO_MODE: "false", MIDDLEWARE_USER: "client", MIDDLEWARE_PASSWORD: "secret", WIDGETS_FILE: widgetFile });
+  let releaseRoot;
+  const rootGate = new Promise((resolve) => { releaseRoot = resolve; });
+  let failBranch = false;
+  const poller = new PointPoller({ ...config, fetchImpl: async (url) => {
+    if (String(url).includes("/api/values/read")) return { ok: true, json: async () => ({ values: [] }) };
+    const id = new URL(url).searchParams.get("id");
+    await rootGate;
+    return { ok: true, json: async () => id === ""
+      ? { containers: [{ containerItems: [{ id: "floor", name: "Floor" }], valueItems: [{ id: "existing", name: "EWS name" }] }] }
+      : failBranch ? { containers: [], errors: [{ id, message: "Cannot read" }] }
+      : { containers: [{ valueItems: [{ id: "floor/temperature", name: "Temperature", unit: "°C", writeable: 1 }] }] } };
+  } });
+  const store = new WidgetStore(widgetFile);
+  const server = createApp({ poller, config, widgetStore: store }).listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections?.(); }));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const start = () => fetch(`${baseUrl}/api/discovery/auto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  async function completed() {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const state = await (await fetch(`${baseUrl}/api/discovery/auto`)).json();
+      if (state.state !== "running") return state;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.fail("Automatic discovery did not finish");
+  }
+  assert.equal((await fetch(`${baseUrl}/api/discovery/auto`, { method: "POST" })).status, 415);
+  const events = await fetch(`${baseUrl}/events`, { signal: AbortSignal.timeout(4000) });
+  const reader = events.body.getReader();
+  await reader.read();
+  assert.equal((await start()).status, 202);
+  assert.equal((await start()).status, 409);
+  releaseRoot();
+  const result = await completed();
+  assert.equal(result.state, "done");
+  assert.equal(result.added, 1);
+  assert.equal(result.skipped, 1);
+  assert.equal(result.containers, 2);
+  assert.equal(result.tree.find((item) => item.id === "floor/temperature").parentId, "floor");
+  let stream = "";
+  while (!stream.includes("event: config")) {
+    const chunk = await reader.read();
+    assert.equal(chunk.done, false);
+    stream += new TextDecoder().decode(chunk.value);
+  }
+  assert.match(stream, /"widgets":\[\{"id":"floor\/temperature"/);
+  await reader.cancel();
+  const saved = JSON.parse(await fs.readFile(widgetFile, "utf8"));
+  assert.deepEqual(saved[0], existing);
+  assert.equal(saved.length, 2);
+  assert.equal(poller.getSnapshot().widgets[1].writable, false);
+  assert.equal((await (await fetch(`${baseUrl}/api/config`)).json()).autoDiscovery.state, "done");
+  assert.equal((await start()).status, 202);
+  assert.equal((await completed()).added, 0);
+  failBranch = true;
+  assert.equal((await start()).status, 202);
+  assert.equal((await completed()).state, "error");
+  assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), saved);
+  failBranch = false;
+  store.addMany = async () => { throw new Error("disk error"); };
+  assert.equal((await start()).status, 202);
+  assert.equal((await completed()).state, "error");
+  assert.equal(poller.getSnapshot().widgets.length, 2);
+  const readOnly = await startApp(t);
+  assert.equal((await fetch(`${readOnly.baseUrl}/api/discovery/auto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).status, 409);
 });

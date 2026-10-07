@@ -79,9 +79,9 @@ test("validates names, ports, URLs and widget files before creating an instance"
   assert.throws(() => validateOptions({ ...options, "dashboard-port": "3000" }), /razliciti/);
   assert.throws(() => prepareInstance(options, { ...connection, url: "ftp://controller.example" }), /http/);
   const widgets = path.join(options["base-dir"], "widgets.json");
-  fs.writeFileSync(widgets, "[]");
+  fs.writeFileSync(widgets, "{}");
   const { "point-id": _point, ...withoutPoint } = options;
-  assert.throws(() => prepareInstance({ ...withoutPoint, widgets }, connection), /non-empty/);
+  assert.throws(() => prepareInstance({ ...withoutPoint, widgets }, connection), /contain an array/);
   fs.writeFileSync(widgets, '[{"id":"same"},{"id":"same"}]');
   assert.throws(() => prepareInstance({ ...withoutPoint, widgets }, connection), /duplicate/);
   assert.equal(fs.existsSync(path.join(options["base-dir"], options.name)), false);

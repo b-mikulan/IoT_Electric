@@ -36,7 +36,8 @@ Ako već imaš konfiguraciju widgeta, dodaj:
 Tada skripta kopira i provjerava tvoju datoteku. Inače prvu vrijednost možeš zadati
 s `--point-id '01/ES/Building/Temperature'` ili unijeti na upit.
 Prvi generirani widget ima `writable: false`. Postojeća datoteka zadržava svoje postavke.
-Dashboard trenutačno traži neprazan popis widgeta; zato se ne generira prazan `[]`.
+Bez `--widgets` skripta traži prvu vrijednost za početnu konfiguraciju.
+Postojeći `widgets.json` može sadržavati i prazan `[]`; dashboard tada čeka dodavanje vrijednosti.
 Nakon deploya ostale vrijednosti dodaješ kroz discovery na dashboardu.
 
 Shell skripta koristi Node >=24 ako je instaliran. Inače pokrene kratkotrajni

@@ -262,6 +262,24 @@ class PointPoller extends EventEmitter {
     return clone(normalized);
   }
 
+  addWidgets(widgets) {
+    const ids = new Set(this.#widgets.map((widget) => widget.id));
+    const added = widgets.map(normalizeWidget).filter((widget) => {
+      if (ids.has(widget.id)) return false;
+      ids.add(widget.id);
+      widget.writable = false;
+      return true;
+    });
+    if (added.length === 0) return [];
+    this.#widgets.push(...added);
+    this.snapshot.widgets.push(...added.map((widget) => ({
+      ...clone(widget), value: null, state: null, error: null, updatedAt: null,
+    })));
+    this.emit("config", { widgets: clone(added) });
+    void this.#refreshAfterWidgetAdd();
+    return clone(added);
+  }
+
   updateWidget(id, settings) {
     const widgetId = typeof id === "string" ? id.trim() : "";
     const index = this.#widgets.findIndex((widget) => widget.id === widgetId);
@@ -292,6 +310,21 @@ class PointPoller extends EventEmitter {
 
     this.emit("config", { widget: clone(normalized) });
     return clone(normalized);
+  }
+
+  removeWidget(id) {
+    const widgetId = typeof id === "string" ? id.trim() : "";
+    const index = this.#widgets.findIndex((widget) => widget.id === widgetId);
+    if (index < 0) {
+      throw new PointDiscoveryError(
+        "Widget was not found in the running dashboard.", 404, "WIDGET_NOT_FOUND"
+      );
+    }
+    this.#widgets.splice(index, 1);
+    this.snapshot.widgets = this.snapshot.widgets.filter((widget) => widget.id !== widgetId);
+    if (this.#widgets.length === 0) this.#emptySnapshot();
+    this.emit("removed", { id: widgetId });
+    return { id: widgetId };
   }
 
   async discoverObjects(query = "") {
@@ -344,6 +377,45 @@ class PointPoller extends EventEmitter {
 
     if (initialError) throw initialError;
     return this.#discoveryResponse(containerId, [], payload);
+  }
+
+  async discoverAllValues({ onProgress = () => {} } = {}) {
+    if (this.#demoMode) {
+      throw new PointDiscoveryError("Object discovery is unavailable in demo mode.", 409, "DEMO_MODE");
+    }
+    const queue = [""];
+    const visited = new Set(queue);
+    const values = new Map();
+    const tree = [{ id: "", name: "EWS", kind: "container", parentId: null }];
+    for (let index = 0; index < queue.length; index += 1) {
+      const containerId = queue[index];
+      const payload = await this.#fetchContainer(containerId);
+      if (!Array.isArray(payload?.containers) || (Array.isArray(payload.errors) && payload.errors.length > 0)) {
+        throw new PointDiscoveryError(
+          `Discovery could not fully read container "${containerId || "root"}". No widgets were added.`,
+          502, "INCOMPLETE_DISCOVERY"
+        );
+      }
+      // Use the complete result; the manual browser's 500-item display limit does not apply here.
+      for (const item of this.#normalizeDiscoveryItems(payload)) {
+        if (item.kind === "value") {
+          if (!values.has(item.id)) tree.push({ id: item.id, name: item.name, kind: "value", unit: item.unit, parentId: containerId });
+          values.set(item.id, item);
+        } else if (!visited.has(item.id)) {
+          visited.add(item.id);
+          queue.push(item.id);
+          tree.push({ id: item.id, name: item.name, kind: "container", parentId: containerId });
+        }
+      }
+      if (queue.length > 10_000 || values.size > 50_000) {
+        throw new PointDiscoveryError(
+          "Discovery exceeded 10,000 containers or 50,000 values. No widgets were added.",
+          422, "DISCOVERY_LIMIT_EXCEEDED"
+        );
+      }
+      onProgress({ containers: index + 1, pending: queue.length - index - 1, found: values.size });
+    }
+    return { values: [...values.values()], tree };
   }
 
   async writeValue(id, value) {
@@ -599,11 +671,22 @@ class PointPoller extends EventEmitter {
     }
   }
 
+  #emptySnapshot() {
+    const previousStatus = this.snapshot.status;
+    this.snapshot = { status: "idle", syncedAt: null, error: null, widgets: [] };
+    if (previousStatus !== "idle") {
+      this.emit("status", { status: "idle", syncedAt: null, error: null });
+    }
+    return this.getSnapshot();
+  }
+
   async #performPoll() {
+    if (this.#widgets.length === 0) return this.#emptySnapshot();
     try {
       const points = this.#demoMode
         ? this.#createDemoPoints()
         : await this.#fetchPoints();
+      if (this.#widgets.length === 0) return this.#emptySnapshot();
       const syncedAt = timestampFrom(this.#now);
       const previousById = new Map(
         this.snapshot.widgets.map((widget) => [widget.id, widget])
@@ -664,6 +747,7 @@ class PointPoller extends EventEmitter {
 
       return this.getSnapshot();
     } catch (error) {
+      if (this.#widgets.length === 0) return this.#emptySnapshot();
       const message = error instanceof Error ? error.message : String(error);
       const previousStatus = this.snapshot.status;
       const previousError = this.snapshot.error;
@@ -687,6 +771,28 @@ class PointPoller extends EventEmitter {
   }
 
   async #fetchPoints() {
+    const batches = [];
+    let batch = [];
+    let bytes = 12;
+    for (const { id } of this.#widgets) {
+      const size = Buffer.byteLength(JSON.stringify(id), "utf8") + 1;
+      if (batch.length > 0 && (batch.length >= 500 || bytes + size > 60_000)) {
+        batches.push(batch);
+        batch = [];
+        bytes = 12;
+      }
+      batch.push(id);
+      bytes += size;
+    }
+    if (batch.length > 0) batches.push(batch);
+    const points = new Map();
+    for (const ids of batches) {
+      for (const [id, point] of await this.#fetchPointBatch(ids)) points.set(id, point);
+    }
+    return points;
+  }
+
+  async #fetchPointBatch(ids) {
     const authorization = Buffer.from(
       `${this.#username}:${this.#password}`,
       "utf8"
@@ -706,7 +812,7 @@ class PointPoller extends EventEmitter {
             Authorization: `Basic ${authorization}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ ids: this.#widgets.map(({ id }) => id) }),
+          body: JSON.stringify({ ids }),
           signal: controller.signal,
         }
       );

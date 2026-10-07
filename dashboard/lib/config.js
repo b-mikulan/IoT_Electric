@@ -143,8 +143,8 @@ function parseWidgets(rawWidgets, demoMode) {
     throw new Error(`Widget configuration is not valid JSON: ${error.message}`);
   }
 
-  if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new Error("Widget configuration must contain a non-empty array.");
+  if (!Array.isArray(parsed)) {
+    throw new Error("Widget configuration must contain an array.");
   }
 
   const widgets = parsed.map(normalizeWidget);

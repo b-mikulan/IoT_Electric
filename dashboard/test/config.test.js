@@ -102,6 +102,13 @@ test("prefers inline widget JSON over a configured file", () => {
   assert.equal(config.widgetsFile, "");
 });
 
+test("loads an empty real dashboard after the last widget is deleted", () => {
+  const config = loadConfig({ DEMO_MODE: "false", WIDGETS_JSON: "[]", MIDDLEWARE_USER: "client", MIDDLEWARE_PASSWORD: "secret" });
+  assert.deepEqual(config.widgets, []);
+  assert.equal(config.demoMode, false);
+  assert.throws(() => parseWidgets("{}", false), /contain an array/);
+});
+
 test("reports an unreadable widget configuration file", () => {
   assert.throws(
     () =>

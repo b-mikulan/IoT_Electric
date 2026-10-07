@@ -91,4 +91,42 @@ test("refuses persistence without WIDGETS_FILE", async () => {
     name: "WidgetStoreError",
     code: "WIDGET_FILE_UNAVAILABLE",
   });
+  await assert.rejects(store.remove("new"), { code: "WIDGET_FILE_UNAVAILABLE" });
+});
+
+test("serializes deletion with additions and preserves other widgets, including custom fields", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "widget-delete-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, "widgets.json");
+  const kept = { id: "keep", custom: { note: "preserve" }, writable: true, visible: false };
+  await fs.writeFile(filePath, JSON.stringify([{ id: "delete" }, kept]));
+  const store = new WidgetStore(filePath);
+  await Promise.all([store.remove("delete"), store.add({ id: "new" })]);
+  const widgets = JSON.parse(await fs.readFile(filePath, "utf8"));
+  assert.deepEqual(widgets[0], kept);
+  assert.equal(widgets[1].id, "new");
+  await assert.rejects(store.remove("delete"), { status: 404, code: "WIDGET_NOT_FOUND" });
+  await store.remove("keep");
+  await store.remove("new");
+  assert.deepEqual(JSON.parse(await fs.readFile(filePath, "utf8")), []);
+  await store.add({ id: "delete" });
+  assert.equal(JSON.parse(await fs.readFile(filePath, "utf8"))[0].id, "delete");
+});
+
+test("bulk discovery saving preserves settings, skips duplicate IDs and validates before changing the file", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "widget-bulk-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, "widgets.json");
+  const existing = { id: "keep", label: "Custom", writable: true, visible: false, precision: 2, custom: true };
+  await fs.writeFile(filePath, JSON.stringify([existing]));
+  const store = new WidgetStore(filePath);
+  const additions = await store.addMany([{ id: "keep", label: "Replace?" }, { id: "new", unit: "°C", writable: true }, { id: "new" }]);
+  assert.equal(additions.length, 1);
+  const persisted = JSON.parse(await fs.readFile(filePath, "utf8"));
+  assert.deepEqual(persisted[0], existing);
+  assert.equal(persisted[1].writable, undefined);
+  const before = await fs.readFile(filePath, "utf8");
+  await assert.rejects(store.addMany([{ id: "valid" }, { id: "" }]), { code: "WIDGET_FILE_WRITE_FAILED" });
+  assert.equal(await fs.readFile(filePath, "utf8"), before);
+  assert.deepEqual(await store.addMany([{ id: "new" }]), []);
 });

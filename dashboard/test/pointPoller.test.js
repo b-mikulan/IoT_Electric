@@ -546,3 +546,102 @@ test("updates widget presentation settings without losing its current value", as
   assert.equal(snapshot.precision, 2);
   assert.equal(configEvents[0].widget.label, "Sobna temperatura");
 });
+
+test("deletion survives an in-flight poll, stops reading deleted ids and disables their writes", async () => {
+  let finishRequest;
+  const requests = [];
+  const removed = [];
+  const poller = new PointPoller({
+    middlewareUrl: "http://middleware", username: "client", password: "secret",
+    widgets: [{ id: "delete", writable: true }, { id: "keep" }],
+    fetchImpl: async (_url, options) => {
+      requests.push(JSON.parse(options.body).ids);
+      if (requests.length === 1) return new Promise((resolve) => { finishRequest = resolve; });
+      return jsonResponse({ values: [{ id: "keep", value: 2 }] });
+    },
+  });
+  poller.on("removed", (event) => removed.push(event));
+  const pending = poller.poll();
+  poller.removeWidget("delete");
+  finishRequest(jsonResponse({ values: [{ id: "delete", value: 1 }, { id: "keep", value: 2 }] }));
+  await pending;
+  assert.deepEqual(poller.getSnapshot().widgets.map((widget) => widget.id), ["keep"]);
+  await assert.rejects(poller.writeValue("delete", 42), { code: "POINT_NOT_WRITABLE" });
+  await poller.poll();
+  assert.deepEqual(requests[1], ["keep"]);
+  poller.removeWidget("keep");
+  assert.deepEqual(removed, [{ id: "delete" }, { id: "keep" }]);
+  await poller.poll();
+  assert.equal(requests.length, 2);
+  assert.deepEqual(poller.getSnapshot(), { status: "idle", syncedAt: null, error: null, widgets: [] });
+  assert.throws(() => poller.removeWidget("keep"), { code: "WIDGET_NOT_FOUND" });
+});
+
+test("deleting the last widget during a failed poll leaves a healthy empty configuration", async () => {
+  let failRequest;
+  const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets: [{ id: "last" }],
+    fetchImpl: () => new Promise((_resolve, reject) => { failRequest = reject; }) });
+  const pending = poller.poll();
+  poller.removeWidget("last");
+  failRequest(new Error("network failure"));
+  await pending;
+  assert.equal(poller.getSnapshot().status, "idle");
+  assert.equal(poller.getSnapshot().error, null);
+});
+
+test("automatic discovery traverses nested containers once and keeps all values beyond the manual limit", async () => {
+  const requests = [];
+  const progress = [];
+  const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets: [],
+    username: "dashboard", password: "secret",
+    fetchImpl: async (url, options) => {
+      const id = new URL(url).searchParams.get("id");
+      requests.push(id);
+      assert.equal(options.headers.Authorization, `Basic ${Buffer.from("dashboard:secret").toString("base64")}`);
+      return jsonResponse({ containers: [{
+        containerItems: id === "" ? [{ id: "floor", name: "Floor" }, { id: "other", name: "Other" }]
+          : id === "floor" ? [{ id: "floor", name: "Self" }, { id: "other", name: "Other" }, { id: "floor/room", name: "Room" }] : [],
+        valueItems: id === "" ? Array.from({ length: 501 }, (_, i) => ({ id: `value-${i}`, name: `Value ${i}` }))
+          : [{ id: "shared", name: "Shared", unit: "°C", writeable: 1 }],
+      }], errors: [] });
+    } });
+  const result = await poller.discoverAllValues({ onProgress: (event) => progress.push(event) });
+  assert.deepEqual(requests, ["", "floor", "other", "floor/room"]);
+  assert.equal(result.values.length, 502);
+  assert.equal(result.tree.filter((item) => item.kind === "value").length, 502);
+  assert.deepEqual(result.tree.find((item) => item.id === "floor/room"), { id: "floor/room", name: "Room", kind: "container", parentId: "floor" });
+  assert.equal(result.tree.find((item) => item.id === "shared").parentId, "floor");
+  assert.deepEqual(progress.at(-1), { containers: 4, pending: 0, found: 502 });
+  assert.deepEqual(poller.getSnapshot().widgets, []);
+});
+
+test("automatic discovery reports partial failures and malformed responses instead of silently omitting branches", async () => {
+  for (const payload of [{ containers: [], errors: [{ id: "root", message: "unavailable" }] }, {}]) {
+    const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets: [], fetchImpl: async () => jsonResponse(payload) });
+    await assert.rejects(poller.discoverAllValues(), { code: "INCOMPLETE_DISCOVERY" });
+  }
+  const demo = new PointPoller({ demoMode: true, widgets: [] });
+  await assert.rejects(demo.discoverAllValues(), { code: "DEMO_MODE" });
+});
+
+test("polls a large discovered dashboard in bounded requests and emits one complete update", async () => {
+  const widgets = Array.from({ length: 502 }, (_, index) => ({ id: `point-${index}/${"x".repeat(180)}` }));
+  const requests = [];
+  const updates = [];
+  const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets,
+    fetchImpl: async (_url, options) => {
+      assert.ok(Buffer.byteLength(options.body) < 60_000);
+      const { ids } = JSON.parse(options.body);
+      assert.ok(ids.length <= 500);
+      requests.push(ids);
+      return jsonResponse({ values: ids.map((id) => ({ id, value: 42 })) });
+    } });
+  poller.on("update", (payload) => updates.push(payload));
+  const snapshot = await poller.poll();
+  assert.equal(requests.length, 2);
+  assert.deepEqual(requests.flat(), widgets.map((widget) => widget.id));
+  assert.equal(snapshot.widgets.length, 502);
+  assert.equal(snapshot.widgets.every((widget) => widget.value === 42 && widget.error === null), true);
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].widgets.length, 502);
+});

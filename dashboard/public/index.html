@@ -111,7 +111,7 @@
       <div id="empty-state" class="empty-state" hidden>
         <span class="empty-icon" aria-hidden="true">◇</span>
         <h2>Nema vidljivih točaka</h2>
-        <p>Uključi postojeći widget kroz izbornik prikaza ili dodaj novu PLC vrijednost u dashboard/config/widgets.json.</p>
+        <p>Uključi postojeći widget kroz izbornik prikaza ili dodaj nove vrijednosti kroz pretragu i automatsko otkrivanje.</p>
       </div>
 
       <div id="error-banner" class="error-banner" role="alert" hidden>
@@ -160,6 +160,12 @@
           Pretraga još nije pokrenuta.
         </p>
         <div id="discovery-results" class="discovery-results"></div>
+        <div id="automatic-discovery" class="automatic-discovery" hidden>
+          <button id="discovery-auto" class="btn waves-effect waves-light" type="button">Automatski dodaj sve vrijednosti</button>
+          <p>Pretražuje cijeli EWS od korijena i dodaje sve vrijednosti. Postojeći widgeti zadržavaju svoje postavke.</p>
+          <p id="discovery-auto-status" class="discovery-status" role="status" aria-live="polite"></p>
+          <div id="discovery-tree" class="discovery-tree" aria-label="Pronađena EWS struktura" hidden></div>
+        </div>
       </div>
     </dialog>
 
@@ -239,10 +245,19 @@
           </label>
 
           <div class="settings-actions settings-field-wide">
+            <button id="settings-delete" class="btn-flat settings-delete" type="button">Obriši widget</button>
             <button id="settings-cancel" class="btn-flat" type="button">Odustani</button>
             <button id="settings-save" class="btn waves-effect waves-light" type="submit">Spremi</button>
           </div>
         </form>
+        <div id="settings-delete-confirmation" class="settings-delete-confirmation" hidden>
+          <p id="settings-delete-message"></p>
+          <p>Vrijednost možeš ponovno dodati kroz pretragu. Podaci na kontroleru ostaju sačuvani.</p>
+          <div class="settings-delete-actions">
+            <button id="settings-delete-cancel" class="btn-flat" type="button">Zadrži widget</button>
+            <button id="settings-delete-confirm" class="btn" type="button">Da, obriši</button>
+          </div>
+        </div>
         <p id="settings-status" class="discovery-status" role="status" aria-live="polite"></p>
       </div>
     </dialog>
