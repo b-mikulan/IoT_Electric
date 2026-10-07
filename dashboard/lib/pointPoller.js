@@ -387,14 +387,32 @@ class PointPoller extends EventEmitter {
     const visited = new Set(queue);
     const values = new Map();
     const tree = [{ id: "", name: "EWS", kind: "container", parentId: null }];
+    const treeById = new Map([["", tree[0]]]);
+    const warnings = [];
+    function recordWarning(id, message) {
+      warnings.push({ id, message });
+      treeById.get(id).error = message;
+    }
     for (let index = 0; index < queue.length; index += 1) {
       const containerId = queue[index];
-      const payload = await this.#fetchContainer(containerId);
-      if (!Array.isArray(payload?.containers) || (Array.isArray(payload.errors) && payload.errors.length > 0)) {
-        throw new PointDiscoveryError(
-          `Discovery could not fully read container "${containerId || "root"}". No widgets were added.`,
-          502, "INCOMPLETE_DISCOVERY"
-        );
+      let payload = null;
+      try {
+        payload = await this.#fetchContainer(containerId);
+        const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+        if (!Array.isArray(payload?.containers) || (containerId === "" && payload.containers.length === 0 && errors.length > 0)) {
+          throw new PointDiscoveryError(
+            `Discovery could not read container "${containerId || "root"}".`,
+            502, "INCOMPLETE_DISCOVERY"
+          );
+        }
+        if (errors.length > 0) {
+          recordWarning(containerId, errors.map((error) => String(error?.message || "Unknown discovery error")).join("; "));
+        }
+      } catch (error) {
+        // Without the root there are no branches to scan. Individual branch failures are recoverable.
+        if (containerId === "") throw error;
+        recordWarning(containerId, error?.message || "This branch could not be read.");
+        payload = null;
       }
       // Use the complete result; the manual browser's 500-item display limit does not apply here.
       for (const item of this.#normalizeDiscoveryItems(payload)) {
@@ -404,7 +422,9 @@ class PointPoller extends EventEmitter {
         } else if (!visited.has(item.id)) {
           visited.add(item.id);
           queue.push(item.id);
-          tree.push({ id: item.id, name: item.name, kind: "container", parentId: containerId });
+          const node = { id: item.id, name: item.name, kind: "container", parentId: containerId };
+          tree.push(node);
+          treeById.set(item.id, node);
         }
       }
       if (queue.length > 10_000 || values.size > 50_000) {
@@ -413,9 +433,9 @@ class PointPoller extends EventEmitter {
           422, "DISCOVERY_LIMIT_EXCEEDED"
         );
       }
-      onProgress({ containers: index + 1, pending: queue.length - index - 1, found: values.size });
+      onProgress({ containers: index + 1, pending: queue.length - index - 1, found: values.size, failedBranches: warnings.length });
     }
-    return { values: [...values.values()], tree };
+    return { values: [...values.values()], tree, warnings };
   }
 
   async writeValue(id, value) {

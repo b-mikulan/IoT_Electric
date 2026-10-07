@@ -111,7 +111,7 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
 
   async function runAutoDiscovery() {
     try {
-      const { values, tree } = await poller.discoverAllValues({
+      const { values, tree, warnings } = await poller.discoverAllValues({
         onProgress: (progress) => updateAutoDiscovery(progress),
       });
       updateAutoDiscovery({ phase: "saving", pending: 0, found: values.length });
@@ -120,7 +120,7 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
       })));
       const added = poller.addWidgets(stored);
       config.widgets.push(...added);
-      updateAutoDiscovery({ state: "done", added: added.length, skipped: values.length - added.length, tree });
+      updateAutoDiscovery({ state: "done", added: added.length, skipped: values.length - added.length, tree, warnings });
     } catch (error) {
       updateAutoDiscovery({ state: "error", error: error?.code ? error.message : "Automatsko dodavanje nije uspjelo. Provjeri vezu i mogućnost spremanja widgeta." });
     }
@@ -409,7 +409,7 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
     if (autoDiscovery.state === "running") {
       return response.status(409).json({ error: "Automatic discovery is already running.", code: "DISCOVERY_IN_PROGRESS" });
     }
-    autoDiscovery = { state: "running", phase: "scanning", containers: 0, pending: 1, found: 0 };
+    autoDiscovery = { state: "running", phase: "scanning", containers: 0, pending: 1, found: 0, failedBranches: 0 };
     broadcast("discovery", autoDiscovery);
     // Long scans continue on the server after browser closure or proxy timeouts.
     void runAutoDiscovery();

@@ -56,6 +56,7 @@ jobs:
   image:
     name: Build ${{ matrix.name }} image
     needs: test
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read

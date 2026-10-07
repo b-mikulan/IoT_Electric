@@ -198,6 +198,7 @@ h1 {
 .discovery-tree .tree-value { overflow-wrap: anywhere; }
 .discovery-tree .tree-id { display: block; color: var(--muted); font-size: 0.75rem; }
 .discovery-tree .tree-added { margin-left: 8px; color: var(--brand); font-size: 0.75rem; }
+.discovery-tree .tree-warning { margin: 6px 0; color: #8a4b00; font-size: 0.8rem; overflow-wrap: anywhere; }
 
 .intro-actions {
   display: flex;
@@ -484,6 +485,7 @@ h1 {
 
 .discovery-status.is-success { color: var(--ok); }
 .discovery-status.is-error { color: var(--error); }
+.discovery-status.is-warning { color: #8a4b00; }
 
 .discovery-results {
   display: grid;

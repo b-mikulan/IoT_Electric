@@ -619,12 +619,19 @@ function renderDiscoveryTree(nodes) {
     const entry = document.createElement("li");
     if (node.kind === "container") {
       const folder = document.createElement("details");
-      folder.open = node.parentId === null;
+      folder.open = node.parentId === null || Boolean(node.error);
       const title = document.createElement("summary");
-      title.textContent = `📁 ${node.name}`;
+      title.textContent = `📁 ${node.name}${node.error ? " ⚠" : ""}`;
       title.title = node.id || "EWS root";
       const children = document.createElement("ul");
-      folder.append(title, children);
+      folder.appendChild(title);
+      if (node.error) {
+        const warning = document.createElement("p");
+        warning.className = "tree-warning";
+        warning.textContent = `Nije u potpunosti pročitano: ${node.error}`;
+        folder.appendChild(warning);
+      }
+      folder.appendChild(children);
       entry.appendChild(folder);
       childLists.set(node.id, children);
     } else {
@@ -653,18 +660,21 @@ function renderDiscoveryTree(nodes) {
 }
 
 function showAutomaticDiscovery(payload) {
+  const warningCount = payload.failedBranches || 0;
   automaticDiscoveryRunning = payload.state === "running";
   discoveryAuto.disabled = automaticDiscoveryRunning || !widgetEditingEnabled;
   discoveryAuto.textContent = automaticDiscoveryRunning ? "Automatsko dodavanje u tijeku…" : "Automatski dodaj sve vrijednosti";
-  discoveryAutoStatus.className = `discovery-status${payload.state === "error" ? " is-error" : payload.state === "done" ? " is-success" : ""}`;
+  discoveryAutoStatus.className = `discovery-status${payload.state === "error" ? " is-error" : warningCount > 0 ? " is-warning" : payload.state === "done" ? " is-success" : ""}`;
   if (automaticDiscoveryRunning) {
     discoveryTree.hidden = true;
     discoveryAutoStatus.textContent = payload.phase === "saving"
       ? `Spremam pronađene vrijednosti: ${payload.found}.`
       : `Pregledano mapa: ${payload.containers}. Pronađeno vrijednosti: ${payload.found}. Preostalo mapa: ${payload.pending}.`;
+    if (warningCount > 0) discoveryAutoStatus.textContent += ` Grane s upozorenjem: ${warningCount}.`;
   } else if (payload.state === "done") {
     if (Array.isArray(payload.tree)) renderDiscoveryTree(payload.tree);
     discoveryAutoStatus.textContent = `Dodano: ${payload.added}. Već postojeće: ${payload.skipped}. Pregledano mapa: ${payload.containers}.`;
+    if (warningCount > 0) discoveryAutoStatus.textContent += ` Grane s upozorenjem: ${warningCount}. Otvori označene mape u stablu za detalje.`;
   } else if (payload.state === "error") {
     discoveryAutoStatus.textContent = payload.error;
   }

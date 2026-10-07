@@ -611,17 +611,54 @@ test("automatic discovery traverses nested containers once and keeps all values 
   assert.equal(result.tree.filter((item) => item.kind === "value").length, 502);
   assert.deepEqual(result.tree.find((item) => item.id === "floor/room"), { id: "floor/room", name: "Room", kind: "container", parentId: "floor" });
   assert.equal(result.tree.find((item) => item.id === "shared").parentId, "floor");
-  assert.deepEqual(progress.at(-1), { containers: 4, pending: 0, found: 502 });
+  assert.deepEqual(progress.at(-1), { containers: 4, pending: 0, found: 502, failedBranches: 0 });
+  assert.deepEqual(result.warnings, []);
   assert.deepEqual(poller.getSnapshot().widgets, []);
 });
 
-test("automatic discovery reports partial failures and malformed responses instead of silently omitting branches", async () => {
+test("automatic discovery still fails when the root cannot be read", async () => {
   for (const payload of [{ containers: [], errors: [{ id: "root", message: "unavailable" }] }, {}]) {
     const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets: [], fetchImpl: async () => jsonResponse(payload) });
     await assert.rejects(poller.discoverAllValues(), { code: "INCOMPLETE_DISCOVERY" });
   }
   const demo = new PointPoller({ demoMode: true, widgets: [] });
   await assert.rejects(demo.discoverAllValues(), { code: "DEMO_MODE" });
+});
+
+test("automatic discovery skips broken branches, keeps partial results and continues through healthy siblings and descendants", async () => {
+  const brokenIds = ["40https://brickschema.org/schema/Brick#Class", "http-failure", "malformed", "timeout", "partial"];
+  const visited = [];
+  const progress = [];
+  const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets: [], timeoutMs: 10,
+    fetchImpl: async (url, options) => {
+      const id = new URL(url).searchParams.get("id");
+      visited.push(id);
+      if (id === "timeout") return new Promise((_resolve, reject) => options.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true }));
+      if (id === "http-failure") return jsonResponse({}, 500);
+      if (id === "malformed") return jsonResponse({});
+      if (id === brokenIds[0]) return jsonResponse({ containers: [], errors: [{ id, message: "Cannot resolve ontology ID" }] });
+      if (id === "") return jsonResponse({ containers: [{
+        containerItems: [...brokenIds, "healthy"].map((child) => ({ id: child, name: child })),
+        valueItems: [{ id: "root-value", name: "Root value" }],
+      }] });
+      if (id === "partial") return jsonResponse({ containers: [{
+        containerItems: [{ id: "partial/child", name: "Child" }],
+        valueItems: [{ id: "partial/value", name: "Readable partial value" }],
+      }], errors: [{ id, message: "One item is unavailable" }] });
+      return jsonResponse({ containers: [{ valueItems: [{ id: `${id}/value`, name: id }] }] });
+    } });
+  const result = await poller.discoverAllValues({ onProgress: (event) => progress.push(event) });
+  assert.deepEqual(result.values.map((item) => item.id).sort(), ["root-value", "partial/value", "healthy/value", "partial/child/value"].sort());
+  assert.equal(result.warnings.length, 5);
+  assert.deepEqual(result.warnings.map((warning) => warning.id).sort(), brokenIds.sort());
+  assert.equal(visited.includes("partial/child"), true);
+  assert.equal(visited.includes("healthy"), true);
+  assert.equal(result.tree.find((node) => node.id === brokenIds.find((id) => id.startsWith("40https"))).error, "Cannot resolve ontology ID");
+  assert.match(result.tree.find((node) => node.id === "timeout").error, /timed out/);
+  assert.equal(result.tree.find((node) => node.id === "partial/child").parentId, "partial");
+  assert.equal(progress.at(-1).failedBranches, 5);
+  assert.equal(progress.at(-1).pending, 0);
+  assert.equal(progress.at(-1).found, 4);
 });
 
 test("polls a large discovered dashboard in bounded requests and emits one complete update", async () => {

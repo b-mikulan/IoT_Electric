@@ -105,7 +105,7 @@ GitHub Actions tests the repository and builds both images:
 - `ghcr.io/b-mikulan/iot-electric`
 - `ghcr.io/b-mikulan/iot-electric-dashboard`
 
-A push to `main` publishes `latest`, `main`, and a commit-specific tag. A Git tag such as `v1.0.0` publishes version tags. For a stable deployment, use the same exact version for both services:
+A push to `main`, a pull request targeting `main`, or a manual workflow run only runs tests and validates Compose files. Docker images are built and published only when a Git version tag matching `v*.*.*` (for example `v1.0.0`) is pushed, after the tests pass. For a stable deployment, use the same exact version for both services:
 
 ```sh
 git tag v1.0.0

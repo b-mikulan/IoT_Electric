@@ -486,9 +486,9 @@ test("automatic discovery runs in the background, broadcasts additions, keeps ex
     const id = new URL(url).searchParams.get("id");
     await rootGate;
     return { ok: true, json: async () => id === ""
-      ? { containers: [{ containerItems: [{ id: "floor", name: "Floor" }], valueItems: [{ id: "existing", name: "EWS name" }] }] }
-      : failBranch ? { containers: [], errors: [{ id, message: "Cannot read" }] }
-      : { containers: [{ valueItems: [{ id: "floor/temperature", name: "Temperature", unit: "°C", writeable: 1 }] }] } };
+      ? { containers: [{ containerItems: [{ id: "floor", name: "Floor" }, ...(failBranch ? [{ id: "other", name: "Other" }] : [])], valueItems: [{ id: "existing", name: "EWS name" }] }] }
+      : failBranch && id === "floor" ? { containers: [], errors: [{ id, message: "Cannot read" }] }
+      : { containers: [{ valueItems: [{ id: `${id}/temperature`, name: "Temperature", unit: "°C", writeable: 1 }] }] } };
   } });
   const store = new WidgetStore(widgetFile);
   const server = createApp({ poller, config, widgetStore: store }).listen(0, "127.0.0.1");
@@ -534,13 +534,22 @@ test("automatic discovery runs in the background, broadcasts additions, keeps ex
   assert.equal((await completed()).added, 0);
   failBranch = true;
   assert.equal((await start()).status, 202);
-  assert.equal((await completed()).state, "error");
-  assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), saved);
+  const partial = await completed();
+  assert.equal(partial.state, "done");
+  assert.equal(partial.added, 1);
+  assert.equal(partial.failedBranches, 1);
+  assert.deepEqual(partial.warnings, [{ id: "floor", message: "Cannot read" }]);
+  assert.equal(partial.tree.find((node) => node.id === "floor").error, "Cannot read");
+  const partialSaved = JSON.parse(await fs.readFile(widgetFile, "utf8"));
+  assert.deepEqual(partialSaved.slice(0, 2), saved);
+  assert.equal(partialSaved[2].id, "other/temperature");
+  assert.equal(poller.getSnapshot().widgets.length, 3);
   failBranch = false;
   store.addMany = async () => { throw new Error("disk error"); };
   assert.equal((await start()).status, 202);
   assert.equal((await completed()).state, "error");
-  assert.equal(poller.getSnapshot().widgets.length, 2);
+  assert.equal(poller.getSnapshot().widgets.length, 3);
+  assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), partialSaved);
   const readOnly = await startApp(t);
   assert.equal((await fetch(`${readOnly.baseUrl}/api/discovery/auto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).status, 409);
 });
