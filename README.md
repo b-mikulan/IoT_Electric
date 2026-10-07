@@ -46,6 +46,8 @@ Local project inputs are organized as follows:
 
 See [tools/gpa-translator/README.md](tools/gpa-translator/README.md) for the GPA tool.
 
+For new Linux/Portainer instances, use [tools/stack-setup/README.md](tools/stack-setup/README.md).
+
 ## Start locally with Docker
 
 1. Copy `.env.example` to `.env`.

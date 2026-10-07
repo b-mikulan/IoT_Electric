@@ -2,7 +2,7 @@ services:
   middleware:
     image: ghcr.io/b-mikulan/iot-electric:${IMAGE_TAG:-latest}
     ports:
-      - "3000:3000"
+      - "${MIDDLEWARE_HOST_PORT:-3000}:3000"
     environment:
       PORT: "3000"
       EWS_URL: "${EWS_URL:-https://bms.iot-electric.hr/EcoStruxure/DataExchange}"
@@ -15,7 +15,7 @@ services:
   dashboard:
     image: ghcr.io/b-mikulan/iot-electric-dashboard:${IMAGE_TAG:-latest}
     ports:
-      - "3001:3001"
+      - "${DASHBOARD_HOST_PORT:-3001}:3001"
     environment:
       PORT: "3001"
       MIDDLEWARE_URL: "http://middleware:3000"

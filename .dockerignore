@@ -4,6 +4,8 @@ npm-debug.log
 .gitignore
 .env
 .env.*
+**/.env
+**/portainer.env
 !.env.example
 credentials.txt
 entrypoint.sh

@@ -13,7 +13,7 @@
     "test": "npm run test:middleware && npm run test:tools && npm run test:dashboard",
     "test:dashboard": "npm test --prefix dashboard",
     "test:middleware": "node --test test/middlewareAuth.test.js test/routes.test.js",
-    "test:tools": "node --test test/knxExtractor.test.js"
+    "test:tools": "node --test test/knxExtractor.test.js test/stackSetup.test.js"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
