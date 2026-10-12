@@ -10,6 +10,7 @@
     <title>IoT Electric · PLC pregled</title>
     <link rel="stylesheet" href="/vendor/materialize/materialize.min.css" />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/deviceCards.css" />
   </head>
   <body>
     <header class="app-header">
@@ -118,6 +119,8 @@
         <strong>Osvježavanje podataka nije uspjelo.</strong>
         <span id="error-message">Prikazane su zadnje dostupne vrijednosti. Servis će pokušati ponovno.</span>
       </div>
+
+      <section id="device-cards-section" aria-label="Probne kartice uređaja"></section>
     </main>
 
     <dialog id="discovery-dialog" class="discovery-dialog" aria-labelledby="discovery-title">
@@ -393,6 +396,9 @@
     <noscript>
       <div class="noscript">Za prikaz vrijednosti potrebno je uključiti JavaScript.</div>
     </noscript>
+    <script src="/widgetGrouping.js" defer></script>
+    <script src="/deviceModel.js" defer></script>
+    <script src="/deviceCards.js" defer></script>
     <script src="/app.js" defer></script>
   </body>
 </html>

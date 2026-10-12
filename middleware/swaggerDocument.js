@@ -54,7 +54,7 @@ const swaggerDocument = {
       get: {
         summary: "Get container items",
         description:
-          "Calls the EWS SOAP operation GetContainerItems. Leave id empty to get the root container. Known test containers include 00/ES/Test4EWS and 00/ES/Test4EWS/Values.",
+          "Calls GetContainerItems and follows advertised pages by default, merging items by exact ID. Leave id empty for root. Later-page failures preserve readable items in containers and add errors. complete is true only after explicit final status and no errors; null means the server omitted its paging flag. Metadata is opt-in. Discovery is bounded to 100 pages, 50,000 items and EWS_CONTAINER_TIMEOUT_MS (8 seconds by default).",
         parameters: [
           {
             name: "id",
@@ -89,10 +89,37 @@ const swaggerDocument = {
             description:
               "EWS container ID. If omitted or empty, the root container is requested.",
           },
+          {
+            name: "metadata",
+            in: "query",
+            schema: { type: "boolean", default: false },
+            description: "Request optional EWS 1.2 metadata. Returned metadata is preserved without flattening. An unsupported request remains an error.",
+          },
+          {
+            name: "allPages",
+            in: "query",
+            schema: { type: "boolean", default: true },
+            description: "Set false to read one logical page. Use status.moreDataRef for the next page with the same id and metadata flag.",
+          },
+          {
+            name: "moreDataRef",
+            in: "query",
+            schema: { type: "string" },
+            description: "Opaque continuation token from a previous response. URL-encode and preserve it exactly. Omit for the first page.",
+          },
         ],
         responses: {
           200: {
-            description: "Container items returned as JSON",
+            description: "Container items, errors, status, pagesRead and complete. A partial result can be HTTP 200; always inspect errors and complete.",
+          },
+          400: {
+            description: "Invalid query parameters",
+          },
+          502: {
+            description: "First-page SOAP failure",
+          },
+          504: {
+            description: "Discovery timed out before any page was read",
           },
           500: {
             description: "Server or EWS communication error",

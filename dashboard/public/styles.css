@@ -287,7 +287,10 @@ h1 {
 .widget-group-summary::before { content: "▸"; color: var(--brand); }
 .widget-group[open] > .widget-group-summary::before { content: "▾"; }
 .widget-group-summary:focus-visible { outline: 3px solid rgba(0, 121, 107, 0.25); outline-offset: -3px; border-radius: 16px; }
-.widget-group-title { flex: 1; min-width: 0; margin: 0; color: var(--ink); font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; }
+.widget-group-copy { flex: 1; min-width: 0; }
+.widget-group-title { margin: 0; color: var(--ink); font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; }
+.widget-group-context { display: block; margin-top: 4px; color: var(--muted); font-size: 0.78rem; overflow-wrap: anywhere; }
+.widget-group-context[hidden] { display: none; }
 .widget-group-count { flex: 0 0 auto; color: var(--muted); font-size: 0.78rem; }
 .widget-group-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 2px; }
 .widget-group-actions .btn-flat { padding: 0 10px; font-size: 0.78rem; }

@@ -269,3 +269,59 @@ test("keeps health public in the OpenAPI document", () => {
   assert.ok(writeOperation.responses[400]);
   assert.ok(writeOperation.responses[500]);
 });
+
+test("container route forwards metadata, paging and exact continuation tokens", async (t) => {
+  const calls = [];
+  const result = { containers: [], errors: [], status: { moreDataAvailable: false, moreDataRef: null }, complete: true, pagesRead: 2 };
+  const baseUrl = await startTestApp(t, createFakeEws({
+    async getContainerItems(id, options) {
+      calls.push({ id, options });
+      return result;
+    },
+  }));
+  const defaults = await fetch(`${baseUrl}/api/containers`);
+  assert.equal(defaults.status, 200);
+  assert.deepEqual(await defaults.json(), result);
+  assert.deepEqual(calls[0], { id: "", options: { metadata: false, allPages: true, moreDataRef: "" } });
+
+  const token = " 000123456789012345678901234567890 & <next> \"' ";
+  const query = new URLSearchParams({ id: "00/ES & /Device", metadata: "true", allPages: "false", moreDataRef: token });
+  const resumed = await fetch(`${baseUrl}/api/containers?${query}`);
+  assert.equal(resumed.status, 200);
+  assert.deepEqual(await resumed.json(), result);
+  assert.deepEqual(calls[1], { id: "00/ES & /Device", options: { metadata: true, allPages: false, moreDataRef: token } });
+});
+
+test("container route rejects invalid scalar and boolean queries before calling EWS", async (t) => {
+  let calls = 0;
+  const baseUrl = await startTestApp(t, createFakeEws({
+    async getContainerItems() {
+      calls += 1;
+      return { containers: [], errors: [] };
+    },
+  }));
+  t.mock.method(console, "error", () => {});
+  const invalidQueries = [
+    "id=one&id=two", "moreDataRef=one&moreDataRef=two",
+    "metadata=true&metadata=false", "allPages=true&allPages=false",
+    "metadata=yes", "metadata=invalid", "metadata=", "allPages=yes", "allPages=invalid", "allPages=",
+  ];
+  for (const query of invalidQueries) {
+    const response = await fetch(`${baseUrl}/api/containers?${query}`);
+    assert.equal(response.status, 400, query);
+    assert.equal(typeof (await response.json()).error, "string", query);
+  }
+  assert.equal(calls, 0);
+});
+
+test("container route maps an HTTP-200 SOAP fault through the common REST error handler", async (t) => {
+  const baseUrl = await startTestApp(t, createFakeEws({
+    async getContainerItems() {
+      throw Object.assign(new Error("Operation not supported"), { status: 200, soapFault: { code: "Receiver", reason: "Operation not supported" } });
+    },
+  }));
+  t.mock.method(console, "error", () => {});
+  const response = await fetch(`${baseUrl}/api/containers?id=00%2Fdevice`);
+  assert.equal(response.status, 502);
+  assert.deepEqual((await response.json()).soapFault, { code: "Receiver", reason: "Operation not supported" });
+});

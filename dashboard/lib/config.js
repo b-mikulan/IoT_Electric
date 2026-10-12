@@ -1,15 +1,5 @@
 const fs = require("node:fs");
-
-function deriveWidgetGroup(id) {
-  const widgetId = String(id || "").trim();
-  const slash = widgetId.lastIndexOf("/");
-  return (slash > 0 ? widgetId.slice(0, slash).trim() : "") || "PLC vrijednosti";
-}
-
-function widgetGroup(widget) {
-  const customGroup = typeof widget?.group === "string" ? widget.group.trim() : "";
-  return customGroup || deriveWidgetGroup(widget?.id);
-}
+const { deriveWidgetGroup, widgetGroup } = require("../public/widgetGrouping");
 
 const DEFAULT_DEMO_WIDGETS = [
   {

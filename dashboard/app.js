@@ -2,6 +2,8 @@ const express = require("express");
 const path = require("node:path");
 const { TelemetryClient } = require("./lib/telemetry");
 const { widgetGroup } = require("./lib/config");
+const { DeviceMetadataClient } = require("./lib/deviceMetadata");
+const { createDeviceDemo } = require("./lib/deviceDemo");
 
 const publicDirectory = path.join(__dirname, "public");
 const materializeDirectory = path.dirname(
@@ -85,7 +87,7 @@ function parseWidgetSettings(body) {
   };
 }
 
-function createApp({ poller, config, widgetStore = null, telemetry = new TelemetryClient(config) }) {
+function createApp({ poller, config, widgetStore = null, telemetry = new TelemetryClient(config), deviceMetadata = new DeviceMetadataClient(config) }) {
   if (!poller) throw new Error("A point poller is required.");
   if (!config) throw new Error("Dashboard configuration is required.");
 
@@ -173,6 +175,19 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
 
   app.get("/api/snapshot", (request, response) => {
     response.json(poller.getSnapshot());
+  });
+
+  app.get("/api/devices/metadata", async (request, response) => {
+    response.set("Cache-Control", "no-store");
+    if (config.demoMode) {
+      const demo = createDeviceDemo();
+      return response.json({ metadataById: demo.metadataById, roomByZone: demo.roomByZone, demoWidgets: demo.widgets, warnings: [] });
+    }
+    try {
+      return response.json(await deviceMetadata.read(config.widgets));
+    } catch {
+      return response.status(502).json({ error: "Opisi uređaja trenutačno nisu dostupni.", code: "DEVICE_METADATA_FAILED" });
+    }
   });
 
   for (const kind of ["history", "alarms"]) {

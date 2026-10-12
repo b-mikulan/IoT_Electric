@@ -483,6 +483,47 @@ async function startPersistedDashboard(t, widgets) {
   return { baseUrl: `http://127.0.0.1:${server.address().port}`, widgetFile, env, poller, config, store };
 }
 
+test("device grouping survives public configuration, renaming and override reset across restart", async (t) => {
+  const device = "03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307";
+  const otherDevice = device.replace("/RP32/", "/RP31/");
+  const widgets = [
+    { id: `01/${device}/Values/LtPct`, label: "Light set", writable: false, custom: { retained: true } },
+    { id: `01/${device}/Points/DevSta`, label: "Device status" },
+    { id: `11/${device}/Values/LtVal/Reliability`, label: "Reliability", visible: false },
+    { id: `01/${otherDevice}/Values/LtPct`, label: "Light set" },
+    { id: `01/${device}/Values/LtVal`, label: "Light actual", group: "Manual group" },
+  ];
+  const { baseUrl, widgetFile, env, poller } = await startPersistedDashboard(t, widgets);
+  const publicWidgets = async () => (await (await fetch(`${baseUrl}/api/config`)).json()).widgets;
+  assert.deepEqual((await publicWidgets()).map(({ group }) => group), [device, device, device, otherDevice, "Manual group"]);
+  assert.equal((await publicWidgets())[2].visible, false);
+
+  const response = await fetch(`${baseUrl}/api/widgets/group`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ group: device, name: "Kitchen light" }),
+  });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.deepEqual(result.widgets.map(({ id }) => id), widgets.slice(0, 3).map(({ id }) => id));
+  assert.deepEqual(JSON.parse(await fs.readFile(widgetFile, "utf8")), widgets.map((widget, index) => index < 3 ? { ...widget, group: "Kitchen light" } : widget));
+
+  const reset = await fetch(`${baseUrl}/api/widgets/settings`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: widgets[4].id, label: widgets[4].label, description: "Light feedback", unit: "%", precision: 0, writable: false, visible: true, group: "" }),
+  });
+  assert.equal(reset.status, 200);
+  assert.equal((await reset.json()).widget.group, device);
+  assert.equal(Object.hasOwn(JSON.parse(await fs.readFile(widgetFile, "utf8"))[4], "group"), false);
+
+  const expectedGroups = ["Kitchen light", "Kitchen light", "Kitchen light", otherDevice, device];
+  assert.deepEqual((await publicWidgets()).map(({ group }) => group), expectedGroups);
+  assert.deepEqual(poller.getSnapshot().widgets.map(({ group }) => group), expectedGroups);
+  const restarted = createRuntime(env);
+  assert.deepEqual(restarted.config.widgets.map(({ group }) => group), expectedGroups);
+  assert.deepEqual(restarted.poller.getSnapshot().widgets.map(({ id }) => id), widgets.map(({ id }) => id));
+  assert.equal(restarted.config.widgets[2].visible, false);
+});
+
 test("bulk removal persists an empty dashboard across restart and updates every SSE client", async (t) => {
   const { baseUrl, widgetFile, env, poller } = await startPersistedDashboard(t, [{ id: "floor/one", writable: true }, { id: "floor/two", visible: false }]);
   const readers = await Promise.all([1, 2].map(async () => {

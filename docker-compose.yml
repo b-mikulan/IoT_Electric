@@ -10,6 +10,7 @@ services:
       EWS_URL: "${EWS_URL:-https://bms.iot-electric.hr/EcoStruxure/DataExchange}"
       EWS_USER: "${EWS_USER:-}"
       EWS_PASSWORD: "${EWS_PASSWORD:-}"
+      EWS_CONTAINER_TIMEOUT_MS: "${EWS_CONTAINER_TIMEOUT_MS:-8000}"
       MIDDLEWARE_USER: "${MIDDLEWARE_USER:-}"
       MIDDLEWARE_PASSWORD_HASH: "${MIDDLEWARE_PASSWORD_HASH:-}"
     restart: unless-stopped

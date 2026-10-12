@@ -59,6 +59,16 @@ const parser = new XMLParser({
   trimValues: true,
 });
 
+// IDs, continuation tokens and metadata values are strings, even when numeric.
+const containerParser = new XMLParser({
+  ignoreAttributes: false,
+  removeNSPrefix: true,
+  parseTagValue: false,
+  trimValues: false,
+});
+const MAX_CONTAINER_PAGES = 100;
+const MAX_CONTAINER_ITEMS = 50_000;
+
 function assertCredentials(username, password) {
   if (!username || !password) {
     throw new Error(
@@ -243,14 +253,18 @@ function buildGetWebServiceInformationBody() {
   version="1.2" />`);
 }
 
-function buildGetContainerItemsBody(containerId) {
+function buildGetContainerItemsBody(containerId, { metadata = false, moreDataRef = "" } = {}) {
   return buildSoapEnvelope(`
 <GetContainerItemsRequest
   xmlns="${EWS_NAMESPACE}"
-  version="1.2">
+  version="1.2"
+  metadata="${metadata}">
   <GetContainerItemsIds>
     <Id>${escapeXml(containerId)}</Id>
   </GetContainerItemsIds>
+  <GetContainerItemsParameter>
+    <MoreDataRef>${escapeXml(moreDataRef)}</MoreDataRef>
+  </GetContainerItemsParameter>
 </GetContainerItemsRequest>`);
 }
 
@@ -669,7 +683,7 @@ function parseGetValuesResponse(xmlText) {
 }
 
 function parseGetContainerItemsResponse(xmlText) {
-  const parsed = parseXml(xmlText);
+  const parsed = containerParser.parse(xmlText);
 
   const response = parsed.Envelope?.Body?.GetContainerItemsResponse;
   if (!response) {
@@ -680,6 +694,14 @@ function parseGetContainerItemsResponse(xmlText) {
   const errorResults = toArray(
     response.GetContainerItemsErrorResults?.ErrorResult
   );
+  const errors = errorResults.map((err) => ({ id: err.Id, message: err.Message }));
+  let status;
+  try {
+    status = parseContainerStatus(response.GetContainerItemsStatus);
+  } catch (error) {
+    status = { moreDataAvailable: null, moreDataRef: response.GetContainerItemsStatus?.MoreDataRef ?? null };
+    errors.push({ id: containers[0]?.Id || "", message: error.message });
+  }
 
   return {
     containers: containers.map((container) => {
@@ -690,12 +712,14 @@ function parseGetContainerItemsResponse(xmlText) {
         name: container.Name,
         description: container.Description || "",
         type: container.Type,
+        ...(container.Metadata !== undefined ? { metadata: container.Metadata } : {}),
         containerItems: toArray(items.ContainerItems?.ContainerItem).map(
           (child) => ({
             id: child.Id,
             name: child.Name,
             description: child.Description || "",
             type: child.Type,
+            ...(child.Metadata !== undefined ? { metadata: child.Metadata } : {}),
           })
         ),
         valueItems: toArray(items.ValueItems?.ValueItem).map((value) => ({
@@ -709,16 +733,102 @@ function parseGetContainerItemsResponse(xmlText) {
           forceable:
             value.Forceable !== undefined ? Number(value.Forceable) : null,
           enumId: value.EnumId || null,
+          ...(value.Metadata !== undefined ? { metadata: value.Metadata } : {}),
         })),
         historyItems: toArray(items.HistoryItems?.HistoryItem),
         alarmItems: toArray(items.AlarmItems?.AlarmItem),
       };
     }),
-    errors: errorResults.map((err) => ({
-      id: err.Id,
-      message: err.Message,
-    })),
+    errors,
+    status,
   };
+}
+
+function parseContainerStatus(status) {
+  if (status === undefined) return null;
+  const flag = status.MoreDataAvailable;
+  let moreDataAvailable = null;
+  if (flag !== undefined) {
+    const value = String(flag).trim();
+    if (value === "true" || value === "1") moreDataAvailable = true;
+    else if (value === "false" || value === "0") moreDataAvailable = false;
+    else throw new Error("Invalid GetContainerItems MoreDataAvailable flag.");
+  }
+  return { moreDataAvailable, moreDataRef: status.MoreDataRef ?? null };
+}
+
+function metadataIdentity(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if (value.Id !== undefined) return `id:${value.Id}`;
+    if (value.Name !== undefined) return `name:${value.Name}`;
+  }
+  return JSON.stringify(value);
+}
+
+function mergeMetadata(previous, next) {
+  if (previous === undefined) return next;
+  if (next === undefined) return previous;
+  const objects = previous && next && typeof previous === "object" && typeof next === "object";
+  if (Array.isArray(previous) || Array.isArray(next) ||
+      (objects && metadataIdentity(previous) !== metadataIdentity(next) &&
+       (previous.Id !== undefined || previous.Name !== undefined) &&
+       (next.Id !== undefined || next.Name !== undefined))) {
+    const entries = new Map();
+    for (const value of [...toArray(previous), ...toArray(next)]) {
+      const key = metadataIdentity(value);
+      entries.set(key, entries.has(key) ? mergeMetadata(entries.get(key), value) : value);
+    }
+    return [...entries.values()];
+  }
+  if (objects) {
+    const merged = { ...previous };
+    for (const [key, value] of Object.entries(next)) merged[key] = mergeMetadata(previous[key], value);
+    return merged;
+  }
+  return next;
+}
+
+function mergeContainerItem(previous, next) {
+  const merged = { ...previous, ...next };
+  for (const field of ["metadata", "Metadata"]) {
+    if (previous[field] !== undefined || next[field] !== undefined) {
+      merged[field] = mergeMetadata(previous[field], next[field]);
+    }
+  }
+  return merged;
+}
+
+function mergeContainerPage(collection, page) {
+  const { containers } = collection;
+  for (const container of page.containers) {
+    const previous = containers.get(container.id);
+    if (!previous) {
+      if (collection.itemCount >= MAX_CONTAINER_ITEMS) return false;
+      collection.itemCount += 1;
+    }
+    const merged = mergeContainerItem(previous || {}, container);
+    const fields = ["containerItems", "valueItems", "historyItems", "alarmItems"];
+    // Initialize all lists before processing so a limit never exposes uncounted items.
+    for (const field of fields) merged[field] = previous?.[field] || [];
+    containers.set(container.id, merged);
+    for (const field of fields) {
+      const items = new Map(merged[field].map((item) => [item.id ?? item.Id ?? JSON.stringify(item), item]));
+      for (const item of container[field]) {
+        const key = item.id ?? item.Id ?? JSON.stringify(item);
+        if (items.has(key)) items.set(key, mergeContainerItem(items.get(key), item));
+        else {
+          if (collection.itemCount >= MAX_CONTAINER_ITEMS) {
+            merged[field] = [...items.values()];
+            return false;
+          }
+          items.set(key, item);
+          collection.itemCount += 1;
+        }
+      }
+      merged[field] = [...items.values()];
+    }
+  }
+  return true;
 }
 
 function parseSetValuesResponse(xmlText) {
@@ -866,7 +976,12 @@ function createEwsClient(config = {}) {
 
   assertCredentials(username, password);
 
-  async function sendSoapRequest(soapAction, soapBody) {
+  const containerTimeoutMs = Number(config.containerTimeoutMs ?? process.env.EWS_CONTAINER_TIMEOUT_MS ?? 8000);
+  if (!Number.isInteger(containerTimeoutMs) || containerTimeoutMs <= 0 || containerTimeoutMs > 2_147_483_647) {
+    throw new Error("EWS_CONTAINER_TIMEOUT_MS must be a positive integer timeout in milliseconds.");
+  }
+
+  async function sendSoapRequest(soapAction, soapBody, { signal } = {}) {
     const response = await digestFetch(
       serviceUrl,
       {
@@ -877,6 +992,7 @@ function createEwsClient(config = {}) {
           Accept: "application/soap+xml, text/xml, */*",
         },
         body: soapBody,
+        ...(signal ? { signal } : {}),
       },
       {
         username,
@@ -927,13 +1043,81 @@ function createEwsClient(config = {}) {
     return parseGetWebServiceInformationResponse(rawXml);
   }
 
-  async function getContainerItems(containerId = "") {
-    const { rawXml } = await sendSoapRequest(
-      SOAP_ACTIONS.GET_CONTAINER_ITEMS,
-      buildGetContainerItemsBody(containerId)
-    );
-
-    return parseGetContainerItemsResponse(rawXml);
+  async function getContainerItems(containerId = "", { metadata = false, moreDataRef = "", allPages = true } = {}) {
+    if (typeof containerId !== "string" || typeof moreDataRef !== "string" ||
+        typeof metadata !== "boolean" || typeof allPages !== "boolean") {
+      throw Object.assign(new Error("Invalid container discovery options."), { status: 400 });
+    }
+    const result = { containers: [], errors: [], status: null, complete: null, pagesRead: 0 };
+    const collection = { containers: new Map(), itemCount: 0 };
+    const usedTokens = new Set();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), containerTimeoutMs);
+    let token = moreDataRef;
+    function incomplete(message, soapFault) {
+      result.complete = false;
+      result.errors.push({ id: containerId, message, ...(soapFault ? { soapFault } : {}) });
+    }
+    try {
+      while (true) {
+        if (token) usedTokens.add(token);
+        let page;
+        try {
+          const { rawXml } = await sendSoapRequest(
+            SOAP_ACTIONS.GET_CONTAINER_ITEMS,
+            buildGetContainerItemsBody(containerId, { metadata, moreDataRef: token }),
+            { signal: controller.signal }
+          );
+          page = parseGetContainerItemsResponse(rawXml);
+        } catch (error) {
+          const failure = controller.signal.aborted
+            ? Object.assign(new Error("Container discovery timed out."), { status: 504 })
+            : error;
+          if (result.pagesRead === 0) throw failure;
+          incomplete(`Container continuation failed: ${failure.message}`, failure.soapFault);
+          break;
+        }
+        result.pagesRead += 1;
+        const withinLimit = mergeContainerPage(collection, page);
+        result.containers = [...collection.containers.values()];
+        result.errors.push(...page.errors);
+        result.status = page.status;
+        if (!withinLimit) {
+          // The next-page token would skip the uncollected remainder of this page.
+          if (result.status) result.status = { ...result.status, moreDataRef: null };
+          incomplete(`Container discovery exceeded ${MAX_CONTAINER_ITEMS} items. This page was truncated; use a narrower container request.`);
+          break;
+        }
+        if (page.status?.moreDataAvailable === false) {
+          result.complete = result.errors.length === 0;
+          break;
+        }
+        // Older EBO servers omit status. Preserve that uncertainty without inventing a cursor.
+        if (page.status?.moreDataAvailable !== true) {
+          result.complete = result.errors.length ? false : null;
+          break;
+        }
+        result.complete = false;
+        const nextToken = page.status.moreDataRef;
+        if (typeof nextToken !== "string" || nextToken.length === 0) {
+          incomplete("Container response advertises more data without a continuation token.");
+          break;
+        }
+        if (usedTokens.has(nextToken)) {
+          incomplete("Container response repeated a continuation token.");
+          break;
+        }
+        if (!allPages) break;
+        if (result.pagesRead >= MAX_CONTAINER_PAGES) {
+          incomplete(`Container discovery exceeded ${MAX_CONTAINER_PAGES} pages.`);
+          break;
+        }
+        token = nextToken;
+      }
+      return result;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   async function getValues(ids) {

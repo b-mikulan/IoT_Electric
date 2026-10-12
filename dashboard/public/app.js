@@ -1,4 +1,5 @@
 const grid = document.querySelector("#widget-grid");
+const { widgetGroup, describeWidgetGroup } = globalThis.IoTWidgetGrouping;
 const template = document.querySelector("#widget-template");
 const demoBadge = document.querySelector("#demo-badge");
 const emptyState = document.querySelector("#empty-state");
@@ -92,6 +93,45 @@ let automaticDiscoveryRunning = false;
 let widgetClearBusy = false;
 let groupClearTarget = "";
 let groupRenameTarget = "";
+let deviceCardView = null;
+let deviceMetadata = { metadataById: {}, roomByZone: {} };
+let deviceDemoWidgets = [];
+let deviceDemoMode = false;
+let deviceConnectionStatus = "connecting";
+let deviceMetadataRequest = 0;
+let deviceMetadataRefreshTimer;
+
+function refreshDeviceCards() {
+  if (!deviceCardView || updatingWidgets) return;
+  const widgets = deviceDemoMode && deviceDemoWidgets.length
+    ? deviceDemoWidgets
+    : [...configById.values()].map((config) => {
+      const point = latestValuesById.get(config.id)?.widget;
+      return { ...config, ...(point ? { value: point.value, state: point.state, error: point.error, updatedAt: point.updatedAt } : {}) };
+    });
+  deviceCardView.update({ widgets, status: deviceConnectionStatus, demo: deviceDemoMode, ...deviceMetadata });
+}
+
+async function refreshDeviceMetadata() {
+  const request = ++deviceMetadataRequest;
+  try {
+    const response = await fetch("/api/devices/metadata", { cache: "no-store" });
+    if (!response.ok) throw new Error("Opisi uređaja nisu dostupni.");
+    const payload = await response.json();
+    if (request !== deviceMetadataRequest) return;
+    deviceMetadata = { metadataById: payload.metadataById || {}, roomByZone: payload.roomByZone || {}, warnings: payload.warnings || [] };
+    deviceDemoWidgets = deviceDemoMode && Array.isArray(payload.demoWidgets) ? payload.demoWidgets : [];
+  } catch {
+    if (request !== deviceMetadataRequest) return;
+    deviceMetadata = { ...deviceMetadata, warnings: ["Opisi uređaja trenutačno nisu dostupni."] };
+  }
+  refreshDeviceCards();
+}
+
+function scheduleDeviceMetadataRefresh() {
+  clearTimeout(deviceMetadataRefreshTimer);
+  deviceMetadataRefreshTimer = setTimeout(() => void refreshDeviceMetadata(), 150);
+}
 
 function visualForUnit(unit = "") {
   const normalized = unit.trim().toLowerCase();
@@ -112,18 +152,13 @@ function visualForUnit(unit = "") {
   return { icon: "●", color: "#00796b", soft: "#e4f4f1" };
 }
 
-function automaticWidgetGroup(widget) {
-  const slash = widget.id.lastIndexOf("/");
-  return slash > 0 ? widget.id.slice(0, slash) : "PLC vrijednosti";
-}
-
 function widgetGroupName(widget) {
-  return typeof widget.group === "string" && widget.group.trim()
-    ? widget.group.trim() : automaticWidgetGroup(widget);
+  return widgetGroup(widget);
 }
 
 function placeWidgetInGroup(widget, column) {
   const name = widgetGroupName(widget);
+  const heading = describeWidgetGroup(widget);
   let group = groupsByName.get(name);
   if (!group) {
     const section = document.createElement("details");
@@ -133,7 +168,15 @@ function placeWidgetInGroup(widget, column) {
     summary.className = "widget-group-summary";
     const title = document.createElement("h2");
     title.className = "widget-group-title";
-    title.textContent = name;
+    title.textContent = heading.label;
+    const copy = document.createElement("div");
+    copy.className = "widget-group-copy";
+    const context = document.createElement("span");
+    context.className = "widget-group-context";
+    context.textContent = heading.context;
+    context.hidden = !heading.context;
+    copy.append(title, context);
+    copy.title = name;
     const count = document.createElement("span");
     count.className = "widget-group-count";
     const actions = document.createElement("div");
@@ -143,7 +186,7 @@ function placeWidgetInGroup(widget, column) {
     rename.className = "btn-flat";
     rename.textContent = "Preimenuj";
     rename.hidden = !widgetEditingEnabled;
-    rename.setAttribute("aria-label", `Preimenuj grupu ${name}`);
+    rename.setAttribute("aria-label", `Preimenuj grupu ${heading.label}`);
     rename.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -154,14 +197,14 @@ function placeWidgetInGroup(widget, column) {
     remove.className = "btn-flat danger-action widget-group-delete";
     remove.textContent = "Obriši grupu";
     remove.hidden = !widgetEditingEnabled;
-    remove.setAttribute("aria-label", `Obriši grupu ${name}`);
+    remove.setAttribute("aria-label", `Obriši grupu ${heading.label}`);
     remove.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
       openGroupClearDialog(name);
     });
     actions.append(rename, remove);
-    summary.append(title, count, actions);
+    summary.append(copy, count, actions);
     const body = document.createElement("div");
     body.className = "widget-group-body";
     const cards = document.createElement("div");
@@ -169,7 +212,7 @@ function placeWidgetInGroup(widget, column) {
     body.appendChild(cards);
     section.append(summary, body);
     grid.appendChild(section);
-    group = { section, cards, count, remove, rename };
+    group = { section, cards, count, remove, rename, heading };
     groupsByName.set(name, group);
   }
   if (column.parentElement !== group.cards) group.cards.appendChild(column);
@@ -200,7 +243,8 @@ function updateGroups() {
   widgetsGroupSelect.replaceChildren(new Option("Odaberi grupu", ""));
   [...groupsByName.entries()].sort(([left], [right]) => left.localeCompare(right, "hr")).forEach(([name, group], index) => {
     if (grid.children[index] !== group.section) grid.insertBefore(group.section, grid.children[index] || null);
-    widgetsGroupSelect.add(new Option(`${name} (${counts.get(name).total})`, name));
+    const heading = [group.heading.label, group.heading.context].filter(Boolean).join(" · ");
+    widgetsGroupSelect.add(new Option(`${heading} (${counts.get(name).total})`, name));
   });
   widgetsGroupSelect.value = groupsByName.has(selection) ? selection : "";
 }
@@ -342,6 +386,7 @@ function updateEmptyState() {
   emptyState.hidden = [...configById.values()].some(
     (widget) => widget.visible !== false
   );
+  refreshDeviceCards();
 }
 
 function setWidgetVisibility(id, visible) {
@@ -570,6 +615,7 @@ function showStatus(status = {}) {
     typeof status === "string"
       ? status
       : status.state || status.status || "connecting";
+  deviceConnectionStatus = state;
   const isOnline = state === "connected" || state === "online";
   const isOffline = state === "error" || state === "offline";
   const isEmpty = state === "idle" && configById.size === 0;
@@ -590,6 +636,7 @@ function showStatus(status = {}) {
     errorMessage.textContent =
       status.error || status.message || "Servis će pokušati ponovno.";
   }
+  refreshDeviceCards();
 }
 
 function applyPayload(payload = {}) {
@@ -601,6 +648,7 @@ function applyPayload(payload = {}) {
     lastSync.textContent = `Zadnja uspješna provjera: ${formatTime(syncTime)}`;
   }
   if (payload.status) showStatus(payload);
+  refreshDeviceCards();
 }
 
 function setupWriteControls(widgets) {
@@ -768,6 +816,7 @@ function applyConfiguredWidgets(widgets, groupRename = null) {
       updateClearButton();
     }
     refreshDiscoveryItems();
+    scheduleDeviceMetadataRefresh();
   }
 }
 
@@ -1282,6 +1331,8 @@ async function boot() {
     if (!response.ok) throw new Error("Konfiguracija nije dostupna.");
 
     const config = await response.json();
+    deviceDemoMode = config.demoMode === true;
+    deviceCardView = globalThis.IoTDeviceCards?.create({ container: document.querySelector("#device-cards-section") });
     demoBadge.hidden = !config.demoMode;
     widgetEditingEnabled = config.widgetEditingEnabled === true;
     discoveryOpen.hidden = config.discoveryEnabled !== true;
@@ -1294,6 +1345,7 @@ async function boot() {
     configureWriteValueInput();
     setupVisibilityControls(config.widgets);
     updateEmptyState();
+    void refreshDeviceMetadata();
 
     const events = new EventSource("/events");
     events.addEventListener("snapshot", (event) => {

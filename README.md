@@ -11,6 +11,20 @@ IoT Electric contains two small services: a REST middleware for Schneider EcoStr
 
 The middleware exposes public health and Swagger pages at `/health` and `/api-docs`. All `/api/*` endpoints require HTTP Basic authentication. Open Swagger and use **Authorize** before trying an API endpoint.
 
+## EWS container discovery
+
+`GET /api/containers?id=...` reads a container and automatically follows EWS continuation pages. Repeated container headers are combined; child containers, values, histories and alarms are merged by their exact, case-sensitive IDs. The existing `containers` and `errors` arrays remain available. History/alarm items retain their original `Id`/`Name` field names.
+
+The response also includes `pagesRead`, `status` and `complete`. `status` contains `moreDataAvailable` and the exact string `moreDataRef` from the last successful page, or is `null` when absent. An unsafe continuation is cleared when the item limit truncates a page. `complete` is `true` only after an explicit final paging flag and no item errors, `false` for a partial result or an error, and `null` when the server did not provide its paging flag. Completion covers this container request, not the entire server tree. Some EBO servers omit paging status even in EWS 1.2 responses.
+
+Add `metadata=true` to request optional EWS metadata. Container and value metadata is returned as `metadata` without flattening categories/properties or converting their string values. Metadata returned on history/alarm items remains under `Metadata`. An unsupported metadata request is reported as a fault. Metadata is not requested by default and the dashboard does not yet use it to classify devices.
+
+For page-by-page inspection use `allPages=false`. To resume, URL-encode `status.moreDataRef` and send it as the `moreDataRef` query parameter with the same `id` and `metadata` setting. Preserve whitespace, leading zeros, case and special characters in the token. A resumed response covers the requested suffix, not pages read by a previous request.
+
+If a later page fails, the middleware returns the collected items with an error and `complete=false`; HTTP 200 alone does not imply a complete result. A first-page SOAP fault uses HTTP 502, and a timeout before the first page uses 504. Missing or repeated continuation tokens stop aggregation with an error. Each call is bounded to 100 pages and 50,000 returned items, counting container headers and all item types. An item-limit stop may occur within a page, so that page cannot be resumed by token alone; narrow the container request when this limit is reported.
+
+`EWS_CONTAINER_TIMEOUT_MS` sets the total controller-read budget, including authentication and every page (default 8000 ms). Keep the dashboard's `DASHBOARD_MIDDLEWARE_TIMEOUT_MS` comfortably above it (default 10000 ms). The deadline aborts the controller fetch and returns any already collected pages. For larger installations, use individual pages or increase both budgets together.
+
 ## Repository layout
 
 ```text
