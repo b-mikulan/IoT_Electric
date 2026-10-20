@@ -98,6 +98,7 @@ let deviceMetadata = { metadataById: {}, roomByZone: {} };
 let deviceDemoWidgets = [];
 let deviceDemoMode = false;
 let deviceConnectionStatus = "connecting";
+let deviceReadAt = null;
 let deviceMetadataRequest = 0;
 let deviceMetadataRefreshTimer;
 
@@ -109,7 +110,7 @@ function refreshDeviceCards() {
       const point = latestValuesById.get(config.id)?.widget;
       return { ...config, ...(point ? { value: point.value, state: point.state, error: point.error, updatedAt: point.updatedAt } : {}) };
     });
-  deviceCardView.update({ widgets, status: deviceConnectionStatus, demo: deviceDemoMode, ...deviceMetadata });
+  deviceCardView.update({ widgets, status: deviceConnectionStatus, readAt: deviceReadAt, demo: deviceDemoMode, ...deviceMetadata });
 }
 
 async function refreshDeviceMetadata() {
@@ -131,6 +132,20 @@ async function refreshDeviceMetadata() {
 function scheduleDeviceMetadataRefresh() {
   clearTimeout(deviceMetadataRefreshTimer);
   deviceMetadataRefreshTimer = setTimeout(() => void refreshDeviceMetadata(), 150);
+}
+
+async function writeDeviceCommand({ widgetId, value }) {
+  const response = await fetch("/api/devices/write", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ widgetId, value }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `Upis nije uspio (${response.status}).`);
+  if (payload.success !== true || payload.id !== widgetId) {
+    throw new Error("Nije primljena valjana potvrda upisa. Provjeri očitanje prije ponovnog pokušaja.");
+  }
+  return payload;
 }
 
 function visualForUnit(unit = "") {
@@ -645,6 +660,7 @@ function applyPayload(payload = {}) {
 
   const syncTime = payload.syncedAt || payload.lastSync;
   if (syncTime) {
+    deviceReadAt = syncTime;
     lastSync.textContent = `Zadnja uspješna provjera: ${formatTime(syncTime)}`;
   }
   if (payload.status) showStatus(payload);
@@ -1332,7 +1348,10 @@ async function boot() {
 
     const config = await response.json();
     deviceDemoMode = config.demoMode === true;
-    deviceCardView = globalThis.IoTDeviceCards?.create({ container: document.querySelector("#device-cards-section") });
+    deviceCardView = globalThis.IoTDeviceCards?.create({
+      container: document.querySelector("#device-cards-section"),
+      onWrite: writeDeviceCommand,
+    });
     demoBadge.hidden = !config.demoMode;
     widgetEditingEnabled = config.widgetEditingEnabled === true;
     discoveryOpen.hidden = config.discoveryEnabled !== true;

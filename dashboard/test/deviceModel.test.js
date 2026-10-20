@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-const { buildDevices, normalizePoint } = require("../public/deviceModel");
+const { buildDevices, normalizePoint, validateDeviceCommand } = require("../public/deviceModel");
 
 const rp = (controller) => `03AS001/[BACnet Interface]/IP Network/${controller}`;
 const zone = `${rp("RP32")}/Application/Zones/Z312`;
@@ -109,6 +109,7 @@ test("cleans display-only unit markers while retaining the server unit in metada
 });
 
 test("unknown ppm readings identify concentration without inventing a CO2 sensor or a command", () => {
+  assert.equal(normalizePoint(point(ac, "constructor")).role, "unknown");
   const unknown = point(ac, "UnspecifiedGas", { value: 5, unit: "ppm" });
   const co2 = point(ac, "RmCO2", { value: 500, unit: "ppm" });
   assert.equal(normalizePoint(unknown).role, "concentration");
@@ -236,4 +237,44 @@ test("browser and server use the same pure model and do not mutate snapshots", (
   const original = JSON.stringify(values);
   assert.deepEqual(JSON.parse(JSON.stringify(context.IoTDeviceModel.buildDevices(values))), buildDevices(values));
   assert.equal(JSON.stringify(values), original);
+});
+
+test("real controls require explicit server permission and reject aliases, ambiguous roles and unconfirmed blind scales", () => {
+  const source = point(light, "LtPct");
+  assert.equal(normalizePoint(source).liveControlAvailable, false);
+  assert.equal(normalizePoint(source, { writeable: 1 }).liveControlAvailable, true);
+  const alias = { ...source, id: `11/${light}/Values/LtPct/Value` };
+  assert.equal(normalizePoint(alias, { writeable: 1 }).liveControlAvailable, false);
+  const blindPoint = normalizePoint(point(blind, "BlndPos"), { writeable: 1 });
+  assert.equal(blindPoint.controlAvailable, true);
+  assert.equal(blindPoint.liveControlAvailable, false);
+  assert.equal(validateDeviceCommand(blindPoint, 30).allowed, false);
+  const duplicate = { ...source, id: `01/${light}/Points/GrpPct` };
+  const [device] = buildDevices([source, duplicate], {
+    metadataById: { ...metadata(source.id), ...metadata(duplicate.id) },
+  });
+  assert.equal(device.roles.brightnessSet.roleAmbiguous, true);
+  assert.equal(validateDeviceCommand(device.roles.brightnessSet, 20).allowed, false);
+});
+
+test("real command validation enforces numeric bounds and controller enum options without coercing arbitrary values", () => {
+  const brightness = normalizePoint(point(light, "LtPct"), { writeable: 1 });
+  for (const value of [-1, 101, NaN, Infinity, "50", null, {}, true]) {
+    assert.equal(validateDeviceCommand(brightness, value).allowed, false);
+  }
+  assert.deepEqual(validateDeviceCommand(brightness, 50), { allowed: true, value: 50 });
+  const mode = normalizePoint(point(ac, "SysMdCtrl", { value: 1 }), {
+    writeable: 1, enumValues: [{ value: 0, label: "Heat" }, { value: 1, label: "Cool" }],
+  });
+  assert.deepEqual(validateDeviceCommand(mode, "0"), { allowed: true, value: 0 });
+  assert.equal(validateDeviceCommand(mode, 2).allowed, false);
+  assert.equal(validateDeviceCommand({ ...mode, state: 2, liveControlAvailable: false }, 0).allowed, false);
+  for (const [unit, min, max] of [["°C", 5, 35], ["°F", 41, 95], ["K", 278.15, 308.15]]) {
+    const target = normalizePoint(point(ac, "EffSpt", { value: (min + max) / 2 }), { writeable: 1, unit });
+    assert.equal(target.control.rangeSource, "dashboard-policy");
+    assert.equal(validateDeviceCommand(target, min).allowed, true);
+    assert.equal(validateDeviceCommand(target, max).allowed, true);
+    assert.equal(validateDeviceCommand(target, min - 0.5).allowed, false);
+    assert.equal(validateDeviceCommand(target, max + 0.5).allowed, false);
+  }
 });

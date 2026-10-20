@@ -261,6 +261,30 @@ h1 {
   outline-offset: 3px;
 }
 
+.raw-widgets-panel {
+  margin: 32px 0 24px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.raw-widgets-panel > summary {
+  padding: 18px 0;
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.raw-widgets-panel > summary:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.raw-widgets-content {
+  padding-top: 8px;
+  color: var(--ink);
+}
+
 .widget-grid {
   display: grid;
   gap: 22px;

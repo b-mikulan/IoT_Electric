@@ -97,15 +97,19 @@
     return ({ 0: "U redu", 1: "Nesigurno očitanje", 2: "Forsirano", 3: "Izvan mreže", 4: "Greška" })[String(point?.state)] || "Stanje nije poznato";
   }
 
-  function create({ container }) {
+  function create({ container, onWrite }) {
     if (!container || typeof container.append !== "function") throw new TypeError("Device cards need a DOM container.");
     const cards = new Map();
     const drafts = new Map();
+    const commands = new Map();
     let devices = [];
     let connection = "idle";
     let selectedRoom = "all";
     let roomsSignature = "";
     let destroyed = false;
+    let demoMode = false;
+    let latestReadAt;
+    let readClockAvailable = false;
 
     container.classList.add("device-cards-section");
     const header = el("div", "dc-section-heading");
@@ -197,20 +201,61 @@
       const detailSummary = el("summary", "", "Detalji funkcija");
       const detailsContent = el("div", "dc-details-content");
       details.append(detailSummary, detailsContent);
-      node.append(top, body, states, details);
+      const commandStatus = el("p", "dc-command-status");
+      commandStatus.setAttribute("role", "status");
+      commandStatus.setAttribute("aria-live", "polite");
+      commandStatus.hidden = true;
+      node.append(top, body, states, commandStatus, details);
 
       const pointFor = (role) => card.device.roles?.[role];
       const draftKey = (role) => `${card.device.key}\u0000${role}`;
       const simulatedValue = (role) => drafts.has(draftKey(role)) ? drafts.get(draftKey(role)) : pointFor(role)?.value;
-      const allowed = (role) => connection === "connected" && pointFor(role)?.controlAvailable === true && !pointFor(role)?.error && Number(pointFor(role)?.state) === 0;
-      const disabledReason = (role) => connection !== "connected" ? "Očitanja se trenutačno ne osvježavaju." : pointFor(role)?.disabledReason || "Trenutačna vrijednost nije dostupna za probu upravljanja.";
+      const pending = () => commands.get(card.device.key)?.status === "pending";
+      const actionLabel = () => demoMode ? "simulacija" : "šalje naredbu kontroleru";
+      const allowed = (role) => {
+        const point = pointFor(role);
+        return connection === "connected" && !pending() && point?.controlAvailable === true && !point?.error && Number(point?.state) === 0
+          && (demoMode || point.writeAllowed === true && point.liveControlAvailable === true && typeof onWrite === "function");
+      };
+      const disabledReason = (role) => pending() ? "Naredba se šalje. Pričekaj odgovor kontrolera."
+        : connection !== "connected" ? "Očitanja se trenutačno ne osvježavaju."
+          : !demoMode && typeof onWrite !== "function" ? "Slanje naredbi nije povezano."
+            : !demoMode && pointFor(role)?.liveDisabledReason ? pointFor(role).liveDisabledReason
+              : pointFor(role)?.disabledReason || "Trenutačna vrijednost nije dostupna za upravljanje.";
 
       function setDraft(role, value) {
         if (!allowed(role)) return;
+        if (!demoMode) commands.delete(card.device.key);
         drafts.set(draftKey(role), value);
-        reset.hidden = false;
+        reset.hidden = !demoMode;
         card.update(card.device);
-        announce.textContent = `${card.device.label}: ${roleLabels[role] || "vrijednost"} simulirano ${format(pointFor(role), value)}. Kontroler nije promijenjen.`;
+        if (demoMode) announce.textContent = `${card.device.label}: ${roleLabels[role] || "vrijednost"} simulirano ${format(pointFor(role), value)}. Kontroler nije promijenjen.`;
+      }
+
+      async function commit(role, value) {
+        if (!allowed(role)) return;
+        if (demoMode) { setDraft(role, value); return; }
+        const point = pointFor(role);
+        const command = {
+          status: "pending", role, value, pointId: point.sourceId || point.id,
+          previousUpdatedAt: point.updatedAt, previousReadAt: latestReadAt, usesReadClock: readClockAvailable,
+        };
+        commands.set(card.device.key, command);
+        drafts.set(draftKey(role), value);
+        card.update(card.device);
+        try {
+          await onWrite({ widgetId: command.pointId, value });
+          if (destroyed || commands.get(card.device.key) !== command) return;
+          command.status = "accepted";
+          command.acceptedReadAt = readClockAvailable ? latestReadAt : command.previousReadAt;
+        } catch (error) {
+          if (destroyed || commands.get(card.device.key) !== command) return;
+          command.status = "error";
+          command.error = error?.message || "Nije dobiven odgovor o naredbi.";
+          drafts.delete(draftKey(role));
+          card.forceControlSync = role;
+        }
+        if (cards.get(card.device.key) === card) card.update(card.device);
       }
 
       function metric(role, label, large = false) {
@@ -234,7 +279,7 @@
         card.bindings.push(() => {
           const draft = drafts.has(draftKey(role));
           text.hidden = !draft;
-          text.textContent = draft ? `Simulirano: ${format(pointFor(role), simulatedValue(role))}` : "";
+          text.textContent = draft ? `${demoMode ? "Simulirano" : "Odabrana vrijednost"}: ${format(pointFor(role), simulatedValue(role))}` : "";
         });
       }
 
@@ -259,8 +304,8 @@
         input.min = String(bounds.min);
         input.max = String(bounds.max);
         input.step = String(bounds.step || 1);
-        input.setAttribute("aria-label", `${card.device.label}: ${label}, simulacija`);
         input.addEventListener("input", () => setDraft(role, Number(input.value)));
+        input.addEventListener("change", () => { if (!demoMode) void commit(role, Number(input.value)); });
         row.append(caption, reading);
         wrap.append(row, input);
         simulationCopy(role, wrap);
@@ -268,8 +313,9 @@
         card.bindings.push(() => {
           const current = numeric(simulatedValue(role));
           input.disabled = !allowed(role) || current === null || current < Number(input.min) || current > Number(input.max);
-          input.title = input.disabled ? disabledReason(role) : "";
-          if (document.activeElement !== input) input.value = String(current === null ? Number(input.min) : current);
+          input.setAttribute("aria-label", `${card.device.label}: ${label}, ${actionLabel()}`);
+          input.title = input.disabled ? disabledReason(role) : demoMode ? "Promjena služi za simulaciju." : "Naredba se šalje kada otpustiš klizač.";
+          if (document.activeElement !== input || card.forceControlSync === role) input.value = String(current === null ? Number(input.min) : current);
           reading.textContent = format(pointFor(role), simulatedValue(role));
           const percent = current === null ? 0 : Math.max(0, Math.min(100, (current - Number(input.min)) / (Number(input.max) - Number(input.min)) * 100));
           input.style.setProperty("--dc-range-fill", `${percent}%`);
@@ -288,17 +334,17 @@
         button.addEventListener("click", () => {
           const current = numeric(simulatedValue(role));
           const maximum = Number(pointFor(role)?.control?.max);
-          if (current !== null && Number.isFinite(maximum)) setDraft(role, current > 0 ? 0 : maximum);
+          if (current !== null && Number.isFinite(maximum)) void commit(role, current > 0 ? 0 : maximum);
         });
         body.append(button);
         card.bindings.push(() => {
           const number = numeric(simulatedValue(role));
           const on = number !== null && number > 0;
-          copy.textContent = on ? "Isključi u simulaciji" : "Uključi u simulaciji";
+          copy.textContent = `${on ? "Isključi" : "Uključi"}${demoMode ? " u simulaciji" : ""}`;
           button.disabled = !allowed(role) || number === null || !Number.isFinite(Number(pointFor(role)?.control?.max));
-          button.title = button.disabled ? disabledReason(role) : "";
+          button.title = button.disabled ? disabledReason(role) : demoMode ? "Simulacija upravljanja svjetlom." : `Šalje zadanu svjetlinu ${on ? 0 : pointFor(role).control.max} % kontroleru.`;
           button.setAttribute("aria-pressed", String(on));
-          button.setAttribute("aria-label", `${card.device.label}: ${on ? "isključi" : "uključi"}, simulacija`);
+          button.setAttribute("aria-label", `${card.device.label}: ${on ? "isključi" : "uključi"}, ${actionLabel()}`);
         });
       }
 
@@ -313,7 +359,7 @@
         const hint = el("p", "dc-control-hint", "Raspon nije potvrđen; unos služi samo za probu prikaza.");
         input.addEventListener("change", () => {
           const value = numeric(input.value);
-          if (value !== null) setDraft(role, value);
+          if (value !== null) void commit(role, value);
         });
         caption.append(input);
         wrap.append(caption, hint);
@@ -321,16 +367,18 @@
         body.append(wrap);
         card.bindings.push(() => {
           const current = numeric(simulatedValue(role));
-          if (document.activeElement !== input) input.value = current === null ? "" : String(current);
+          if (document.activeElement !== input || card.forceControlSync === role) input.value = current === null ? "" : String(current);
           input.disabled = !allowed(role) || current === null;
+          input.setAttribute("aria-label", `${card.device.label}: ${label}, ${actionLabel()}`);
           input.title = input.disabled ? disabledReason(role) : "";
+          hint.textContent = demoMode ? "Raspon nije potvrđen; unos služi samo za probu prikaza." : disabledReason(role);
         });
       }
 
       function stepper(role, label) {
         if (!pointFor(role)) return;
         const wrap = el("div", "dc-control dc-temperature-control");
-        const caption = el("span", "dc-control-label", `${label} · simulacija`);
+        const caption = el("span", "dc-control-label");
         const buttons = el("div", "dc-stepper");
         const down = el("button", "dc-step-button", "−");
         const up = el("button", "dc-step-button", "+");
@@ -346,18 +394,21 @@
           const current = numeric(simulatedValue(role));
           if (current === null) return null;
           const hints = pointFor(role)?.control || {};
-          const next = Math.round((current + direction * Number(hints.step || 0.5)) * 10) / 10;
+          const next = Number((current + direction * Number(hints.step || 0.5)).toFixed(6));
           if (hints.min !== undefined && next < Number(hints.min) || hints.max !== undefined && next > Number(hints.max)) return null;
           return next;
         }
-        down.addEventListener("click", () => { const next = target(-1); if (next !== null) setDraft(role, next); });
-        up.addEventListener("click", () => { const next = target(1); if (next !== null) setDraft(role, next); });
+        down.addEventListener("click", () => { const next = target(-1); if (next !== null) void commit(role, next); });
+        up.addEventListener("click", () => { const next = target(1); if (next !== null) void commit(role, next); });
         card.bindings.push(() => {
+          caption.textContent = `${label}${demoMode ? " · simulacija" : ""}`;
+          down.setAttribute("aria-label", `${card.device.label}: smanji zadanu temperaturu, ${actionLabel()}`);
+          up.setAttribute("aria-label", `${card.device.label}: povećaj zadanu temperaturu, ${actionLabel()}`);
           reading.textContent = format(pointFor(role), simulatedValue(role));
           down.disabled = !allowed(role) || target(-1) === null;
           up.disabled = !allowed(role) || target(1) === null;
-          down.title = down.disabled ? disabledReason(role) : "";
-          up.title = up.disabled ? disabledReason(role) : "";
+          down.title = down.disabled ? target(-1) === null ? "Dosegnuta je donja granica zadane temperature." : disabledReason(role) : actionLabel();
+          up.title = up.disabled ? target(1) === null ? "Dosegnuta je gornja granica zadane temperature." : disabledReason(role) : actionLabel();
         });
       }
 
@@ -366,7 +417,9 @@
         if (!point) return;
         if (!Array.isArray(point.control?.options) || point.control.options.length === 0) { metric(role, label); return; }
         const wrap = el("div", "dc-control dc-select-control");
-        const caption = el("label", "dc-control-label", `${label} · simulacija`);
+        const caption = el("label", "dc-control-label");
+        const captionText = el("span");
+        caption.append(captionText);
         const input = el("select", "dc-select browser-default");
         input.setAttribute("aria-label", `${card.device.label}: ${label}, simulacija`);
         caption.append(input);
@@ -381,7 +434,7 @@
         }
         input.addEventListener("change", () => {
           const option = pointFor(role)?.control?.options?.find((entry) => String(entry.value) === input.value);
-          if (option) setDraft(role, option.value);
+          if (option) void commit(role, option.value);
         });
         wrap.append(caption);
         simulationCopy(role, wrap);
@@ -389,10 +442,12 @@
         card.bindings.push(() => {
           const current = String(simulatedValue(role) ?? "");
           const known = pointFor(role)?.control?.options?.some((entry) => String(entry.value) === current);
-          if (document.activeElement !== input) input.value = known ? current : "";
+          if (document.activeElement !== input || card.forceControlSync === role) input.value = known ? current : "";
           missing.textContent = current && !known ? `Očitano: ${format(pointFor(role))}` : "Nije očitano";
           input.disabled = !allowed(role) || !known;
-          input.title = input.disabled ? disabledReason(role) : "";
+          captionText.textContent = `${label}${demoMode ? " · simulacija" : ""}`;
+          input.setAttribute("aria-label", `${card.device.label}: ${label}, ${actionLabel()}`);
+          input.title = input.disabled ? disabledReason(role) : actionLabel();
         });
       }
 
@@ -403,7 +458,7 @@
         if (card.device.type === "light" || card.device.type === "lightGroup") {
           metric(roles.brightnessStatus ? "brightnessStatus" : "brightnessSet", roles.brightnessStatus ? "Očitana svjetlina" : "Očitana zadana svjetlina", true);
           lightToggle();
-          range("brightnessSet", "Svjetlina · simulacija");
+          range("brightnessSet", demoMode ? "Svjetlina · simulacija" : "Svjetlina");
         } else if (card.device.type === "climate") {
           metric("temperature", "Temperatura", true);
           metric("humidity");
@@ -415,8 +470,8 @@
           selection("power", "Napajanje");
         } else if (card.device.type === "blind") {
           metric(roles.positionStatus ? "positionStatus" : "positionSet", roles.positionStatus ? "Očitani položaj" : "Očitani zadani položaj", true);
-          range("positionSet", "Položaj · simulacija");
-          range("slatSet", "Kut lamela · simulacija");
+          range("positionSet", demoMode ? "Položaj · simulacija" : "Položaj");
+          range("slatSet", demoMode ? "Kut lamela · simulacija" : "Kut lamela");
         } else if (card.device.type === "sensor" || card.device.type === "zone") {
           metric("illuminance", "Osvijetljenost", true);
           metric("occupancy");
@@ -480,9 +535,21 @@
         title.textContent = device.label;
         room.textContent = device.room?.label || "Prostorija nije dodijeljena";
         room.classList.toggle("dc-room-unknown", !device.room);
-        const signature = JSON.stringify([device.type, Object.entries(device.roles || {}).map(([role, point]) => [role, point.id, point.control]), (device.primary || []).map((point) => point.id)]);
+        const command = commands.get(device.key);
+        const commandedPoint = command && device.roles?.[command.role];
+        const hasFreshReadback = command && (command.usesReadClock
+          ? latestReadAt !== undefined && latestReadAt !== null && latestReadAt !== command.acceptedReadAt
+          : commandedPoint?.updatedAt && commandedPoint.updatedAt !== command.previousUpdatedAt);
+        if (command?.status === "accepted" && commandedPoint && hasFreshReadback
+          && !commandedPoint.error && Number(commandedPoint.state) === 0
+          && (String(commandedPoint.value) === String(command.value) || numeric(commandedPoint.value) !== null && numeric(commandedPoint.value) === numeric(command.value))) {
+          command.status = "readback";
+          drafts.delete(draftKey(command.role));
+        }
+        const signature = JSON.stringify([device.type, demoMode, Object.entries(device.roles || {}).map(([role, point]) => [role, point.id, point.control]), (device.primary || []).map((point) => point.id)]);
         if (signature !== card.signature) { card.signature = signature; renderBody(); }
         for (const binding of card.bindings) binding();
+        card.forceControlSync = null;
         states.replaceChildren();
         const points = [...(device.primary || []), ...(device.diagnostics || []), ...Object.values(device.roles || {})];
         const forced = points.some((point) => Number(point.state) === 2);
@@ -490,20 +557,38 @@
         if (connection !== "connected") states.append(el("span", "dc-state dc-state-warning", "Bez svježih očitanja"));
         if (forced) states.append(el("span", "dc-state dc-state-warning", "Forsirano"));
         if (failed) states.append(el("span", "dc-state dc-state-warning", "Provjeri stanje"));
-        if ([...drafts.keys()].some((key) => key.startsWith(`${device.key}\u0000`))) states.append(el("span", "dc-state dc-state-simulated", "Lokalna simulacija"));
+        if (demoMode && [...drafts.keys()].some((key) => key.startsWith(`${device.key}\u0000`))) states.append(el("span", "dc-state dc-state-simulated", "Lokalna simulacija"));
+        if (command?.status === "pending") states.append(el("span", "dc-state dc-state-pending", "Slanje naredbe"));
         states.hidden = !states.childElementCount;
+        node.setAttribute("aria-busy", String(command?.status === "pending"));
+        commandStatus.hidden = !command;
+        commandStatus.classList.toggle("dc-command-error", command?.status === "error");
+        if (command) {
+          const target = `${roleLabels[command.role] || "Vrijednost"}: ${format(commandedPoint, command.value)}`;
+          commandStatus.textContent = command.status === "pending" ? `Šaljem naredbu. ${target}.`
+            : command.status === "accepted" ? `Naredba je prihvaćena. ${target}. Čekam novo očitanje zadane vrijednosti.`
+              : command.status === "readback" ? `Zadana vrijednost potvrđena je novim očitanjem. ${target}.`
+                : `Slanje nije potvrđeno: ${command.error} Provjeri očitanja prije novog pokušaja.`;
+        } else commandStatus.textContent = "";
         if (details.open) renderDetails();
       };
       card.update(initial);
       return card;
     }
 
-    function update({ widgets = [], status = "idle", metadataById = {}, roomByZone = {}, demo = false, warnings = [] } = {}) {
+    function update({ widgets = [], status = "idle", metadataById = {}, roomByZone = {}, demo = false, warnings = [], readAt, syncedAt } = {}) {
       if (destroyed) return;
+      if (demoMode !== Boolean(demo)) { drafts.clear(); commands.clear(); }
+      demoMode = Boolean(demo);
+      readClockAvailable = readAt !== undefined || syncedAt !== undefined;
+      latestReadAt = readAt !== undefined ? readAt : syncedAt;
       connection = typeof status === "string" ? status : status?.status || status?.state || "idle";
       explanation.textContent = demo
         ? "Funkcije istog uređaja objedinjene su u jednu karticu. Očitanja su izmišljeni primjeri; isprobavanje kontrola ostaje samo na ovom prikazu."
-        : "Funkcije istog uređaja objedinjene su u jednu karticu. Očitanja dolaze iz dodanih vrijednosti; isprobavanje kontrola ostaje samo na ovom prikazu.";
+        : "Funkcije istog uređaja objedinjene su u jednu karticu. Aktivne kontrole šalju stvarne naredbe kontroleru. Očitano stanje uređaja prikazuje se zasebno od zatražene vrijednosti.";
+      simulationBadge.textContent = demoMode ? "Simulacija upravljanja" : "Stvarno upravljanje";
+      simulationBadge.classList.toggle("dc-live-badge", !demoMode);
+      simulationBadge.title = demoMode ? "Kontrole mijenjaju samo lokalnu simulaciju." : "Aktivne kontrole mijenjaju stvarne uređaje u stanu.";
       const warningTexts = (Array.isArray(warnings) ? warnings : []).filter((warning) => typeof warning === "string" && warning.trim());
       readWarning.hidden = warningTexts.length === 0;
       readWarning.textContent = warningTexts[0] || "";
@@ -512,28 +597,31 @@
       devices = Array.isArray(result) ? result : result?.devices || [];
       const present = new Set(devices.map((device) => device.key));
       for (const [key, card] of cards) {
-        if (!present.has(key)) { card.node.remove(); cards.delete(key); }
+        if (!present.has(key)) { card.node.remove(); cards.delete(key); commands.delete(key); }
       }
       for (const key of drafts.keys()) if (!present.has(key.split("\u0000")[0])) drafts.delete(key);
-      reset.hidden = drafts.size === 0;
+      reset.hidden = !demoMode || drafts.size === 0;
       for (const device of devices) {
         let card = cards.get(device.key);
         if (!card) { card = makeCard(device); cards.set(device.key, card); grid.append(card.node); }
         else {
           for (const [role, previousPoint] of Object.entries(card.device.roles || {})) {
             const nextPoint = device.roles?.[role];
-            if (!nextPoint?.control || (previousPoint.sourceId || previousPoint.id) !== (nextPoint.sourceId || nextPoint.id)) drafts.delete(`${device.key}\u0000${role}`);
+            if (!nextPoint?.control || (previousPoint.sourceId || previousPoint.id) !== (nextPoint.sourceId || nextPoint.id)) {
+              drafts.delete(`${device.key}\u0000${role}`);
+              if (commands.get(device.key)?.role === role) commands.delete(device.key);
+            }
           }
           card.update(device);
         }
       }
-      reset.hidden = drafts.size === 0;
+      reset.hidden = !demoMode || drafts.size === 0;
       updateFilters();
       applyFilter();
     }
 
     update();
-    return { update, destroy() { destroyed = true; drafts.clear(); cards.clear(); container.replaceChildren(); } };
+    return { update, destroy() { destroyed = true; drafts.clear(); commands.clear(); cards.clear(); container.replaceChildren(); } };
   }
 
   const api = { create };

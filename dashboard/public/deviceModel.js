@@ -76,7 +76,7 @@
       reason: "Pomoćno svojstvo izvornog objekta; ne predstavlja zasebnu korisničku naredbu.",
     };
     const functionPath = /^(01|11)\//.test(id) && /\/(Values|Points|External Bindings)\//.test(id);
-    const definition = functionPath ? definitions[token] : null;
+    const definition = functionPath && Object.hasOwn(definitions, token) ? definitions[token] : null;
     if (definition) {
       const [role, importance, label, command] = definition;
       return {
@@ -125,7 +125,12 @@
       control = options.length ? { kind: classification.role === "power" ? "toggle" : "select", options, rangeConfirmed: true }
         : { kind: "number", rangeConfirmed: false };
       if (classification.role === "brightnessSet") control = { kind: "range", min: 0, max: 100, step: 1, rangeConfirmed: true };
-      if (classification.role === "setpoint" && unitKnown) control = { kind: "number", step: 0.5, rangeConfirmed: false };
+      if (classification.role === "setpoint" && unitKnown) {
+        // Dashboard test policy, not limits discovered from EWS. The controller
+        // can still reject a setpoint within this intentionally bounded range.
+        const limits = /^°F$/i.test(unit) ? [41, 95] : /^K$/i.test(unit) ? [278.15, 308.15] : [5, 35];
+        control = { kind: "number", min: limits[0], max: limits[1], step: 0.5, rangeConfirmed: true, rangeSource: "dashboard-policy" };
+      }
     }
     const disabledReason = !classification.command ? "Očitanje ili pomoćni podatak; nije korisnička naredba."
       : !serverWriteable ? "Server nije potvrdio da se vrijednost može postavljati."
@@ -135,12 +140,21 @@
               : !unitKnown ? "Mjerna jedinica naredbe nije potvrđena."
                 : !enumKnown ? "Dopuštene opcije upravljanja nisu potvrđene."
                   : !valueKnown ? "Trenutačno očitanje nije valjana vrijednost naredbe." : null;
+    const explicitServerPermission = hasFlag(metadata.writeable ?? metadata.writable) && flag(metadata.writeable ?? metadata.writable);
+    const nativeCommand = String(widget.id || "").startsWith("01/");
+    const liveControlAvailable = controlAvailable && explicitServerPermission && nativeCommand && control?.rangeConfirmed === true;
+    const liveDisabledReason = disabledReason
+      || (!nativeCommand ? "Stvarno upravljanje koristi samo izvornu 01 točku; referenca se ne zapisuje."
+        : !explicitServerPermission ? "Za stvarni upis potrebna je izričita dozvola servera Writeable."
+          : control?.rangeConfirmed !== true ? "Raspon ove naredbe nije potvrđen; stvarni upis nije omogućen."
+            : !flag(widget.writable) ? "Upis nije uključen u postavkama ove točke." : null);
     return {
       id: String(widget.id || ""), label: classification.label, configuredLabel: widget.label || metadata.name || null,
       value: widget.value, state, error: widget.error || null, unit, updatedAt: widget.updatedAt || null,
       role: classification.role, importance: classification.importance, reason: classification.reason,
       metadata: normalizedMetadata, command: classification.command, control, controlAvailable,
       writeAllowed: controlAvailable && flag(widget.writable), disabledReason,
+      liveControlAvailable, liveDisabledReason,
       auxiliary: [],
     };
   }
@@ -221,6 +235,7 @@
           point.command = false;
           point.controlAvailable = false;
           point.writeAllowed = false;
+          point.liveControlAvailable = false;
           point.reason = "Value referenca bez pronađene osnovne točke; veza nije potvrđena.";
         }
       }
@@ -244,6 +259,14 @@
       if (source) source.auxiliary.push(property);
     }
     for (const device of devices.values()) {
+      for (const point of device.primary.filter((item) => item.command)) {
+        const matches = device.primary.filter((item) => item.command && item.role === point.role);
+        if (matches.length > 1) {
+          point.roleAmbiguous = true;
+          point.liveControlAvailable = false;
+          point.liveDisabledReason = "Više naredbenih točaka ima istu ulogu na ovoj kartici; potrebno je ručno odabrati izvor.";
+        }
+      }
       device.type = deviceType(device);
       device.reason += " Funkcije točaka određuju tip kartice; writeable samo po sebi ne određuje namjenu.";
       delete device.groupingKind;
@@ -251,7 +274,25 @@
     return [...devices.values()];
   }
 
-  const api = { buildDevices, classifyPoint, normalizePoint };
+  function validateDeviceCommand(point, value) {
+    const denied = (reason, code = "INVALID_DEVICE_VALUE") => ({ allowed: false, reason, code });
+    if (!point?.writeAllowed || !point.liveControlAvailable || point.roleAmbiguous) {
+      return denied(point?.liveDisabledReason || "Ova točka nije dostupna za stvarno upravljanje.", "DEVICE_CONTROL_UNAVAILABLE");
+    }
+    const control = point.control;
+    if (control.options?.length) {
+      if (!["string", "number", "boolean"].includes(typeof value)) return denied("Odaberi jednu od potvrđenih opcija.");
+      const option = control.options.find((entry) => String(entry.value) === String(value));
+      return option ? { allowed: true, value: option.value } : denied("Odabrana opcija nije u popisu koji je vratio kontroler.");
+    }
+    if (typeof value !== "number" || !Number.isFinite(value)) return denied("Naredba mora sadržavati konačan broj.");
+    if (!Number.isFinite(control.min) || !Number.isFinite(control.max) || value < control.min || value > control.max) {
+      return denied(`Vrijednost mora biti između ${control.min} i ${control.max} ${point.unit || ""}.`.trim());
+    }
+    return { allowed: true, value };
+  }
+
+  const api = { buildDevices, classifyPoint, normalizePoint, validateDeviceCommand };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.IoTDeviceModel = api;
 })();

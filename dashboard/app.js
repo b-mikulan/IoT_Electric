@@ -4,6 +4,7 @@ const { TelemetryClient } = require("./lib/telemetry");
 const { widgetGroup } = require("./lib/config");
 const { DeviceMetadataClient } = require("./lib/deviceMetadata");
 const { createDeviceDemo } = require("./lib/deviceDemo");
+const { DeviceCommandService } = require("./lib/deviceCommands");
 
 const publicDirectory = path.join(__dirname, "public");
 const materializeDirectory = path.dirname(
@@ -87,7 +88,7 @@ function parseWidgetSettings(body) {
   };
 }
 
-function createApp({ poller, config, widgetStore = null, telemetry = new TelemetryClient(config), deviceMetadata = new DeviceMetadataClient(config) }) {
+function createApp({ poller, config, widgetStore = null, telemetry = new TelemetryClient(config), deviceMetadata = new DeviceMetadataClient(config), deviceCommands = new DeviceCommandService({ poller, config, deviceMetadata }) }) {
   if (!poller) throw new Error("A point poller is required.");
   if (!config) throw new Error("Dashboard configuration is required.");
 
@@ -190,6 +191,19 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
     }
   });
 
+  app.post("/api/devices/write", requireJson, express.json({ limit: "4kb" }), async (request, response) => {
+    response.set("Cache-Control", "no-store");
+    const body = request.body || {};
+    if (typeof body.widgetId !== "string" || !Object.hasOwn(body, "value")) {
+      return response.status(400).json({ error: "Body must contain widgetId and value.", code: "INVALID_WRITE_BODY" });
+    }
+    try {
+      return response.json(await deviceCommands.write(body.widgetId, body.value));
+    } catch (error) {
+      return sendOperationError(response, error, "DEVICE_COMMAND_WRITE_FAILED", "Slanje naredbe nije uspjelo.");
+    }
+  });
+
   for (const kind of ["history", "alarms"]) {
     app.post(`/api/${kind}/query`, requireJson, express.json({ limit: "16kb" }), async (request, response) => {
       try {
@@ -222,7 +236,10 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
       }
 
       try {
-        const result = await poller.writeValue(widgetId, value);
+        // Recognized device commands must use the same fresh checks even when
+        // submitted through the older value-widget endpoint.
+        const result = await (deviceCommands.isDeviceCommand(widgetId)
+          ? deviceCommands.write(widgetId, value) : poller.writeValue(widgetId, value));
         return response.json(result);
       } catch (error) {
         return sendOperationError(

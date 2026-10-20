@@ -2,9 +2,7 @@
   --dc-accent: #008577;
   --dc-ink: #17302f;
   --dc-muted: #647771;
-  margin: 48px 0 24px;
-  padding-top: 32px;
-  border-top: 1px solid #dbe5e2;
+  margin: 0 0 24px;
 }
 
 .dc-section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
@@ -15,6 +13,8 @@
 .dc-header-actions { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
 .dc-simulation-badge { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border: 1px solid #d8e7e2; border-radius: 999px; background: #e8f3ed; color: #47765b; white-space: nowrap; font-size: .72rem; font-weight: 650; }
 .dc-simulation-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #5a9170; }
+.dc-live-badge { color: #006b61; border-color: #acd4cc; background: #e4f3ef; }
+.dc-live-badge::before { background: #008577; }
 .dc-reset { border: 0; background: transparent; padding: 4px; color: var(--dc-accent); font-size: .76rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .dc-room-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
 .dc-room-filter { border: 1px solid #dbe5e2; border-radius: 999px; background: #fff; padding: 8px 15px; color: #60726d; font: inherit; font-size: .8rem; cursor: pointer; }
@@ -71,6 +71,10 @@
 .dc-state { display: inline-flex; padding: 4px 7px; border-radius: 6px; font-size: .62rem; }
 .dc-state-warning { color: #927233; background: #faf4e4; }
 .dc-state-simulated { color: #4f8160; background: #eef6ef; }
+.dc-state-pending { color: #336f84; background: #eaf4f8; }
+.dc-command-status { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: #edf6f2; color: #426f5a; font-size: .69rem; line-height: 1.6; overflow-wrap: anywhere; }
+.dc-command-error { color: #964d3b; background: #fff0e9; }
+.dc-card[aria-busy="true"] { border-color: #afd3ce; }
 .dc-details { border-top: 1px solid #edf1ee; margin-top: 19px; padding-top: 12px; }
 .dc-details > summary { width: max-content; max-width: 100%; color: #65776a; font-size: .68rem; cursor: pointer; }
 .dc-details-content { padding-top: 10px; overflow-wrap: anywhere; }

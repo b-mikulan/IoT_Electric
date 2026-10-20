@@ -68,6 +68,38 @@ class DeviceMetadataClient {
     }
   }
 
+  // Command checks must not use the display cache or fall back to old permissions.
+  // GetItems supplies capability and current state in the same controller response.
+  async readFreshPoint(id) {
+    if (this.#demoMode) throw new Error("Fresh device reads are unavailable in demo mode");
+    const payload = await this.#request("/api/items/read", { ids: [id], metadata: true });
+    if (asArray(payload.GetItemsErrorResults?.ErrorResult).length) throw new Error("Point read failed");
+    const items = asArray(payload.GetItemsItems?.ValueItems?.ValueItem).filter((item) => scalar(item?.Id) === id);
+    if (items.length !== 1) throw new Error("Point identity missing or ambiguous");
+    const item = items[0];
+    const metadata = {
+      id, name: scalar(item.Name), description: scalar(item.Description), type: scalar(item.Type),
+      unit: scalar(item.Unit), writeable: flag(item.Writeable), forceable: flag(item.Forceable),
+      enumId: scalar(item.EnumId), enumValues: [],
+    };
+    if (metadata.enumId) {
+      const enumsPayload = await this.#request("/api/enums/read", { ids: [metadata.enumId] });
+      if (asArray(enumsPayload.GetEnumsErrorResults?.ErrorResult).length) throw new Error("Enum read failed");
+      const enums = asArray(enumsPayload.GetEnumsEnums?.Enum);
+      const entry = enums.find((value) => scalar(value.Id) === metadata.enumId)
+        || (enums.length === 1 && !scalar(enums[0].Id) ? enums[0] : null);
+      if (!entry) throw new Error("Enum identity missing");
+      metadata.enumValues = asArray(entry.EnumValues?.EnumValue)
+        .filter((value) => Object.hasOwn(value || {}, "Value") && ["string", "number", "boolean"].includes(typeof value.Value) && scalar(value.Text))
+        .map((value) => ({ value: value.Value, label: scalar(value.Text) }));
+      if (!metadata.enumValues.length) throw new Error("Enum values missing");
+    }
+    return {
+      widget: { id, value: item.Value, state: item.State, error: null },
+      metadata,
+    };
+  }
+
   async #request(endpoint, body) {
     const response = await this.#fetch(`${this.#middlewareUrl}${endpoint}`, {
       method: body === undefined ? "GET" : "POST",

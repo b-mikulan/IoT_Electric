@@ -68,59 +68,65 @@
         </div>
       </section>
 
-      <section id="control-panel" class="control-panel" aria-labelledby="control-title" hidden>
-        <details class="control-disclosure">
-          <summary class="control-summary">
-            <span>
-              <span class="eyebrow">Upravljanje</span>
-              <span id="control-title" class="control-title">Postavi vrijednost</span>
-            </span>
-            <span class="control-chevron" aria-hidden="true"></span>
-          </summary>
-
-          <div class="control-body">
-            <p class="control-description">Prikazani su samo widgeti koji u widgets.json imaju <code>"writable": true</code>.</p>
-
-            <form id="write-form" class="write-form">
-              <div class="write-field">
-                <label for="write-widget">Widget</label>
-                <select id="write-widget" class="browser-default" required>
-                  <option value="">Odaberi widget</option>
-                </select>
-              </div>
-
-              <div class="write-field">
-                <label id="write-value-label" for="write-value">Nova vrijednost</label>
-                <input id="write-value" type="text" maxlength="1000" required />
-              </div>
-
-              <button id="write-submit" class="btn waves-effect waves-light" type="submit">
-                Pošalji
-              </button>
-            </form>
-            <p class="write-warning">Promjena se šalje stvarnom kontroleru. Prije slanja provjeri odabrani widget i vrijednost.</p>
-            <p id="write-status" class="write-status" role="status" aria-live="polite"></p>
-          </div>
-        </details>
-      </section>
-
-      <section aria-labelledby="widgets-heading">
-        <h2 id="widgets-heading" class="visually-hidden">Mjerne točke</h2>
-        <div id="widget-grid" class="widget-grid" aria-live="polite"></div>
-      </section>
-
-      <div id="empty-state" class="empty-state" hidden>
-        <span class="empty-icon" aria-hidden="true">◇</span>
-        <h2>Nema vidljivih točaka</h2>
-        <p>Uključi postojeći widget kroz izbornik prikaza ili dodaj nove vrijednosti kroz pretragu i automatsko otkrivanje.</p>
-      </div>
-
       <div id="error-banner" class="error-banner" role="alert" hidden>
         <strong>Osvježavanje podataka nije uspjelo.</strong>
         <span id="error-message">Prikazane su zadnje dostupne vrijednosti. Servis će pokušati ponovno.</span>
       </div>
 
       <section id="device-cards-section" aria-label="Probne kartice uređaja"></section>
+
+      <details id="raw-widgets-panel" class="raw-widgets-panel">
+        <summary>Tehnički prikaz vrijednosti</summary>
+        <div class="raw-widgets-content">
+          <section id="control-panel" class="control-panel" aria-labelledby="control-title" hidden>
+            <details class="control-disclosure">
+              <summary class="control-summary">
+                <span>
+                  <span class="eyebrow">Upravljanje</span>
+                  <span id="control-title" class="control-title">Postavi vrijednost</span>
+                </span>
+                <span class="control-chevron" aria-hidden="true"></span>
+              </summary>
+
+              <div class="control-body">
+                <p class="control-description">Prikazani su samo widgeti koji u widgets.json imaju <code>"writable": true</code>.</p>
+
+                <form id="write-form" class="write-form">
+                  <div class="write-field">
+                    <label for="write-widget">Widget</label>
+                    <select id="write-widget" class="browser-default" required>
+                      <option value="">Odaberi widget</option>
+                    </select>
+                  </div>
+
+                  <div class="write-field">
+                    <label id="write-value-label" for="write-value">Nova vrijednost</label>
+                    <input id="write-value" type="text" maxlength="1000" required />
+                  </div>
+
+                  <button id="write-submit" class="btn waves-effect waves-light" type="submit">
+                    Pošalji
+                  </button>
+                </form>
+                <p class="write-warning">Promjena se šalje stvarnom kontroleru. Prije slanja provjeri odabrani widget i vrijednost.</p>
+                <p id="write-status" class="write-status" role="status" aria-live="polite"></p>
+              </div>
+            </details>
+          </section>
+
+          <section aria-labelledby="widgets-heading">
+            <h2 id="widgets-heading" class="visually-hidden">Mjerne točke</h2>
+            <div id="widget-grid" class="widget-grid" aria-live="polite"></div>
+          </section>
+
+          <div id="empty-state" class="empty-state" hidden>
+            <span class="empty-icon" aria-hidden="true">◇</span>
+            <h2>Nema vidljivih točaka</h2>
+            <p>Uključi postojeći widget kroz izbornik prikaza ili dodaj nove vrijednosti kroz pretragu i automatsko otkrivanje.</p>
+          </div>
+
+        </div>
+      </details>
     </main>
 
     <dialog id="discovery-dialog" class="discovery-dialog" aria-labelledby="discovery-title">

@@ -127,6 +127,10 @@ class PointPoller extends EventEmitter {
 
   #writesInFlight = new Set();
 
+  #writeRefreshTimers = new Set();
+
+  #writeRefreshGeneration = 0;
+
   constructor({
     middlewareUrl,
     username,
@@ -214,6 +218,10 @@ class PointPoller extends EventEmitter {
       clearInterval(this.#timer);
       this.#timer = null;
     }
+
+    for (const timer of this.#writeRefreshTimers) clearTimeout(timer);
+    this.#writeRefreshTimers.clear();
+    this.#writeRefreshGeneration += 1;
 
     return this;
   }
@@ -528,6 +536,7 @@ class PointPoller extends EventEmitter {
       );
     }
 
+    const refreshGeneration = this.#writeRefreshGeneration;
     this.#writesInFlight.add(pointId);
     const authorization = Buffer.from(
       `${this.#username}:${this.#password}`,
@@ -581,8 +590,14 @@ class PointPoller extends EventEmitter {
         );
       }
 
-      const refresh = setImmediate(() => void this.poll());
-      refresh.unref?.();
+      if (refreshGeneration === this.#writeRefreshGeneration) {
+        const refresh = setTimeout(() => {
+          this.#writeRefreshTimers.delete(refresh);
+          void this.#refreshAfterWrite(refreshGeneration);
+        }, 2_000);
+        this.#writeRefreshTimers.add(refresh);
+        refresh.unref?.();
+      }
 
       return {
         id: pointId,
@@ -614,6 +629,13 @@ class PointPoller extends EventEmitter {
   async #refreshAfterWidgetAdd() {
     if (this.#pollPromise) await this.#pollPromise;
     await this.poll();
+  }
+
+  async #refreshAfterWrite(generation) {
+    // A read already in flight can predate the command. Finish it, then read
+    // every configured point again so related feedback is refreshed as well.
+    if (this.#pollPromise) await this.#pollPromise;
+    if (generation === this.#writeRefreshGeneration) await this.poll();
   }
 
   #discoveryResponse(containerId, items, payload, exactMatch = false) {

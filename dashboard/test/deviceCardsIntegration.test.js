@@ -32,7 +32,7 @@ test("demo dashboard keeps existing value widgets and supplies four synthetic de
   assert.equal(publicConfig.widgets.length, 1);
   assert.equal(publicConfig.widgets[0].id, "original-point");
   const html = await (await fetch(base)).text();
-  assert.ok(html.indexOf('id="device-cards-section"') > html.indexOf('id="widget-grid"'));
+  assert.ok(html.indexOf('id="device-cards-section"') < html.indexOf('id="raw-widgets-panel"'));
   for (const resource of ["deviceModel.js", "deviceCards.js", "deviceCards.css"]) assert.equal((await fetch(`${base}/${resource}`)).status, 200);
 });
 
