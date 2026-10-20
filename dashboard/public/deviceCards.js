@@ -8,10 +8,11 @@
     sensor: ["M12 13v4m-2 0h4", "M5 9a10 10 0 0 1 14 0M8 12a6 6 0 0 1 8 0M11 15a2 2 0 0 1 2 0"],
     zone: ["M3 11 12 3l9 8M5 9v12h14V9M9 21v-7h6v7"],
     generic: ["M5 5h14v14H5zM9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"],
+    settings: ["M10 3h4l.5 2.2 1.5.9 2.2-.6 2 3.5-1.7 1.6v1.8l1.7 1.6-2 3.5-2.2-.6-1.5.9-.5 2.2h-4l-.5-2.2-1.5-.9-2.2.6-2-3.5 1.7-1.6v-1.8L3.8 9l2-3.5 2.2.6 1.5-.9L10 3Z", "M15 11.7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"],
   };
   const roleLabels = {
     brightnessSet: "Zadana svjetlina", brightnessStatus: "Očitana svjetlina",
-    positionSet: "Zadani položaj", positionStatus: "Očitani položaj", slatSet: "Zadani kut lamela", slatStatus: "Očitani kut lamela",
+    positionSet: "Zadani položaj", positionStatus: "Očitani položaj", slatSet: "Zadani položaj lamela", slatStatus: "Očitani kut lamela",
     temperature: "Temperatura", humidity: "Vlažnost", co2: "CO₂", setpoint: "Zadana temperatura",
     fanSpeed: "Ventilator", modeSet: "Zadani način rada", modeStatus: "Način rada uređaja", power: "Napajanje",
     illuminance: "Osvijetljenost", occupancy: "Prisutnost",
@@ -84,8 +85,8 @@
     const option = (point?.control?.options || point?.metadata?.enumValues || []).find((entry) => String(entry.value) === String(value));
     if (option) return enumLabel(point, option);
     const number = numeric(value);
-    const unknownPositionRange = ["positionSet", "positionStatus", "slatSet", "slatStatus"].includes(point?.role) && point?.control?.rangeConfirmed !== true;
-    const text = number === null ? String(value) : (unknownPositionRange ? preciseFormatter : formatter).format(number);
+    const positionReading = ["positionSet", "positionStatus", "slatSet", "slatStatus"].includes(point?.role);
+    const text = number === null ? String(value) : (positionReading ? preciseFormatter : formatter).format(number);
     let unit = point?.unit || "";
     if (point?.role === "humidity" && /^%\s*RH$/i.test(unit)) unit = "%";
     if (point?.role === "brightnessSet" && !unit && point?.control?.rangeConfirmed === true && Number(point.control.min) === 0 && Number(point.control.max) === 100) unit = "%";
@@ -97,7 +98,7 @@
     return ({ 0: "U redu", 1: "Nesigurno očitanje", 2: "Forsirano", 3: "Izvan mreže", 4: "Greška" })[String(point?.state)] || "Stanje nije poznato";
   }
 
-  function create({ container, onWrite }) {
+  function create({ container, onWrite, onSettings }) {
     if (!container || typeof container.append !== "function") throw new TypeError("Device cards need a DOM container.");
     const cards = new Map();
     const drafts = new Map();
@@ -110,6 +111,7 @@
     let demoMode = false;
     let latestReadAt;
     let readClockAvailable = false;
+    let settingsEnabled = false;
 
     container.classList.add("device-cards-section");
     const header = el("div", "dc-section-heading");
@@ -193,8 +195,16 @@
       const title = el("h3", "dc-card-title", initial.label);
       const room = el("p", "dc-room");
       identity.append(title, room);
+      const settings = el("button", "dc-settings-button");
+      settings.type = "button";
+      settings.hidden = true;
+      settings.setAttribute("aria-haspopup", "dialog");
+      settings.append(icon("settings"));
+      settings.addEventListener("click", () => {
+        if (!destroyed && settingsEnabled && typeof onSettings === "function") onSettings(card.device);
+      });
       const type = el("span", "dc-type-label", typeLabels[initial.type] || "Uređaj");
-      top.append(deviceIcon, identity, type);
+      top.append(deviceIcon, identity, settings, type);
       const body = el("div", "dc-card-body");
       const states = el("div", "dc-state-line");
       const details = el("details", "dc-details");
@@ -308,6 +318,9 @@
         input.addEventListener("change", () => { if (!demoMode) void commit(role, Number(input.value)); });
         row.append(caption, reading);
         wrap.append(row, input);
+        if (["positionSet", "slatSet"].includes(role) && Number(bounds.min) === 0 && Number(bounds.max) === 1) {
+          wrap.append(el("p", "dc-control-hint", "Raspon 0–1"));
+        }
         simulationCopy(role, wrap);
         body.append(wrap);
         card.bindings.push(() => {
@@ -471,7 +484,7 @@
         } else if (card.device.type === "blind") {
           metric(roles.positionStatus ? "positionStatus" : "positionSet", roles.positionStatus ? "Očitani položaj" : "Očitani zadani položaj", true);
           range("positionSet", demoMode ? "Položaj · simulacija" : "Položaj");
-          range("slatSet", demoMode ? "Kut lamela · simulacija" : "Kut lamela");
+          range("slatSet", demoMode ? "Položaj lamela · simulacija" : "Položaj lamela");
         } else if (card.device.type === "sensor" || card.device.type === "zone") {
           metric("illuminance", "Osvijetljenost", true);
           metric("occupancy");
@@ -533,6 +546,9 @@
           type.textContent = typeLabels[device.type] || "Uređaj";
         }
         title.textContent = device.label;
+        settings.hidden = !settingsEnabled || typeof onSettings !== "function";
+        settings.setAttribute("aria-label", `Postavke uređaja ${device.label}`);
+        settings.title = `Postavke uređaja ${device.label}`;
         room.textContent = device.room?.label || "Prostorija nije dodijeljena";
         room.classList.toggle("dc-room-unknown", !device.room);
         const command = commands.get(device.key);
@@ -576,8 +592,9 @@
       return card;
     }
 
-    function update({ widgets = [], status = "idle", metadataById = {}, roomByZone = {}, demo = false, warnings = [], readAt, syncedAt } = {}) {
+    function update({ widgets = [], status = "idle", metadataById = {}, roomByZone = {}, demo = false, warnings = [], readAt, syncedAt, settingsEnabled: editingEnabled = false } = {}) {
       if (destroyed) return;
+      settingsEnabled = editingEnabled === true;
       if (demoMode !== Boolean(demo)) { drafts.clear(); commands.clear(); }
       demoMode = Boolean(demo);
       readClockAvailable = readAt !== undefined || syncedAt !== undefined;

@@ -86,17 +86,18 @@ test("uses described mode and fan options and never makes a status point a mode 
   assert.equal(normalizePoint(mode).controlAvailable, false);
 });
 
-test("requires temperature units and preserves unconfirmed blind position scales", () => {
+test("requires temperature units and uses confirmed blind and slat scales without scaling feedback", () => {
   const setpoint = point(ac, "EffSpt", { value: 23.5 });
   assert.equal(normalizePoint(setpoint).controlAvailable, false);
   assert.equal(normalizePoint(setpoint, { writeable: 1, unit: "°C" }).controlAvailable, true);
-  const values = [point(blind, "BlndPos"), point(blind, "BlndVal", { value: 0.36 }), point(blind, "BlndAng", { value: 18 }), point(blind, "BlndBtnUp")];
+  const values = [point(blind, "BlndPos"), point(blind, "BlndVal", { value: 0.36 }), point(blind, "BlndSlt"), point(blind, "BlndAng", { value: 18 }), point(blind, "BlndBtnUp")];
   const [device] = buildDevices(values);
   assert.equal(device.type, "blind");
-  assert.equal(device.roles.positionSet.control.kind, "number");
-  assert.equal(device.roles.positionSet.control.rangeConfirmed, false);
+  assert.deepEqual(device.roles.positionSet.control, { kind: "range", min: 0, max: 1, step: 0.01, rangeConfirmed: true, rangeSource: "user-confirmed" });
   assert.equal(device.roles.positionStatus.value, 0.36);
   assert.equal(device.roles.positionStatus.writeAllowed, false);
+  assert.deepEqual(device.roles.slatSet.control, device.roles.positionSet.control);
+  assert.equal(device.roles.slatStatus.value, 18);
   assert.equal(device.roles.buttonUp.writeAllowed, false);
 });
 
@@ -239,22 +240,41 @@ test("browser and server use the same pure model and do not mutate snapshots", (
   assert.equal(JSON.stringify(values), original);
 });
 
-test("real controls require explicit server permission and reject aliases, ambiguous roles and unconfirmed blind scales", () => {
+test("real controls require explicit server permission and reject aliases and ambiguous roles", () => {
   const source = point(light, "LtPct");
   assert.equal(normalizePoint(source).liveControlAvailable, false);
   assert.equal(normalizePoint(source, { writeable: 1 }).liveControlAvailable, true);
   const alias = { ...source, id: `11/${light}/Values/LtPct/Value` };
   assert.equal(normalizePoint(alias, { writeable: 1 }).liveControlAvailable, false);
-  const blindPoint = normalizePoint(point(blind, "BlndPos"), { writeable: 1 });
-  assert.equal(blindPoint.controlAvailable, true);
-  assert.equal(blindPoint.liveControlAvailable, false);
-  assert.equal(validateDeviceCommand(blindPoint, 30).allowed, false);
   const duplicate = { ...source, id: `01/${light}/Points/GrpPct` };
   const [device] = buildDevices([source, duplicate], {
     metadataById: { ...metadata(source.id), ...metadata(duplicate.id) },
   });
   assert.equal(device.roles.brightnessSet.roleAmbiguous, true);
   assert.equal(validateDeviceCommand(device.roles.brightnessSet, 20).allowed, false);
+});
+
+test("blind and slat commands accept normalized bounds and fractions unchanged while preserving write protections", () => {
+  for (const name of ["BlndPos", "BlndSlt"]) {
+    const source = point(blind, name, { value: 0.36 });
+    const position = normalizePoint(source, { writeable: 1, unit: "" });
+    assert.equal(position.liveControlAvailable, true);
+    assert.deepEqual(position.control, { kind: "range", min: 0, max: 1, step: 0.01, rangeConfirmed: true, rangeSource: "user-confirmed" });
+    for (const value of [0, 0.36, 1]) {
+      assert.deepEqual(validateDeviceCommand(position, value), { allowed: true, value });
+    }
+    for (const value of [-0.01, 1.01, 36, "0.36", null, true, NaN, Infinity]) {
+      assert.equal(validateDeviceCommand(position, value).allowed, false);
+    }
+    for (const blocked of [
+      normalizePoint({ ...source, state: 2 }, { writeable: 1 }),
+      normalizePoint(source, { writeable: 0 }),
+      normalizePoint({ ...source, writable: false }, { writeable: 1 }),
+      normalizePoint({ ...source, id: `11/${blind}/Values/${name}/Value` }, { writeable: 1 }),
+    ]) {
+      assert.equal(validateDeviceCommand(blocked, 0.36).allowed, false);
+    }
+  }
 });
 
 test("real command validation enforces numeric bounds and controller enum options without coercing arbitrary values", () => {

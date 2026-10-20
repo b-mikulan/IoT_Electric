@@ -4,6 +4,8 @@ Kartice koriste eksplicitna pravila prilagođena pregledanoj EBO instalaciji. Ne
 
 Kartice uređaja glavni su prikaz dashboarda. Sirovi widgeti i obrazac ručnog upisa skriveni su u početno zatvorenom odjeljku **Tehnički prikaz vrijednosti** ispod kartica. Točke ostaju konfigurirane i nastavljaju se dohvaćati; ne mijenjamo njihovo polje `visible`, jer ono utječe i na kartice uređaja.
 
+Zupčanik na kartici otvara postavke njezinih funkcija. Odabir **Funkcija uređaja** nudi najprije naredbe, zatim očitanja. Postavke se spremaju za odabranu točku; na naredbi se može uključiti **Dozvoli upis vrijednosti**, dok je ta opcija zaključana za očitanja. Naziv kartice i pronađena prostorija i dalje proizlaze iz modela uređaja. Zupčanik je dostupan kad instalacija podržava spremanje postavki u `WIDGETS_FILE`; samo otvaranje ili spremanje dijaloga ne šalje naredbu kontroleru.
+
 ## 1. Kojoj kartici pripada točka
 
 `widgetGrouping.js` izvodi vlasnika iz pune EWS putanje. Za `01/.../L3307/Values/LtPct` vlasnik je cijela putanja do `L3307`. Organizacijske mape `Values`, `Points`, `External Bindings`, `Logs`, `Alarms` i `Graphics` pripadaju tom vlasniku. Tako AC309 okuplja Input/Holding Registers, a B301 okuplja svoje Values i Points. Za direktna svojstva Modbus uređaja postoji prepoznavanje putanje do konkretnog Modbus uređaja.
@@ -18,7 +20,7 @@ U prepoznatim granama Values, Points i External Bindings točan završni naziv o
 | --- | --- | --- |
 | `LtPct`, `GrpPct` | Zadana svjetlina pojedinačnog svjetla ili grupe | Naredba |
 | `LtVal` | Povratno očitanje rasvjete | Prikaz |
-| `BlndPos`, `BlndSlt` | Zadani položaj rolete i lamela | Prepoznate naredbe, stvarni upis zaključan dok je skala nepoznata |
+| `BlndPos`, `BlndSlt` | Zadani položaj rolete i lamela | Naredbe s korisnički potvrđenim rasponom 0–1 i korakom 0,01 |
 | `BlndVal`, `BlndAng`, `BlndSts` | Očitani položaj, kut i stanje | Prikaz / detalji |
 | `BlndBtnUp`, `BlndBtnDn` | Signali fizičkih tipki | Detalji; ne šaljemo ih kao naredbe |
 | `RmTmp`, `RmRh`, `RmCO2` | Temperatura, vlaga, CO₂ | Prikaz |
@@ -60,7 +62,7 @@ Vrijednost se provjerava prije slanja postojećem middleware `POST /api/values/w
 - Rasvjeta: broj u rasponu 0–100, prema pregledanoj funkciji LtPct/GrpPct.
 - Klima: samo potvrđene enum opcije.
 - Temperatura: **politika ovog testnog dashboarda** je 5–35 °C, odnosno 41–95 °F ili 278,15–308,15 K. To nisu granice dobivene iz EWS-a niti jamstvo da ih konkretna klima podržava. UI mijenja vrijednost u koracima 0,5; kontroler može odbiti vrijednost i unutar tog raspona.
-- Roleta: upis ostaje blokiran jer nema potvrđenih granica i značenja skale.
+- Položaj rolete (`BlndPos`) i lamela (`BlndSlt`): korisnik je potvrdio raspon 0–1 za obje naredbe. Klizači koriste korak 0,01 i šalju izvornu vrijednost, npr. 0,36; ne pretvaraju je u 36 ili postotak. Backend odbija vrijednosti izvan raspona. Značenje krajnjih položaja nije pretpostavljeno. Očitani kut lamela (`BlndAng`) zadržava izvornu skalu.
 
 Provjera se primjenjuje i na poznate naredbe poslane kroz stari `/api/write`, kako stari obrazac ne bi zaobišao pravila. Demo ostaje lokalna simulacija.
 

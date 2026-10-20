@@ -743,6 +743,24 @@ h1 {
   font-weight: 700;
 }
 
+.settings-context {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.83rem;
+  line-height: 1.5;
+}
+
+#settings-point {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+#settings-dialog[data-device-settings="true"] #settings-source-field,
+#settings-dialog[data-device-settings="true"] #settings-group-field {
+  display: none;
+}
+
 .settings-field input {
   width: 100%;
   height: 42px;

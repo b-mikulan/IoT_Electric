@@ -98,13 +98,38 @@ test("rejects fresh Forced, offline, missing state, errors and revoked server pe
   }
 });
 
-test("numeric commands reject coercion and out-of-policy values, while blind scale remains unconfirmed", async () => {
+test("numeric commands reject coercion and out-of-policy values", async () => {
   const f = fixture();
   for (const value of [-1, 101, "50", true, null, {}, NaN, Infinity]) await assert.rejects(f.service.write(light, value));
   assert.equal(f.writes.length, 0);
-  const blind = fixture({ id: light.replace(/LtPct$/, "BlndPos"), value: 0.36, metadata: { unit: "" } });
-  await assert.rejects(blind.service.write(blind.config.widgets[0].id, 0.5));
-  assert.equal(blind.writes.length, 0);
+});
+
+test("blind and slat commands send 0, a fractional position and 1 unchanged and reject values outside the confirmed range", async () => {
+  for (const name of ["BlndPos", "BlndSlt"]) {
+    const id = `01/ES/Network/RP31/Application/Items/B301/Values/${name}`;
+    const f = fixture({ id, value: 0.36, metadata: { unit: "" } });
+    for (const value of [0, 0.36, 1]) await f.service.write(id, value);
+    assert.deepEqual(f.writes, [{ id, value: 0 }, { id, value: 0.36 }, { id, value: 1 }]);
+    for (const value of [-0.01, 1.01, 36, "0.36", null, NaN, Infinity]) {
+      await assert.rejects(f.service.write(id, value));
+    }
+    assert.equal(f.writes.length, 3);
+  }
+});
+
+test("confirmed blind and slat ranges do not bypass Forced, server read-only, local permission or native ID requirements", async () => {
+  for (const name of ["BlndPos", "BlndSlt"]) {
+    const id = `01/ES/Network/RP31/Application/Items/B301/Values/${name}`;
+    for (const f of [
+      fixture({ id, value: 0.36, state: 2, metadata: { unit: "" } }),
+      fixture({ id, value: 0.36, metadata: { unit: "", writeable: false } }),
+      fixture({ id, value: 0.36, widget: { writable: false }, metadata: { unit: "" } }),
+      fixture({ id: id.replace(/^01\//, "11/") + "/Value", value: 0.36, metadata: { unit: "" } }),
+    ]) {
+      await assert.rejects(f.service.write(f.config.widgets[0].id, 0.5));
+      assert.deepEqual(f.writes, []);
+    }
+  }
 });
 
 test("setpoints use the explicit dashboard test policy in the confirmed temperature unit", async () => {

@@ -277,7 +277,12 @@
         </header>
 
         <form id="settings-form" class="settings-form">
-          <div class="settings-field settings-field-wide">
+          <div id="settings-point-field" class="settings-field settings-field-wide" hidden>
+            <label for="settings-point">Funkcija uređaja</label>
+            <select id="settings-point" class="browser-default"></select>
+          </div>
+          <p id="settings-context" class="settings-field-wide settings-context" hidden>Postavke se odnose na odabranu funkciju uređaja.</p>
+          <div id="settings-source-field" class="settings-field settings-field-wide">
             <label for="settings-id">Controller ID</label>
             <input id="settings-id" type="text" readonly />
             <small>ID se ne mijenja ovdje; za drugi datapoint koristi discovery.</small>
@@ -293,7 +298,7 @@
             <input id="settings-description" type="text" maxlength="500" />
           </div>
 
-          <div class="settings-field settings-field-wide">
+          <div id="settings-group-field" class="settings-field settings-field-wide">
             <label for="settings-group">Grupa</label>
             <input id="settings-group" type="text" maxlength="1024" />
             <small>Prazno polje grupira widget prema njegovoj EWS mapi.</small>
@@ -313,6 +318,8 @@
             <input id="settings-writable" class="browser-default" type="checkbox" />
             <span>Dozvoli upis vrijednosti</span>
           </label>
+
+          <p id="settings-write-hint" class="settings-field-wide settings-context" hidden></p>
 
           <label class="settings-check">
             <input id="settings-visible" class="browser-default" type="checkbox" />

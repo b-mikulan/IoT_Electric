@@ -37,7 +37,7 @@ function descendants(node) { return node.children.flatMap((child) => [child, ...
 function byClass(container, name) { return descendants(container).filter((node) => node.className.split(" ").includes(name)); }
 function flush() { return new Promise((resolve) => setImmediate(resolve)); }
 
-function setup(t, initialDevices, onWrite, demo = false, initialReadAt) {
+function setup(t, initialDevices, onWrite, demo = false, initialReadAt, options = {}) {
   const previousDocument = globalThis.document;
   const previousModel = globalThis.IoTDeviceModel;
   let devices = initialDevices;
@@ -45,8 +45,8 @@ function setup(t, initialDevices, onWrite, demo = false, initialReadAt) {
   globalThis.document = { createElement: (tag) => new Element(tag), createElementNS: (_, tag) => new Element(tag), activeElement: null };
   globalThis.IoTDeviceModel = { buildDevices: () => devices };
   const container = new Element("section");
-  const view = create({ container, onWrite });
-  const update = (next = devices, nextReadAt = readAt) => { devices = next; readAt = nextReadAt; view.update({ status: "connected", demo, readAt }); };
+  const view = create({ container, onWrite, onSettings: options.onSettings });
+  const update = (next = devices, nextReadAt = readAt, overrides = {}) => { devices = next; readAt = nextReadAt; view.update({ status: "connected", demo, readAt, settingsEnabled: options.settingsEnabled, ...overrides }); };
   update();
   t.after(() => { view.destroy(); globalThis.document = previousDocument; globalThis.IoTDeviceModel = previousModel; });
   return { container, update };
@@ -150,7 +150,7 @@ test("a rejected command restores the focused select without blurring or retryin
   assert.equal(calls, 1);
 });
 
-test("live controls respect local permission, server health and unknown blind range", (t) => {
+test("live controls respect local permission and server health", (t) => {
   const calls = [];
   const forbidden = point("brightnessSet", 40, { writeAllowed: false });
   const light = device("light", { brightnessSet: forbidden });
@@ -160,13 +160,38 @@ test("live controls respect local permission, server health and unknown blind ra
   update([device("light", { brightnessSet: { ...forbidden, writeAllowed: true, state: 2 } })]);
   assert.equal(byClass(container, "dc-toggle")[0].disabled, true);
   byClass(container, "dc-toggle")[0].dispatch("click");
-  update([device("blind", { positionSet: point("positionSet", .36, { liveControlAvailable: false, liveDisabledReason: "Raspon rolete nije potvrđen.", control: { kind: "number", rangeConfirmed: false }, unit: "" }) })]);
-  const input = byClass(container, "dc-number")[0];
-  assert.equal(input.disabled, true);
-  assert.match(byClass(container, "dc-control-hint")[0].textContent, /Raspon rolete nije potvrđen/);
-  input.value = "1";
-  input.dispatch("change");
   assert.deepEqual(calls, []);
+});
+
+test("blind position and slat sliders preserve fractional values and send normalized commands unchanged", async (t) => {
+  const calls = [];
+  const positionSet = point("positionSet", 0.36, {
+    id: "01/ES/Device/Values/BlndPos", unit: "",
+    control: { kind: "range", min: 0, max: 1, step: 0.01, rangeConfirmed: true },
+  });
+  const slatSet = { ...positionSet, id: "01/ES/Device/Values/BlndSlt", role: "slatSet" };
+  const { container } = setup(t, [device("blind", { positionSet, slatSet })], async (command) => { calls.push(command); });
+  const [input, slatInput] = byClass(container, "dc-range");
+  assert.equal(input.min, "0");
+  assert.equal(input.max, "1");
+  assert.equal(input.step, "0.01");
+  assert.equal(byClass(container, "dc-control-output")[0].textContent, "0,36");
+  input.value = "0.37";
+  input.dispatch("input");
+  assert.equal(calls.length, 0);
+  assert.equal(byClass(container, "dc-control-output")[0].textContent, "0,37");
+  input.dispatch("change");
+  await flush();
+  assert.equal(slatInput.min, "0");
+  assert.equal(slatInput.max, "1");
+  assert.equal(slatInput.step, "0.01");
+  slatInput.value = "0.42";
+  slatInput.dispatch("input");
+  assert.equal(calls.length, 1);
+  assert.equal(byClass(container, "dc-control-output")[1].textContent, "0,42");
+  slatInput.dispatch("change");
+  await flush();
+  assert.deepEqual(calls, [{ widgetId: positionSet.id, value: 0.37 }, { widgetId: slatSet.id, value: 0.42 }]);
 });
 
 test("demo controls remain local even when a real write callback is provided", async (t) => {
@@ -210,4 +235,52 @@ test("temperature stepper respects confirmed bounds and retains fractional Kelvi
   byClass(container, "dc-step-button")[1].dispatch("click");
   await flush();
   assert.equal(calls[0].value, 298.65);
+});
+
+test("device settings open with the latest model without issuing a controller command", (t) => {
+  const writes = [];
+  const settings = [];
+  const initial = device("light", { brightnessSet: point("brightnessSet", 40) });
+  const { container, update } = setup(t, [initial], (command) => writes.push(command), false, undefined, {
+    onSettings: (current) => settings.push(current), settingsEnabled: true,
+  });
+  const button = byClass(container, "dc-settings-button")[0];
+  assert.equal(button.hidden, false);
+  assert.equal(button.attributes["aria-label"], "Postavke uređaja Test device");
+  assert.equal(button.attributes["aria-haspopup"], "dialog");
+  button.dispatch("click");
+  assert.equal(settings[0], initial);
+
+  const changed = { ...initial, label: "Kitchen light", roles: { brightnessSet: point("brightnessSet", 70, { state: 2, writeAllowed: false }) } };
+  update([changed], undefined, { status: "offline" });
+  assert.equal(button.attributes["aria-label"], "Postavke uređaja Kitchen light");
+  assert.equal(button.hidden, false);
+  assert.notEqual(button.disabled, true);
+  button.dispatch("click");
+  assert.equal(settings[1], changed);
+  assert.deepEqual(writes, []);
+});
+
+test("device settings are hidden and inert when editing is unavailable", (t) => {
+  const settings = [];
+  const light = device("light", { brightnessSet: point("brightnessSet", 40) });
+  const { container, update } = setup(t, [light], undefined, false, undefined, { onSettings: (current) => settings.push(current) });
+  const button = byClass(container, "dc-settings-button")[0];
+  assert.equal(button.hidden, true);
+  button.dispatch("click");
+  assert.deepEqual(settings, []);
+  update([light], undefined, { settingsEnabled: true });
+  assert.equal(button.hidden, false);
+  update([light], undefined, { settingsEnabled: false });
+  assert.equal(button.hidden, true);
+  button.dispatch("click");
+  assert.deepEqual(settings, []);
+});
+
+test("device settings remain hidden without a settings callback", (t) => {
+  const light = device("light", { brightnessSet: point("brightnessSet", 40) });
+  const { container } = setup(t, [light], undefined, false, undefined, { settingsEnabled: true });
+  const button = byClass(container, "dc-settings-button")[0];
+  assert.equal(button.hidden, true);
+  button.dispatch("click");
 });

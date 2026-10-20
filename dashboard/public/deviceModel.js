@@ -125,6 +125,9 @@
       control = options.length ? { kind: classification.role === "power" ? "toggle" : "select", options, rangeConfirmed: true }
         : { kind: "number", rangeConfirmed: false };
       if (classification.role === "brightnessSet") control = { kind: "range", min: 0, max: 100, step: 1, rangeConfirmed: true };
+      if (["positionSet", "slatSet"].includes(classification.role)) {
+        control = { kind: "range", min: 0, max: 1, step: 0.01, rangeConfirmed: true, rangeSource: "user-confirmed" };
+      }
       if (classification.role === "setpoint" && unitKnown) {
         // Dashboard test policy, not limits discovered from EWS. The controller
         // can still reject a setpoint within this intentionally bounded range.

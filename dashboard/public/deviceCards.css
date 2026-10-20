@@ -36,6 +36,10 @@
 .dc-room { margin: 3px 0 0; color: var(--dc-muted); font-size: .7rem; line-height: 1.45; }
 .dc-room-unknown { color: #697a71; }
 .dc-type-label { position: absolute; right: 0; bottom: -22px; color: #6e7d73; font-size: .62rem; text-transform: uppercase; letter-spacing: .07em; }
+.device-cards-section .dc-settings-button { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; padding: 7px; border: 1px solid #dfe7e2; border-radius: 11px; background: #fafcfb; color: #647771; cursor: pointer; }
+.device-cards-section .dc-settings-button[hidden] { display: none; }
+.dc-settings-button svg { display: block; width: 20px; height: 20px; }
+.device-cards-section .dc-settings-button:hover, .device-cards-section .dc-settings-button:focus-visible { background: #edf6f2; border-color: #afd3ce; color: var(--dc-accent); }
 .dc-card-body { display: flex; flex-direction: column; gap: 16px; padding-top: 25px; }
 .dc-metric { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .dc-metric-value { font-size: .95rem; font-weight: 650; font-variant-numeric: tabular-nums; }

@@ -1,5 +1,5 @@
 const grid = document.querySelector("#widget-grid");
-const { widgetGroup, describeWidgetGroup } = globalThis.IoTWidgetGrouping;
+const { widgetGroup, describeWidgetGroup, deriveWidgetGroup } = globalThis.IoTWidgetGrouping;
 const template = document.querySelector("#widget-template");
 const demoBadge = document.querySelector("#demo-badge");
 const emptyState = document.querySelector("#empty-state");
@@ -63,6 +63,11 @@ const settingsDialog = document.querySelector("#settings-dialog");
 const settingsClose = document.querySelector("#settings-close");
 const settingsCancel = document.querySelector("#settings-cancel");
 const settingsForm = document.querySelector("#settings-form");
+const settingsTitle = document.querySelector("#settings-title");
+const settingsPointField = document.querySelector("#settings-point-field");
+const settingsPoint = document.querySelector("#settings-point");
+const settingsContext = document.querySelector("#settings-context");
+const settingsWriteHint = document.querySelector("#settings-write-hint");
 const settingsId = document.querySelector("#settings-id");
 const settingsLabel = document.querySelector("#settings-label");
 const settingsDescription = document.querySelector("#settings-description");
@@ -87,6 +92,7 @@ const groupsByName = new Map();
 const groupByWidgetId = new Map();
 let widgetEditingEnabled = false;
 let settingsBusy = false;
+let settingsDeviceContext = null;
 let lastDiscoveryPayload = null;
 let updatingWidgets = false;
 let automaticDiscoveryRunning = false;
@@ -110,7 +116,7 @@ function refreshDeviceCards() {
       const point = latestValuesById.get(config.id)?.widget;
       return { ...config, ...(point ? { value: point.value, state: point.state, error: point.error, updatedAt: point.updatedAt } : {}) };
     });
-  deviceCardView.update({ widgets, status: deviceConnectionStatus, readAt: deviceReadAt, demo: deviceDemoMode, ...deviceMetadata });
+  deviceCardView.update({ widgets, status: deviceConnectionStatus, readAt: deviceReadAt, demo: deviceDemoMode, settingsEnabled: widgetEditingEnabled, ...deviceMetadata });
 }
 
 async function refreshDeviceMetadata() {
@@ -1164,16 +1170,14 @@ function showSettingsStatus(message, state = "") {
   settingsStatus.textContent = message;
 }
 
-function openSettingsDialog(id) {
-  const widget = configById.get(id);
-  if (!widget || !widgetEditingEnabled || settingsBusy || widgetClearBusy) return;
-
+function populateSettingsForm(widget) {
   settingsForm.reset();
+  settingsPoint.value = widget.id;
   settingsId.value = widget.id;
   settingsLabel.value = widget.label;
   settingsDescription.value = widget.description;
   settingsGroup.value = widget.group || "";
-  settingsGroup.placeholder = automaticWidgetGroup(widget);
+  settingsGroup.placeholder = deriveWidgetGroup(widget.id);
   settingsUnit.value = widget.unit;
   settingsPrecision.value = Number.isInteger(widget.precision)
     ? String(widget.precision)
@@ -1183,9 +1187,74 @@ function openSettingsDialog(id) {
   settingsPrecision.setCustomValidity("");
   showSettingsStatus("");
   settingsDeleteConfirmation.hidden = true;
-  settingsDialog.showModal();
+  updateSettingsWritePermission();
+}
+
+function updateSettingsWritePermission() {
+  const point = settingsDeviceContext?.points.find((entry) => entry.id === settingsId.value);
+  const reading = Boolean(settingsDeviceContext) && (!point?.command || !point.id.startsWith("01/"));
+  settingsWritable.disabled = settingsBusy || reading;
+  settingsWriteHint.hidden = !settingsDeviceContext;
+  settingsWriteHint.textContent = reading
+    ? "Ova funkcija služi za očitanje. Dozvola za upis uređuje se na izvornoj naredbenoj funkciji."
+    : "Dozvola vrijedi za odabranu naredbu. Stanje Forced i ograničenja kontrolera i dalje se provjeravaju prije upisa.";
+}
+
+function openSettingsDialog(id) {
+  const widget = configById.get(id);
+  if (!widget || !widgetEditingEnabled || settingsBusy || widgetClearBusy) return;
+  settingsDeviceContext = null;
+  settingsDialog.setAttribute("data-device-settings", "false");
+  settingsTitle.textContent = "Uredi widget";
+  settingsPointField.hidden = true;
+  settingsContext.hidden = true;
+  settingsPoint.replaceChildren();
+  populateSettingsForm(widget);
+  if (!settingsDialog.open) settingsDialog.showModal();
   requestAnimationFrame(() => settingsLabel.focus());
 }
+
+function openDeviceSettingsDialog(device) {
+  if (!device || !widgetEditingEnabled || settingsBusy || widgetClearBusy) return;
+  const candidates = device.primary?.length ? device.primary
+    : [...(device.other || []), ...(device.diagnostics || [])];
+  const seen = new Set();
+  const points = [];
+  for (const point of candidates) {
+    const id = configById.has(point.sourceId) ? point.sourceId : point.id;
+    if (!configById.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    points.push({ id, label: point.label || configById.get(id).label, command: point.command === true && id.startsWith("01/") });
+  }
+  points.sort((left, right) => Number(right.command) - Number(left.command));
+  if (!points.length) return;
+  settingsDeviceContext = { key: device.key, label: device.label, points };
+  settingsDialog.setAttribute("data-device-settings", "true");
+  settingsTitle.textContent = `Postavke uređaja ${device.label}`;
+  settingsPointField.hidden = false;
+  settingsContext.hidden = false;
+  settingsContext.textContent = `Postavke se odnose na odabranu funkciju uređaja ${device.label}.`;
+  settingsPoint.replaceChildren();
+  for (const point of points) {
+    const option = document.createElement("option");
+    option.value = point.id;
+    option.textContent = `${point.command ? "Upravljanje" : "Očitanje"} · ${point.label}`;
+    settingsPoint.appendChild(option);
+  }
+  populateSettingsForm(configById.get(points[0].id));
+  if (!settingsDialog.open) settingsDialog.showModal();
+  requestAnimationFrame(() => settingsPoint.focus());
+}
+
+settingsPoint.addEventListener("change", () => {
+  if (!settingsDeviceContext || settingsBusy) return;
+  const widget = configById.get(settingsPoint.value);
+  if (!widget || !settingsDeviceContext.points.some((point) => point.id === widget.id)) {
+    showSettingsStatus("Odabrana funkcija više nije dostupna. Ponovno otvori postavke uređaja.", "error");
+    return;
+  }
+  populateSettingsForm(widget);
+});
 
 function setSettingsBusy(busy) {
   settingsBusy = busy;
@@ -1193,6 +1262,7 @@ function setSettingsBusy(busy) {
   settingsClose.disabled = busy;
   settingsDeleteConfirm.disabled = busy;
   settingsDeleteCancel.disabled = busy;
+  updateSettingsWritePermission();
 }
 
 settingsClose.addEventListener("click", () => { if (!settingsBusy) settingsDialog.close(); });
@@ -1351,6 +1421,7 @@ async function boot() {
     deviceCardView = globalThis.IoTDeviceCards?.create({
       container: document.querySelector("#device-cards-section"),
       onWrite: writeDeviceCommand,
+      onSettings: openDeviceSettingsDialog,
     });
     demoBadge.hidden = !config.demoMode;
     widgetEditingEnabled = config.widgetEditingEnabled === true;
