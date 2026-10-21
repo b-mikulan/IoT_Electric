@@ -106,6 +106,7 @@
     const description = String(metadata.description ?? widget.description ?? "");
     const sourceUnit = String(metadata.unit ?? widget.unit ?? "");
     const unit = /^none$/i.test(sourceUnit) ? "" : sourceUnit;
+    const displayUnit = !unit && ["positionSet", "positionStatus", "slatSet"].includes(classification.role) ? "%" : unit;
     const state = widget.state === null || widget.state === undefined || widget.state === ""
       ? null : Number(widget.state);
     const options = enumOptions(metadata, description);
@@ -126,7 +127,7 @@
         : { kind: "number", rangeConfirmed: false };
       if (classification.role === "brightnessSet") control = { kind: "range", min: 0, max: 100, step: 1, rangeConfirmed: true };
       if (["positionSet", "slatSet"].includes(classification.role)) {
-        control = { kind: "range", min: 0, max: 1, step: 0.01, rangeConfirmed: true, rangeSource: "user-confirmed" };
+        control = { kind: "range", min: 0, max: 100, step: 1, rangeConfirmed: true, rangeSource: "user-confirmed" };
       }
       if (classification.role === "setpoint" && unitKnown) {
         // Dashboard test policy, not limits discovered from EWS. The controller
@@ -153,7 +154,7 @@
             : !flag(widget.writable) ? "Upis nije uključen u postavkama ove točke." : null);
     return {
       id: String(widget.id || ""), label: classification.label, configuredLabel: widget.label || metadata.name || null,
-      value: widget.value, state, error: widget.error || null, unit, updatedAt: widget.updatedAt || null,
+      value: widget.value, state, error: widget.error || null, unit: displayUnit, updatedAt: widget.updatedAt || null,
       role: classification.role, importance: classification.importance, reason: classification.reason,
       metadata: normalizedMetadata, command: classification.command, control, controlAvailable,
       writeAllowed: controlAvailable && flag(widget.writable), disabledReason,

@@ -21,8 +21,8 @@ function createDeviceDemo() {
   const fan = point(`${other}/Klima`, "FanSpd", "Fan speed: 0=Auto, 1=High, 2=Med, 3=Low", "", 0, true);
   metadataById[fan].enumValues = [{ value: 0, label: "Auto" }, { value: 1, label: "High" }, { value: 2, label: "Med" }, { value: 3, label: "Low" }];
   point(`${other}/Klima`, "OnOffMd", "On/Off mode: 0=Off, 1=On", "", 1, true);
-  point(`${other}/Roleta`, "BlndPos", "Blind height position set", "", 0.36, true);
-  point(`${other}/Roleta`, "BlndVal", "Blind height position status", "", 0.36);
+  point(`${other}/Roleta`, "BlndPos", "Blind height position set", "%", 36, true);
+  point(`${other}/Roleta`, "BlndVal", "Blind height position status", "%", 36);
   point(`${kitchen}/Senzor`, "LtLvl", "Illuminance", "lx", 222);
   point(`${kitchen}/Senzor`, "OccSts", "Occupancy status", "", 0);
   return { widgets, metadataById, roomByZone: { [kitchen]: "Kuhinja · demo" } };

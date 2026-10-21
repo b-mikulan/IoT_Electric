@@ -90,15 +90,27 @@ test("requires temperature units and uses confirmed blind and slat scales withou
   const setpoint = point(ac, "EffSpt", { value: 23.5 });
   assert.equal(normalizePoint(setpoint).controlAvailable, false);
   assert.equal(normalizePoint(setpoint, { writeable: 1, unit: "°C" }).controlAvailable, true);
-  const values = [point(blind, "BlndPos"), point(blind, "BlndVal", { value: 0.36 }), point(blind, "BlndSlt"), point(blind, "BlndAng", { value: 18 }), point(blind, "BlndBtnUp")];
+  const values = [point(blind, "BlndPos"), point(blind, "BlndVal", { value: 0.36 }), point(blind, "BlndSlt"), point(blind, "BlndAng", { value: 18, unit: "°" }), point(blind, "BlndBtnUp")];
   const [device] = buildDevices(values);
   assert.equal(device.type, "blind");
-  assert.deepEqual(device.roles.positionSet.control, { kind: "range", min: 0, max: 1, step: 0.01, rangeConfirmed: true, rangeSource: "user-confirmed" });
+  assert.deepEqual(device.roles.positionSet.control, { kind: "range", min: 0, max: 100, step: 1, rangeConfirmed: true, rangeSource: "user-confirmed" });
   assert.equal(device.roles.positionStatus.value, 0.36);
   assert.equal(device.roles.positionStatus.writeAllowed, false);
   assert.deepEqual(device.roles.slatSet.control, device.roles.positionSet.control);
   assert.equal(device.roles.slatStatus.value, 18);
+  assert.equal(device.roles.slatStatus.unit, "°");
   assert.equal(device.roles.buttonUp.writeAllowed, false);
+});
+
+test("blind and slat commands display percentages without changing raw values or their metadata units", () => {
+  for (const name of ["BlndPos", "BlndSlt"]) {
+    for (const unit of ["", "none", "%"]) {
+      const normalized = normalizePoint(point(blind, name, { value: 36.5 }), { writeable: 1, unit });
+      assert.equal(normalized.value, 36.5);
+      assert.equal(normalized.unit, "%");
+      assert.equal(normalized.metadata.unit, unit);
+    }
+  }
 });
 
 test("cleans display-only unit markers while retaining the server unit in metadata", () => {
@@ -254,16 +266,16 @@ test("real controls require explicit server permission and reject aliases and am
   assert.equal(validateDeviceCommand(device.roles.brightnessSet, 20).allowed, false);
 });
 
-test("blind and slat commands accept normalized bounds and fractions unchanged while preserving write protections", () => {
+test("blind and slat commands accept percentage bounds and fractional percentages unchanged while preserving write protections", () => {
   for (const name of ["BlndPos", "BlndSlt"]) {
-    const source = point(blind, name, { value: 0.36 });
+    const source = point(blind, name, { value: 36 });
     const position = normalizePoint(source, { writeable: 1, unit: "" });
     assert.equal(position.liveControlAvailable, true);
-    assert.deepEqual(position.control, { kind: "range", min: 0, max: 1, step: 0.01, rangeConfirmed: true, rangeSource: "user-confirmed" });
-    for (const value of [0, 0.36, 1]) {
+    assert.deepEqual(position.control, { kind: "range", min: 0, max: 100, step: 1, rangeConfirmed: true, rangeSource: "user-confirmed" });
+    for (const value of [0, 36, 100, 36.5]) {
       assert.deepEqual(validateDeviceCommand(position, value), { allowed: true, value });
     }
-    for (const value of [-0.01, 1.01, 36, "0.36", null, true, NaN, Infinity]) {
+    for (const value of [-0.01, 100.01, "36", null, true, {}, NaN, Infinity]) {
       assert.equal(validateDeviceCommand(position, value).allowed, false);
     }
     for (const blocked of [
@@ -272,7 +284,7 @@ test("blind and slat commands accept normalized bounds and fractions unchanged w
       normalizePoint({ ...source, writable: false }, { writeable: 1 }),
       normalizePoint({ ...source, id: `11/${blind}/Values/${name}/Value` }, { writeable: 1 }),
     ]) {
-      assert.equal(validateDeviceCommand(blocked, 0.36).allowed, false);
+      assert.equal(validateDeviceCommand(blocked, 36).allowed, false);
     }
   }
 });

@@ -163,35 +163,36 @@ test("live controls respect local permission and server health", (t) => {
   assert.deepEqual(calls, []);
 });
 
-test("blind position and slat sliders preserve fractional values and send normalized commands unchanged", async (t) => {
+test("blind position and slat sliders display percentages and send percentage commands unchanged", async (t) => {
   const calls = [];
-  const positionSet = point("positionSet", 0.36, {
-    id: "01/ES/Device/Values/BlndPos", unit: "",
-    control: { kind: "range", min: 0, max: 1, step: 0.01, rangeConfirmed: true },
+  const positionSet = point("positionSet", 36, {
+    id: "01/ES/Device/Values/BlndPos", unit: "%",
+    control: { kind: "range", min: 0, max: 100, step: 1, rangeConfirmed: true },
   });
   const slatSet = { ...positionSet, id: "01/ES/Device/Values/BlndSlt", role: "slatSet" };
   const { container } = setup(t, [device("blind", { positionSet, slatSet })], async (command) => { calls.push(command); });
   const [input, slatInput] = byClass(container, "dc-range");
   assert.equal(input.min, "0");
-  assert.equal(input.max, "1");
-  assert.equal(input.step, "0.01");
-  assert.equal(byClass(container, "dc-control-output")[0].textContent, "0,36");
-  input.value = "0.37";
+  assert.equal(input.max, "100");
+  assert.equal(input.step, "1");
+  assert.equal(byClass(container, "dc-control-output")[0].textContent, "36 %");
+  assert.equal(byClass(container, "dc-control-hint")[0].textContent, "Raspon 0–100 %");
+  input.value = "37";
   input.dispatch("input");
   assert.equal(calls.length, 0);
-  assert.equal(byClass(container, "dc-control-output")[0].textContent, "0,37");
+  assert.equal(byClass(container, "dc-control-output")[0].textContent, "37 %");
   input.dispatch("change");
   await flush();
   assert.equal(slatInput.min, "0");
-  assert.equal(slatInput.max, "1");
-  assert.equal(slatInput.step, "0.01");
-  slatInput.value = "0.42";
+  assert.equal(slatInput.max, "100");
+  assert.equal(slatInput.step, "1");
+  slatInput.value = "42";
   slatInput.dispatch("input");
   assert.equal(calls.length, 1);
-  assert.equal(byClass(container, "dc-control-output")[1].textContent, "0,42");
+  assert.equal(byClass(container, "dc-control-output")[1].textContent, "42 %");
   slatInput.dispatch("change");
   await flush();
-  assert.deepEqual(calls, [{ widgetId: positionSet.id, value: 0.37 }, { widgetId: slatSet.id, value: 0.42 }]);
+  assert.deepEqual(calls, [{ widgetId: positionSet.id, value: 37 }, { widgetId: slatSet.id, value: 42 }]);
 });
 
 test("demo controls remain local even when a real write callback is provided", async (t) => {

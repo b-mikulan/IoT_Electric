@@ -318,8 +318,8 @@
         input.addEventListener("change", () => { if (!demoMode) void commit(role, Number(input.value)); });
         row.append(caption, reading);
         wrap.append(row, input);
-        if (["positionSet", "slatSet"].includes(role) && Number(bounds.min) === 0 && Number(bounds.max) === 1) {
-          wrap.append(el("p", "dc-control-hint", "Raspon 0–1"));
+        if (["positionSet", "slatSet"].includes(role) && Number(bounds.min) === 0 && Number(bounds.max) === 100) {
+          wrap.append(el("p", "dc-control-hint", "Raspon 0–100 %"));
         }
         simulationCopy(role, wrap);
         body.append(wrap);

@@ -20,7 +20,7 @@ U prepoznatim granama Values, Points i External Bindings točan završni naziv o
 | --- | --- | --- |
 | `LtPct`, `GrpPct` | Zadana svjetlina pojedinačnog svjetla ili grupe | Naredba |
 | `LtVal` | Povratno očitanje rasvjete | Prikaz |
-| `BlndPos`, `BlndSlt` | Zadani položaj rolete i lamela | Naredbe s korisnički potvrđenim rasponom 0–1 i korakom 0,01 |
+| `BlndPos`, `BlndSlt` | Zadani položaj rolete i lamela | Naredbe s korisnički potvrđenim rasponom 0–100 % i korakom 1 % |
 | `BlndVal`, `BlndAng`, `BlndSts` | Očitani položaj, kut i stanje | Prikaz / detalji |
 | `BlndBtnUp`, `BlndBtnDn` | Signali fizičkih tipki | Detalji; ne šaljemo ih kao naredbe |
 | `RmTmp`, `RmRh`, `RmCO2` | Temperatura, vlaga, CO₂ | Prikaz |
@@ -62,7 +62,7 @@ Vrijednost se provjerava prije slanja postojećem middleware `POST /api/values/w
 - Rasvjeta: broj u rasponu 0–100, prema pregledanoj funkciji LtPct/GrpPct.
 - Klima: samo potvrđene enum opcije.
 - Temperatura: **politika ovog testnog dashboarda** je 5–35 °C, odnosno 41–95 °F ili 278,15–308,15 K. To nisu granice dobivene iz EWS-a niti jamstvo da ih konkretna klima podržava. UI mijenja vrijednost u koracima 0,5; kontroler može odbiti vrijednost i unutar tog raspona.
-- Položaj rolete (`BlndPos`) i lamela (`BlndSlt`): korisnik je potvrdio raspon 0–1 za obje naredbe. Klizači koriste korak 0,01 i šalju izvornu vrijednost, npr. 0,36; ne pretvaraju je u 36 ili postotak. Backend odbija vrijednosti izvan raspona. Značenje krajnjih položaja nije pretpostavljeno. Očitani kut lamela (`BlndAng`) zadržava izvornu skalu.
+- Položaj rolete (`BlndPos`) i lamela (`BlndSlt`): korisnik je ispravio raspon na 0–100 % za obje naredbe. Klizači koriste korak 1 % i šalju izravnu postotnu vrijednost, npr. 36; ne dijele je sa 100. Backend odbija vrijednosti izvan raspona. Numerička očitanja se ne preračunavaju; položaj se označava znakom % ako server nije dao jedinicu. Izvorna jedinica ostaje u detaljima metapodataka, a očitani kut lamela (`BlndAng`) zadržava izvornu skalu. Značenje krajnjih položaja nije pretpostavljeno.
 
 Provjera se primjenjuje i na poznate naredbe poslane kroz stari `/api/write`, kako stari obrazac ne bi zaobišao pravila. Demo ostaje lokalna simulacija.
 
