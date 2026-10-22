@@ -83,6 +83,11 @@ const settingsDeleteConfirmation = document.querySelector("#settings-delete-conf
 const settingsDeleteMessage = document.querySelector("#settings-delete-message");
 const settingsDeleteConfirm = document.querySelector("#settings-delete-confirm");
 const settingsDeleteCancel = document.querySelector("#settings-delete-cancel");
+const cardSettings = Object.fromEntries([
+  "dialog", "title", "close", "form", "label", "label-hint", "room", "new-room-field", "new-room",
+  "primary", "unit-mode", "unit", "unit-field", "unit-hint", "secondary-mode", "secondary-hint", "secondary-field", "search", "secondary-list",
+  "secondary-count", "functions", "reset", "cancel", "save", "status",
+].map((name) => [name, document.querySelector(`#device-settings-${name}`)]));
 
 const elementsById = new Map();
 const configById = new Map();
@@ -107,6 +112,12 @@ let deviceConnectionStatus = "connecting";
 let deviceReadAt = null;
 let deviceMetadataRequest = 0;
 let deviceMetadataRefreshTimer;
+const deviceSettingsByKey = new Map();
+let deviceSettingsEnabled = false;
+let deviceSettingsWarning = "";
+let deviceSettingsRequest = 0;
+let cardSettingsContext = null;
+let cardSettingsBusy = false;
 
 function refreshDeviceCards() {
   if (!deviceCardView || updatingWidgets) return;
@@ -116,7 +127,35 @@ function refreshDeviceCards() {
       const point = latestValuesById.get(config.id)?.widget;
       return { ...config, ...(point ? { value: point.value, state: point.state, error: point.error, updatedAt: point.updatedAt } : {}) };
     });
-  deviceCardView.update({ widgets, status: deviceConnectionStatus, readAt: deviceReadAt, demo: deviceDemoMode, settingsEnabled: widgetEditingEnabled, ...deviceMetadata });
+  deviceCardView.update({ widgets, status: deviceConnectionStatus, readAt: deviceReadAt, demo: deviceDemoMode,
+    ...deviceMetadata, settingsEnabled: widgetEditingEnabled || deviceSettingsEnabled,
+    deviceSettings: [...deviceSettingsByKey.values()],
+    warnings: [...(deviceMetadata.warnings || []), ...(deviceSettingsWarning ? [deviceSettingsWarning] : [])],
+  });
+}
+
+function applyDeviceSettings(entries) {
+  if (!Array.isArray(entries)) return;
+  deviceSettingsByKey.clear();
+  for (const entry of entries) if (typeof entry?.key === "string") deviceSettingsByKey.set(entry.key, entry);
+  deviceSettingsWarning = "";
+  refreshDeviceCards();
+}
+
+async function refreshSavedDeviceSettings() {
+  const request = ++deviceSettingsRequest;
+  try {
+    const response = await fetch("/api/devices/settings", { cache: "no-store" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !Array.isArray(payload.devices)) throw new Error(payload.error || "Postavke kartica nisu dostupne.");
+    if (request !== deviceSettingsRequest) return;
+    deviceSettingsEnabled = payload.enabled === true;
+    applyDeviceSettings(payload.devices);
+  } catch {
+    if (request !== deviceSettingsRequest) return;
+    deviceSettingsWarning = "Spremljene postavke kartica trenutačno nisu dostupne. Prethodni odabir je sačuvan.";
+    refreshDeviceCards();
+  }
 }
 
 async function refreshDeviceMetadata() {
@@ -1165,6 +1204,278 @@ groupRenameForm.addEventListener("submit", async (event) => {
   }
 });
 
+function showCardSettingsStatus(message, state = "") {
+  cardSettings.status.className = `discovery-status${state ? ` is-${state}` : ""}`;
+  cardSettings.status.textContent = message;
+}
+
+function cardSettingsDevices() {
+  return deviceCardView?.getDevices?.() || [];
+}
+
+function metricChoicesForDevice(device) {
+  const owners = new Map(cardSettingsDevices().map((entry) => [entry.key, entry.label]));
+  const choices = [];
+  for (const widget of configById.values()) {
+    if (widget.visible === false) continue;
+    const owner = globalThis.IoTWidgetGrouping.deriveWidgetGrouping(widget.id);
+    const point = globalThis.IoTDeviceModel.normalizePoint(widget, deviceMetadata.metadataById[widget.id] || {});
+    const title = point.role === "unknown" ? widget.label : point.label;
+    const reference = widget.id.startsWith("11/") ? " · referenca" : "";
+    const ownerLabel = owners.get(owner.key) || owner.label;
+    choices.push({ id: widget.id, title, owner: ownerLabel, label: `${title} · ${ownerLabel}${reference}`, related: owner.key === device.key });
+  }
+  choices.sort((left, right) => Number(right.related) - Number(left.related) || left.label.localeCompare(right.label, "hr"));
+  return choices;
+}
+
+function appendSettingsOption(select, value, label) {
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = label;
+  select.appendChild(option);
+}
+
+function effectiveCardPrimaryId() {
+  return cardSettings.primary.value === "auto" ? cardSettingsContext?.device.defaultMetrics?.primaryPointId : cardSettings.primary.value;
+}
+
+function renderCardSecondaryChoices() {
+  if (!cardSettingsContext) return;
+  const { choices, secondaryIds } = cardSettingsContext;
+  const relatedIds = new Set(choices.filter((choice) => choice.related).map((choice) => choice.id));
+  for (const id of secondaryIds) if (!relatedIds.has(id)) secondaryIds.delete(id);
+  const primaryId = effectiveCardPrimaryId();
+  if (primaryId) secondaryIds.delete(primaryId);
+  const query = cardSettings.search.value.trim().toLocaleLowerCase("hr");
+  cardSettings["secondary-list"].replaceChildren();
+  let count = 0;
+  for (const choice of choices) {
+    if (!choice.related) continue;
+    if (query && !`${choice.label} ${choice.id}`.toLocaleLowerCase("hr").includes(query)) continue;
+    const label = document.createElement("label");
+    label.className = "device-metric-option";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "browser-default";
+    checkbox.value = choice.id;
+    checkbox.checked = secondaryIds.has(choice.id);
+    checkbox.disabled = cardSettingsBusy || choice.id === primaryId;
+    checkbox.setAttribute("aria-label", choice.label);
+    checkbox.addEventListener("change", () => {
+      if (cardSettingsBusy) return;
+      if (checkbox.checked && secondaryIds.size >= 12) {
+        checkbox.checked = false;
+        showCardSettingsStatus("Odaberi najviše 12 sekundarnih očitanja.", "error");
+        return;
+      }
+      if (checkbox.checked) secondaryIds.add(choice.id);
+      else secondaryIds.delete(choice.id);
+      cardSettings["secondary-count"].textContent = `${secondaryIds.size} / 12 odabranih · Redoslijed prati odabir.`;
+      showCardSettingsStatus("");
+    });
+    const copy = document.createElement("span");
+    copy.textContent = choice.title;
+    const source = document.createElement("small");
+    source.textContent = `${choice.owner}${choice.missing ? " · nije dostupno" : ""}${choice.id.startsWith("11/") ? " · referenca" : ""}`;
+    copy.appendChild(source);
+    label.append(checkbox, copy);
+    cardSettings["secondary-list"].appendChild(label);
+    count++;
+  }
+  if (!count) {
+    const empty = document.createElement("p");
+    empty.className = "settings-context";
+    empty.textContent = "Nema očitanja za taj upit.";
+    cardSettings["secondary-list"].appendChild(empty);
+  }
+  cardSettings["secondary-count"].textContent = `${secondaryIds.size} / 12 odabranih · Redoslijed prati odabir.`;
+}
+
+function updateCardSecondaryMode() {
+  cardSettings["secondary-field"].hidden = cardSettings["secondary-mode"].value !== "custom";
+  renderCardSecondaryChoices();
+}
+
+function updateCardUnitMode() {
+  const custom = cardSettings["unit-mode"].value === "custom";
+  cardSettings["unit-field"].hidden = !custom;
+  cardSettings.unit.required = custom;
+  cardSettings.unit.setCustomValidity("");
+  cardSettings["unit-hint"].textContent = "Jedinica vrijedi za glavno očitanje. Mijenja oznaku, bez preračunavanja vrijednosti.";
+}
+
+function updateCardAutomaticUnit() {
+  if (!cardSettingsContext) return;
+  const [device] = globalThis.IoTDeviceModel.buildDevices([...configById.values()], {
+    ...deviceMetadata,
+    deviceSettings: [{ key: cardSettingsContext.key, primaryPointId: cardSettings.primary.value === "auto" ? null : cardSettings.primary.value }],
+  }).filter((entry) => entry.key === cardSettingsContext.key);
+  const automaticUnit = device?.primaryAutomaticUnit || "";
+  const option = [...cardSettings["unit-mode"].options].find((entry) => entry.value === "auto");
+  if (option) option.textContent = `Automatski · ${automaticUnit || "bez jedinice"}`;
+}
+
+function updateCardRoomMode() {
+  const custom = cardSettings.room.value === "new";
+  cardSettings["new-room-field"].hidden = !custom;
+  cardSettings["new-room"].required = custom;
+  cardSettings["new-room"].setCustomValidity("");
+}
+
+function populateCardSettings(entry) {
+  const { device } = cardSettingsContext;
+  const automaticLabel = device.automaticLabel || device.label;
+  cardSettings.label.value = entry?.label || "";
+  cardSettings.label.placeholder = automaticLabel;
+  cardSettings["label-hint"].textContent = `Prazno polje koristi automatski naziv: ${automaticLabel}.`;
+  cardSettings.room.replaceChildren();
+  appendSettingsOption(cardSettings.room, "auto", `Automatski · ${device.automaticRoom?.label || "Bez prostorije"}`);
+  appendSettingsOption(cardSettings.room, "unassigned", "Bez prostorije");
+  const rooms = new Set();
+  for (const candidate of cardSettingsDevices()) {
+    if (candidate.room?.label) rooms.add(candidate.room.label);
+    if (candidate.automaticRoom?.label) rooms.add(candidate.automaticRoom.label);
+  }
+  for (const saved of deviceSettingsByKey.values()) if (saved.room) rooms.add(saved.room);
+  if (entry?.room) rooms.add(entry.room);
+  for (const room of [...rooms].sort((a, b) => a.localeCompare(b, "hr"))) appendSettingsOption(cardSettings.room, `room:${room}`, room);
+  appendSettingsOption(cardSettings.room, "new", "Nova prostorija…");
+  cardSettings.room.value = entry?.room === "" ? "unassigned" : entry?.room ? `room:${entry.room}` : "auto";
+  cardSettings["new-room"].value = "";
+  updateCardRoomMode();
+
+  const choices = metricChoicesForDevice(device);
+  const configuredIds = new Set(choices.map((choice) => choice.id));
+  for (const id of [entry?.primaryPointId, ...(entry?.secondaryPointIds || [])]) {
+    if (!id || configuredIds.has(id)) continue;
+    const related = globalThis.IoTWidgetGrouping.deriveWidgetGrouping(id).key === device.key;
+    choices.push({ id, title: "Nedostupna točka", owner: id, label: `Nedostupna točka · ${id}`, missing: true, related });
+    configuredIds.add(id);
+  }
+  cardSettingsContext.choices = choices;
+  cardSettings.primary.replaceChildren();
+  const defaultPrimaryId = device.defaultMetrics?.primaryPointId;
+  const defaultPrimary = choices.find((choice) => choice.id === defaultPrimaryId);
+  appendSettingsOption(cardSettings.primary, "auto", `Automatski${defaultPrimary ? ` · ${defaultPrimary.title}` : ""}`);
+  for (const choice of choices) appendSettingsOption(cardSettings.primary, choice.id, choice.label);
+  cardSettings.primary.value = entry?.primaryPointId || "auto";
+  const primaryUnit = typeof entry?.primaryUnit === "string" ? entry.primaryUnit : null;
+  cardSettings["unit-mode"].replaceChildren();
+  appendSettingsOption(cardSettings["unit-mode"], "auto", "Automatski");
+  appendSettingsOption(cardSettings["unit-mode"], "none", "Bez jedinice");
+  appendSettingsOption(cardSettings["unit-mode"], "custom", "Vlastita jedinica");
+  cardSettings["unit-mode"].value = primaryUnit === null ? "auto" : primaryUnit === "" ? "none" : "custom";
+  cardSettings.unit.value = primaryUnit || "";
+  updateCardAutomaticUnit();
+  updateCardUnitMode();
+  cardSettings["secondary-mode"].value = Array.isArray(entry?.secondaryPointIds) ? "custom" : "auto";
+  const defaults = device.defaultMetrics?.secondaryPointIds || [];
+  cardSettingsContext.secondaryIds = new Set(entry?.secondaryPointIds || defaults);
+  const defaultLabels = defaults.map((id) => choices.find((choice) => choice.id === id)?.title).filter(Boolean);
+  cardSettings["secondary-hint"].textContent = defaultLabels.length ? `Automatski: ${defaultLabels.join(", ")}.` : "Automatski: bez dodatnih očitanja.";
+  cardSettings.search.value = "";
+  updateCardSecondaryMode();
+  cardSettings.functions.disabled = !widgetEditingEnabled;
+}
+
+function openDeviceCardSettingsDialog(device) {
+  if (!device || cardSettingsBusy || widgetClearBusy) return;
+  if (!deviceSettingsEnabled) {
+    openDeviceSettingsDialog(device);
+    return;
+  }
+  cardSettingsContext = { key: device.key, device, secondaryIds: new Set(), choices: [] };
+  cardSettings.title.textContent = `Postavke kartice ${device.label}`;
+  populateCardSettings(deviceSettingsByKey.get(device.key));
+  showCardSettingsStatus("");
+  if (!cardSettings.dialog.open) cardSettings.dialog.showModal();
+  requestAnimationFrame(() => cardSettings.label.focus());
+}
+
+function setCardSettingsBusy(busy) {
+  cardSettingsBusy = busy;
+  for (const element of cardSettings.form.elements) element.disabled = busy;
+  cardSettings.close.disabled = busy;
+  cardSettings.functions.disabled = busy || !widgetEditingEnabled;
+  renderCardSecondaryChoices();
+}
+
+cardSettings.room.addEventListener("change", updateCardRoomMode);
+cardSettings.primary.addEventListener("change", () => {
+  renderCardSecondaryChoices();
+  updateCardAutomaticUnit();
+});
+cardSettings["unit-mode"].addEventListener("change", updateCardUnitMode);
+cardSettings["secondary-mode"].addEventListener("change", updateCardSecondaryMode);
+cardSettings.search.addEventListener("input", renderCardSecondaryChoices);
+cardSettings.close.addEventListener("click", () => { if (!cardSettingsBusy) cardSettings.dialog.close(); });
+cardSettings.cancel.addEventListener("click", () => { if (!cardSettingsBusy) cardSettings.dialog.close(); });
+cardSettings.dialog.addEventListener("click", (event) => {
+  if (event.target === cardSettings.dialog && !cardSettingsBusy) cardSettings.dialog.close();
+});
+cardSettings.dialog.addEventListener("cancel", (event) => { if (cardSettingsBusy) event.preventDefault(); });
+cardSettings.reset.addEventListener("click", () => {
+  if (!cardSettingsContext || cardSettingsBusy) return;
+  populateCardSettings(null);
+  showCardSettingsStatus("Automatski naziv, prostorija, očitanja i jedinica su odabrani. Spremi karticu za potvrdu.");
+});
+cardSettings.functions.addEventListener("click", () => {
+  if (!cardSettingsContext || cardSettingsBusy) return;
+  const current = cardSettingsDevices().find((device) => device.key === cardSettingsContext.key) || cardSettingsContext.device;
+  openDeviceSettingsDialog(current);
+});
+cardSettings.form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!cardSettingsContext || cardSettingsBusy || !deviceSettingsEnabled) return;
+  const newRoom = cardSettings["new-room"].value.trim();
+  const needsRoom = cardSettings.room.value === "new";
+  const customUnit = cardSettings["unit-mode"].value === "custom";
+  const unit = cardSettings.unit.value.trim();
+  const invalidUnit = customUnit && (!unit || unit.length > 40);
+  cardSettings.unit.setCustomValidity(invalidUnit ? "Upiši mjernu jedinicu do 40 znakova ili odaberi Bez jedinice." : "");
+  cardSettings["new-room"].setCustomValidity(needsRoom && !newRoom ? "Upiši naziv nove prostorije." : "");
+  if (!cardSettings.form.reportValidity() || needsRoom && !newRoom || invalidUnit) return;
+  const room = cardSettings.room.value === "auto" ? null
+    : cardSettings.room.value === "unassigned" ? ""
+      : needsRoom ? newRoom : cardSettings.room.value.slice(5);
+  const primaryPointId = cardSettings.primary.value === "auto" ? null : cardSettings.primary.value;
+  const secondaryPointIds = cardSettings["secondary-mode"].value === "auto" ? null
+    : [...cardSettingsContext.secondaryIds].filter((id) => id !== effectiveCardPrimaryId()
+      && globalThis.IoTWidgetGrouping.deriveWidgetGrouping(id).key === cardSettingsContext.key);
+  const primaryUnit = cardSettings["unit-mode"].value === "auto" ? null : customUnit ? unit : "";
+  const settings = { key: cardSettingsContext.key, label: cardSettings.label.value.trim() || null, room, primaryPointId, primaryUnit, secondaryPointIds };
+  // Older reconnect reads must not replace the result of this user save.
+  const saveRequest = ++deviceSettingsRequest;
+  setCardSettingsBusy(true);
+  showCardSettingsStatus("Spremam postavke kartice…");
+  try {
+    const response = await fetch("/api/devices/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Spremanje nije uspjelo (${response.status}).`);
+    if (payload.device?.key !== settings.key) throw new Error("Potvrda spremanja ne odgovara odabranoj kartici.");
+    if (saveRequest === deviceSettingsRequest) {
+      deviceSettingsByKey.set(payload.device.key, payload.device);
+      deviceSettingsWarning = "";
+      refreshDeviceCards();
+    } else {
+      // Another settings event/read happened while the POST was in flight.
+      // Reconcile with storage instead of overwriting it with this older response.
+      await refreshSavedDeviceSettings();
+    }
+    const current = cardSettingsDevices().find((device) => device.key === settings.key);
+    if (current) {
+      cardSettingsContext.device = current;
+      cardSettings.title.textContent = `Postavke kartice ${current.label}`;
+    }
+    showCardSettingsStatus("Naziv, prostorija, očitanja i jedinica kartice su spremljeni.", "success");
+  } catch (error) {
+    showCardSettingsStatus(error.message || "Postavke kartice nisu spremljene.", "error");
+  } finally {
+    setCardSettingsBusy(false);
+  }
+});
+
 function showSettingsStatus(message, state = "") {
   settingsStatus.className = `discovery-status${state ? ` is-${state}` : ""}`;
   settingsStatus.textContent = message;
@@ -1421,10 +1732,12 @@ async function boot() {
     deviceCardView = globalThis.IoTDeviceCards?.create({
       container: document.querySelector("#device-cards-section"),
       onWrite: writeDeviceCommand,
-      onSettings: openDeviceSettingsDialog,
+      onSettings: openDeviceCardSettingsDialog,
     });
     demoBadge.hidden = !config.demoMode;
     widgetEditingEnabled = config.widgetEditingEnabled === true;
+    deviceSettingsEnabled = config.deviceSettingsEnabled === true;
+    applyDeviceSettings(config.deviceSettings || []);
     discoveryOpen.hidden = config.discoveryEnabled !== true;
     visibilityOpen.hidden = !widgetEditingEnabled;
     automaticDiscovery.hidden = !widgetEditingEnabled;
@@ -1454,6 +1767,14 @@ async function boot() {
       const payload = JSON.parse(event.data);
       applyConfiguredWidgets(payload.widgets || [payload.widget], payload.groupRename);
     });
+    events.addEventListener("device-settings", (event) => {
+      ++deviceSettingsRequest;
+      applyDeviceSettings(JSON.parse(event.data).devices);
+    });
+    events.addEventListener("device-settings-error", () => {
+      deviceSettingsWarning = "Postavke kartica nije moguće spremiti. Provjeri datoteku konfiguracije.";
+      refreshDeviceCards();
+    });
     events.addEventListener("discovery", (event) => showAutomaticDiscovery(JSON.parse(event.data)));
     events.addEventListener("visibility", (event) => {
       const payload = JSON.parse(event.data);
@@ -1463,7 +1784,10 @@ async function boot() {
       const payload = JSON.parse(event.data);
       removeConfiguredWidgets(Array.isArray(payload.ids) ? payload.ids : [payload.id]);
     });
-    events.onopen = () => showStatus({ state: "connecting" });
+    events.onopen = () => {
+      showStatus({ state: "connecting" });
+      void refreshSavedDeviceSettings();
+    };
     events.onerror = () => showStatus({
       state: "offline",
       message: "Veza s dashboard servisom je prekinuta. Pokušavam ponovno.",

@@ -1,4 +1,5 @@
 const fs = require("node:fs");
+const path = require("node:path");
 const { deriveWidgetGroup, widgetGroup } = require("../public/widgetGrouping");
 
 const DEFAULT_DEMO_WIDGETS = [
@@ -173,6 +174,11 @@ function loadConfig(env = process.env) {
   const widgetsFile = inlineWidgets
     ? ""
     : String(env.WIDGETS_FILE || "").trim();
+  const deviceWidgetsFile = String(env.DEVICE_WIDGETS_FILE || "").trim() ||
+    (widgetsFile ? path.join(path.dirname(widgetsFile), "device-widgets.json") : "");
+  if (deviceWidgetsFile && widgetsFile && path.resolve(deviceWidgetsFile).toLowerCase() === path.resolve(widgetsFile).toLowerCase()) {
+    throw new Error("DEVICE_WIDGETS_FILE must be separate from WIDGETS_FILE.");
+  }
   const demoMode = parseBoolean(env.DEMO_MODE, !rawWidgets);
   const widgets = parseWidgets(rawWidgets, demoMode);
   const password = readMiddlewarePassword(env);
@@ -200,6 +206,7 @@ function loadConfig(env = process.env) {
     password,
     widgets,
     widgetsFile,
+    deviceWidgetsFile,
   };
 }
 

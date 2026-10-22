@@ -2,6 +2,7 @@
   --dc-accent: #008577;
   --dc-ink: #17302f;
   --dc-muted: #647771;
+  --dc-spring: cubic-bezier(.22, 1.45, .36, 1);
   margin: 0 0 24px;
 }
 
@@ -50,8 +51,8 @@
 .dc-reading-warning .dc-metric-value { color: #917644; }
 .dc-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 0; border-radius: 12px; padding: 11px 12px; width: 100%; background: #f5f8f6; color: #567267; cursor: pointer; }
 .dc-toggle-label { font-size: .76rem; }
-.dc-toggle-track { display: inline-flex; align-items: center; padding: 3px; width: 40px; height: 24px; background: #d7e1dc; border-radius: 999px; flex: 0 0 40px; transition: background .2s; }
-.dc-toggle-thumb { height: 18px; width: 18px; border-radius: 50%; background: white; box-shadow: 0 1px 3px #0002; transition: transform .2s; }
+.dc-toggle-track { display: inline-flex; align-items: center; padding: 3px; width: 40px; height: 24px; background: #d7e1dc; border-radius: 999px; flex: 0 0 40px; transition: background-color .22s ease, box-shadow .22s ease; }
+.dc-toggle-thumb { height: 18px; width: 18px; border-radius: 50%; background: white; box-shadow: 0 1px 3px #0002; transition: transform .42s var(--dc-spring), box-shadow .2s ease; }
 .dc-toggle[aria-pressed="true"] .dc-toggle-track { background: var(--dc-accent); }
 .dc-toggle[aria-pressed="true"] .dc-toggle-thumb { transform: translateX(16px); }
 .dc-control { width: 100%; }
@@ -105,6 +106,33 @@
 .dc-room-filter:focus, .dc-step-button:focus { background-color: #fff; }
 .dc-room-filter[aria-pressed="true"]:focus { background-color: var(--dc-ink); }
 .dc-reset:focus { background-color: transparent; }
+.device-cards-section :is(.dc-toggle, .dc-step-button, .dc-settings-button, .dc-room-filter) {
+  transform: translateY(0) scale(1);
+  transition: transform .32s var(--dc-spring), box-shadow .2s ease, background-color .2s ease, border-color .2s ease, color .2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.device-cards-section :is(.dc-step-button, .dc-settings-button, .dc-room-filter):not(:disabled):active {
+  transform: translateY(1px) scale(.95);
+  transition-duration: .08s;
+  box-shadow: 0 1px 2px rgba(24, 56, 48, .05);
+}
+.device-cards-section .dc-toggle:not(:disabled):active {
+  transform: translateY(1px) scale(.985);
+  transition-duration: .08s;
+}
+.dc-toggle:not(:disabled):active .dc-toggle-thumb { transform: scaleX(1.1) scaleY(.94); transition-duration: .08s; }
+.dc-toggle[aria-pressed="true"]:not(:disabled):active .dc-toggle-thumb { transform: translateX(16px) scaleX(1.1) scaleY(.94); }
+.device-cards-section :is(.dc-toggle, .dc-step-button, .dc-settings-button, .dc-room-filter):disabled,
+.dc-toggle:disabled .dc-toggle-thumb,
+.dc-toggle:disabled .dc-toggle-track { transition: none; }
+@media (hover: hover) and (pointer: fine) {
+  .device-cards-section :is(.dc-step-button, .dc-settings-button, .dc-room-filter):not(:disabled):hover:not(:active) {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(24, 56, 48, .08);
+  }
+  .device-cards-section .dc-toggle:not(:disabled):hover { background-color: #edf5f1; }
+  .dc-toggle:not(:disabled):hover .dc-toggle-thumb { box-shadow: 0 2px 5px rgba(24, 56, 48, .2); }
+}
 @media (max-width: 1100px) { .dc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 650px) {
   .device-cards-section { margin-top: 32px; padding-top: 24px; }
@@ -115,4 +143,10 @@
   .dc-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .dc-card { padding: 20px; }
   .dc-room-filter { padding: 7px 12px; font-size: .75rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .device-cards-section *, .device-cards-section *::before, .device-cards-section *::after { animation: none !important; transition: none !important; }
+  .device-cards-section :is(.dc-toggle, .dc-step-button, .dc-settings-button, .dc-room-filter) { transform: none !important; }
+  .dc-toggle:not(:disabled):active .dc-toggle-thumb { transform: none; }
+  .dc-toggle[aria-pressed="true"]:not(:disabled):active .dc-toggle-thumb { transform: translateX(16px); }
 }

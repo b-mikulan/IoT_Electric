@@ -12,7 +12,7 @@
     LtVal: ["brightnessStatus", "primary", "Očitana razina rasvjete", false],
     BlndPos: ["positionSet", "primary", "Zadani položaj rolete", true],
     BlndVal: ["positionStatus", "primary", "Očitani položaj rolete", false],
-    BlndSlt: ["slatSet", "primary", "Zadani položaj lamela", true],
+    BlndSlt: ["slatSet", "primary", "Zadani kut lamela", true],
     BlndAng: ["slatStatus", "primary", "Očitani kut lamela", false],
     BlndSts: ["operatingState", "primary", "Stanje rolete", false],
     BlndBtnUp: ["buttonUp", "other", "Signal tipke gore", false],
@@ -200,7 +200,43 @@
     return "generic";
   }
 
-  function buildDevices(widgets, { metadataById = {}, roomByZone = {} } = {}) {
+  function defaultMetricIds(device) {
+    const roles = device.roles;
+    let primary = null;
+    let secondary = [];
+    if (["light", "lightGroup"].includes(device.type)) primary = roles.brightnessStatus || roles.brightnessSet;
+    else if (device.type === "climate") {
+      primary = roles.temperature;
+      secondary = [roles.humidity, roles.co2, roles.modeStatus];
+    } else if (device.type === "blind") primary = roles.positionStatus || roles.positionSet;
+    else if (["sensor", "zone"].includes(device.type)) {
+      primary = roles.illuminance || roles.temperature;
+      secondary = [roles.occupancy, roles.temperature, roles.humidity, roles.co2].filter((point) => point !== primary);
+    } else secondary = device.primary.slice(0, 3);
+    return { primaryPointId: primary?.id || null, secondaryPointIds: secondary.filter(Boolean).map((point) => point.id) };
+  }
+
+  function displayMetric(point, id, automatic = false) {
+    if (!point) return {
+      id, label: "Odabrano očitanje nije dostupno", metricLabel: "Odabrano očitanje nije dostupno",
+      value: null, state: null, error: "Točka više nije dostupna među prikazanim vrijednostima.", unit: "",
+      role: "unknown", importance: "other", metadata: {}, missing: true, auxiliary: [],
+      command: false, control: null, controlAvailable: false, writeAllowed: false, liveControlAvailable: false,
+    };
+    const defaultCaptions = {
+      brightnessSet: "Očitana zadana svjetlina", brightnessStatus: "Očitana svjetlina",
+      positionSet: "Očitani zadani položaj", positionStatus: "Očitani položaj", modeStatus: "Način rada uređaja",
+    };
+    // A selected metric is always a display. Its source can be a command point,
+    // but choosing it never adds or moves a control to another device.
+    return {
+      ...point, metricLabel: automatic ? defaultCaptions[point.role] || point.label : point.label,
+      unit: point.unit || (point.role === "brightnessSet" && point.control?.rangeConfirmed === true && point.control.min === 0 && point.control.max === 100 ? "%" : ""),
+      command: false, control: null, controlAvailable: false, writeAllowed: false, liveControlAvailable: false,
+    };
+  }
+
+  function buildDevices(widgets, { metadataById = {}, roomByZone = {}, deviceSettings = [] } = {}) {
     const known = new Map((Array.isArray(widgets) ? widgets : []).filter((widget) => widget?.id).map((widget) => [String(widget.id), widget]));
     const byPath = new Map();
     for (const id of [...known.keys(), ...Object.keys(metadataById)]) {
@@ -208,6 +244,7 @@
     }
     const devices = new Map();
     const activePoints = new Map();
+    const visiblePoints = new Map();
     const propertyPoints = [];
     for (const widget of known.values()) {
       if (widget.visible === false) continue;
@@ -230,6 +267,7 @@
         if (known.has(candidate)) {
           device.aliases.push({ sourceId: candidate, aliasId: id });
           point.sourceId = candidate;
+          visiblePoints.set(id, point);
           if (known.get(candidate).visible !== false) continue;
           // A visible reference can represent the function while its source
           // widget stays hidden. Its own live state and permissions apply.
@@ -243,6 +281,7 @@
           point.reason = "Value referenca bez pronađene osnovne točke; veza nije potvrđena.";
         }
       }
+      visiblePoints.set(id, point);
       if (id.startsWith("11/") && properties.has(lastSegment(id))) {
         point.property = lastSegment(id);
         point.sourcePath = id.slice(3, id.lastIndexOf("/"));
@@ -262,6 +301,7 @@
       const source = activePoints.get(property.sourceId);
       if (source) source.auxiliary.push(property);
     }
+    const settingsByKey = new Map((Array.isArray(deviceSettings) ? deviceSettings : []).filter((entry) => entry && typeof entry.key === "string").map((entry) => [entry.key, entry]));
     for (const device of devices.values()) {
       for (const point of device.primary.filter((item) => item.command)) {
         const matches = device.primary.filter((item) => item.command && item.role === point.role);
@@ -272,6 +312,29 @@
         }
       }
       device.type = deviceType(device);
+      device.automaticLabel = device.label;
+      device.automaticRoom = device.room;
+      device.defaultMetrics = defaultMetricIds(device);
+      const settings = settingsByKey.get(device.key) || {};
+      if (typeof settings.label === "string" && settings.label.trim()) device.label = settings.label.trim();
+      if (typeof settings.room === "string") device.room = settings.room.trim() ? { label: settings.room.trim(), source: "Ručno dodijeljena prostorija" } : null;
+      const primaryId = typeof settings.primaryPointId === "string" ? settings.primaryPointId : device.defaultMetrics.primaryPointId;
+      const secondaryIds = Array.isArray(settings.secondaryPointIds) ? [...new Set(settings.secondaryPointIds)] : device.defaultMetrics.secondaryPointIds;
+      device.metrics = {
+        primary: primaryId ? displayMetric(visiblePoints.get(primaryId), primaryId, settings.primaryPointId == null) : null,
+        // Older settings may reference another owner. Keep those out of this
+        // card while preserving unavailable references to its own points.
+        secondary: secondaryIds.filter((id) => id !== primaryId && grouping.deriveWidgetGrouping(id).key === device.key)
+          .map((id) => displayMetric(visiblePoints.get(id), id, settings.secondaryPointIds == null)),
+      };
+      const automaticUnit = device.metrics.primary?.unit || "";
+      device.primaryAutomaticUnit = device.metrics.primary?.role === "humidity" && /^%\s*RH$/i.test(automaticUnit) ? "%" : automaticUnit;
+      if (device.metrics.primary && typeof settings.primaryUnit === "string") {
+        // This is a display suffix only. Never alter source metadata, numeric
+        // values or the command points used for ranges and controller writes.
+        device.metrics.primary.unit = settings.primaryUnit.trim();
+        device.metrics.primary.unitOverridden = true;
+      }
       device.reason += " Funkcije točaka određuju tip kartice; writeable samo po sebi ne određuje namjenu.";
       delete device.groupingKind;
     }

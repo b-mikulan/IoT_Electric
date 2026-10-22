@@ -43,13 +43,13 @@ function setup(t, initialDevices, onWrite, demo = false, initialReadAt, options 
   let devices = initialDevices;
   let readAt = initialReadAt;
   globalThis.document = { createElement: (tag) => new Element(tag), createElementNS: (_, tag) => new Element(tag), activeElement: null };
-  globalThis.IoTDeviceModel = { buildDevices: () => devices };
+  globalThis.IoTDeviceModel = options.model || { buildDevices: () => devices };
   const container = new Element("section");
   const view = create({ container, onWrite, onSettings: options.onSettings });
   const update = (next = devices, nextReadAt = readAt, overrides = {}) => { devices = next; readAt = nextReadAt; view.update({ status: "connected", demo, readAt, settingsEnabled: options.settingsEnabled, ...overrides }); };
   update();
   t.after(() => { view.destroy(); globalThis.document = previousDocument; globalThis.IoTDeviceModel = previousModel; });
-  return { container, update };
+  return { container, update, view };
 }
 
 function point(role, value, options = {}) {
@@ -176,6 +176,7 @@ test("blind position and slat sliders display percentages and send percentage co
   assert.equal(input.max, "100");
   assert.equal(input.step, "1");
   assert.equal(byClass(container, "dc-control-output")[0].textContent, "36 %");
+  assert.equal(byClass(container, "dc-control-label")[1].textContent, "Kut lamela");
   assert.equal(byClass(container, "dc-control-hint")[0].textContent, "Raspon 0–100 %");
   input.value = "37";
   input.dispatch("input");
@@ -284,4 +285,98 @@ test("device settings remain hidden without a settings callback", (t) => {
   const button = byClass(container, "dc-settings-button")[0];
   assert.equal(button.hidden, true);
   button.dispatch("click");
+});
+
+test("persisted card title, room and cross-device metrics update without changing the controlled point", async (t) => {
+  const model = require("../public/deviceModel");
+  const owner = "ES/Room/L1";
+  const set = { id: `01/${owner}/Values/LtPct`, value: 40, state: 0, writable: true };
+  const feedback = { id: `01/${owner}/Values/LtVal`, value: 11, state: 0 };
+  const temperature = { id: "01/ES/AC/Values/RmTmp", value: 24.1, state: 0, unit: "°C" };
+  const writes = [];
+  const { container, update, view } = setup(t, [], async (command) => writes.push(command), false, "first", { model });
+  const state = {
+    widgets: [set, feedback, temperature], metadataById: { [set.id]: { writeable: 1 } }, roomByZone: { "ES/Room": "Kitchen" },
+    deviceSettings: [{ key: owner, label: "Dining light", room: "Dining room", primaryPointId: temperature.id, secondaryPointIds: [feedback.id] }],
+  };
+  update([], "first", state);
+  assert.equal(byClass(container, "dc-card-title")[0].textContent, "Dining light");
+  assert.equal(byClass(container, "dc-room")[0].textContent, "Dining room");
+  const main = byClass(container, "dc-metric-main")[0];
+  assert.equal(byClass(main, "dc-metric-value")[0].textContent, "24,1 °C");
+  assert.equal(byClass(main, "dc-metric-label")[0].textContent, "Temperatura");
+  assert.equal(byClass(container, "dc-metric-value")[1].textContent, "11");
+  const filters = byClass(container, "dc-room-filter");
+  const dining = filters.find((entry) => entry.textContent === "Dining room");
+  dining.dispatch("click");
+  assert.equal(byClass(container, "dc-card")[0].hidden, false);
+  assert.equal(byClass(container, "dc-card")[1].hidden, true);
+  const slider = byClass(container, "dc-range")[0];
+  slider.value = "67";
+  slider.dispatch("change");
+  await flush();
+  assert.deepEqual(writes, [{ widgetId: set.id, value: 67 }]);
+  assert.equal(view.getDevices()[0].key, owner);
+  assert.equal(view.getDevices()[0].metrics.primary.id, temperature.id);
+
+  update([], "second", { ...state, deviceSettings: [{ key: owner, room: "Bedroom", primaryPointId: null, secondaryPointIds: [] }] });
+  assert.equal(byClass(container, "dc-card-title")[0].textContent, "L1");
+  assert.equal(byClass(container, "dc-room")[0].textContent, "Bedroom");
+  assert.equal(byClass(byClass(container, "dc-card")[0], "dc-metric-value").length, 1);
+  assert.equal(byClass(container, "dc-metric-value")[0].textContent, "11");
+  assert.equal(byClass(container, "dc-room-filter").some((entry) => entry.textContent === "Dining room"), false);
+  assert.equal(byClass(container, "dc-room-filter").some((entry) => entry.textContent === "Bedroom"), true);
+  assert.equal(byClass(container, "dc-room-filter")[0].attributes["aria-pressed"], "true");
+});
+
+test("a missing chosen metric displays an unavailable placeholder instead of owner feedback", (t) => {
+  const model = require("../public/deviceModel");
+  const owner = "ES/Room/L1";
+  const { container, update } = setup(t, [], undefined, false, undefined, { model });
+  const widgets = [
+    { id: `01/${owner}/Values/LtPct`, value: 40, state: 0 },
+    { id: `01/${owner}/Values/LtVal`, value: 11, state: 0 },
+  ];
+  update([], undefined, { widgets, deviceSettings: [{ key: owner, primaryPointId: "01/deleted", secondaryPointIds: [] }] });
+  assert.equal(byClass(container, "dc-metric-value")[0].textContent, "—");
+  assert.equal(byClass(container, "dc-metric-label")[0].textContent, "Odabrano očitanje nije dostupno");
+  assert.equal(byClass(container, "dc-metric-value")[0].title, "Nedostupno");
+  assert.equal(byClass(container, "dc-metric")[0].className.includes("dc-reading-warning"), true);
+  assert.equal(byClass(container, "dc-range").length, 1);
+});
+
+test("primary display units update between automatic, literal and unitless without altering secondary units or controls", async (t) => {
+  const model = require("../public/deviceModel");
+  const owner = "ES/Room/Group1";
+  const set = { id: `01/${owner}/Values/GrpPct`, value: 80, state: 0, writable: true, unit: "None" };
+  const secondary = { id: `01/${owner}/Values/RmCO2`, value: 580, state: 0, unit: "ppm" };
+  const writes = [];
+  const { container, update } = setup(t, [], async (command) => writes.push(command), false, undefined, { model });
+  const state = { widgets: [set, secondary], metadataById: { [set.id]: { writeable: 1 } } };
+  for (const [primaryUnit, expected] of [[null, "80 %"], ["", "80"], [" custom ", "80 custom"], [null, "80 %"]]) {
+    update([], undefined, { ...state, deviceSettings: [{ key: owner, primaryUnit, secondaryPointIds: [secondary.id] }] });
+    assert.equal(byClass(container, "dc-metric-value")[0].textContent, expected);
+    assert.equal(byClass(container, "dc-metric-value")[1].textContent, "580 ppm");
+    assert.equal(byClass(container, "dc-range")[0].min, "0");
+    assert.equal(byClass(container, "dc-range")[0].max, "100");
+    assert.equal(byClass(container, "dc-control-output")[0].textContent, "80 %");
+  }
+  assert.deepEqual(writes, []);
+  update([], undefined, { ...state, deviceSettings: [{ key: owner, primaryUnit: "arbitrary label", secondaryPointIds: [secondary.id] }] });
+  const slider = byClass(container, "dc-range")[0];
+  slider.value = "55";
+  slider.dispatch("change");
+  await flush();
+  assert.deepEqual(writes, [{ widgetId: set.id, value: 55 }]);
+});
+
+test("an explicit humidity display unit remains literal instead of applying the automatic RH abbreviation", (t) => {
+  const model = require("../public/deviceModel");
+  const owner = "ES/Room/Sensor1";
+  const humidity = { id: `01/${owner}/Values/RmRh`, value: 52, state: 0, unit: "%RH" };
+  const { container, update } = setup(t, [], undefined, false, undefined, { model });
+  for (const [primaryUnit, expected] of [[null, "52 %"], ["%RH", "52 %RH"], ["", "52"]]) {
+    update([], undefined, { widgets: [humidity], deviceSettings: [{ key: owner, primaryPointId: humidity.id, primaryUnit }] });
+    assert.equal(byClass(container, "dc-metric-value")[0].textContent, expected);
+  }
 });

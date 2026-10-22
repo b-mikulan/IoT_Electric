@@ -3,7 +3,7 @@
 
   const svgPaths = {
     light: ["M9 18h6m-5 3h4", "M8.5 14.5a6 6 0 1 1 7 0c-.9.7-1.5 1.6-1.5 3.5h-4c0-1.9-.6-2.8-1.5-3.5Z"],
-    climate: ["M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9", "m9 5 3 3 3-3m-6 14 3-3 3 3m-9-9 4 1-1 4m14-6-4 1 1 4m-14 2 1-4 4 1m12 3-1-4-4 1"],
+    climate: ["M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"],
     blind: ["M4 4h16v16H4zM4 8h16M4 12h16M4 16h16M17 4v13m-1 0h2v3h-2z"],
     sensor: ["M12 13v4m-2 0h4", "M5 9a10 10 0 0 1 14 0M8 12a6 6 0 0 1 8 0M11 15a2 2 0 0 1 2 0"],
     zone: ["M3 11 12 3l9 8M5 9v12h14V9M9 21v-7h6v7"],
@@ -12,7 +12,7 @@
   };
   const roleLabels = {
     brightnessSet: "Zadana svjetlina", brightnessStatus: "Očitana svjetlina",
-    positionSet: "Zadani položaj", positionStatus: "Očitani položaj", slatSet: "Zadani položaj lamela", slatStatus: "Očitani kut lamela",
+    positionSet: "Zadani položaj", positionStatus: "Očitani položaj", slatSet: "Zadani kut lamela", slatStatus: "Očitani kut lamela",
     temperature: "Temperatura", humidity: "Vlažnost", co2: "CO₂", setpoint: "Zadana temperatura",
     fanSpeed: "Ventilator", modeSet: "Zadani način rada", modeStatus: "Način rada uređaja", power: "Napajanje",
     illuminance: "Osvijetljenost", occupancy: "Prisutnost",
@@ -88,8 +88,8 @@
     const positionReading = ["positionSet", "positionStatus", "slatSet", "slatStatus"].includes(point?.role);
     const text = number === null ? String(value) : (positionReading ? preciseFormatter : formatter).format(number);
     let unit = point?.unit || "";
-    if (point?.role === "humidity" && /^%\s*RH$/i.test(unit)) unit = "%";
-    if (point?.role === "brightnessSet" && !unit && point?.control?.rangeConfirmed === true && Number(point.control.min) === 0 && Number(point.control.max) === 100) unit = "%";
+    if (!point?.unitOverridden && point?.role === "humidity" && /^%\s*RH$/i.test(unit)) unit = "%";
+    if (!point?.unitOverridden && point?.role === "brightnessSet" && !unit && point?.control?.rangeConfirmed === true && Number(point.control.min) === 0 && Number(point.control.max) === 100) unit = "%";
     return `${text}${unit ? ` ${unit}` : ""}`;
   }
 
@@ -268,16 +268,18 @@
         if (cards.get(card.device.key) === card) card.update(card.device);
       }
 
-      function metric(role, label, large = false) {
-        if (!pointFor(role)) return;
+      function metric(source, label, large = false) {
+        const currentPoint = typeof source === "function" ? source : () => pointFor(source);
+        if (!currentPoint()) return;
         const wrapper = el("div", `dc-metric${large ? " dc-metric-main" : ""}`);
         const value = el("strong", "dc-metric-value");
-        const caption = el("span", "dc-metric-label", label || roleLabels[role] || role);
+        const caption = el("span", "dc-metric-label");
         wrapper.append(value, caption);
         body.append(wrapper);
         card.bindings.push(() => {
-          const point = pointFor(role);
+          const point = currentPoint();
           value.textContent = point?.error ? "—" : format(point);
+          caption.textContent = label || point?.metricLabel || roleLabels[point?.role] || point?.label || "Očitanje";
           wrapper.classList.toggle("dc-reading-warning", point?.error || [1, 2, 3, 4].includes(Number(point?.state)));
           value.title = statusName(point);
         });
@@ -468,23 +470,18 @@
         body.replaceChildren();
         card.bindings = [];
         const roles = card.device.roles || {};
-        if (card.device.type === "light" || card.device.type === "lightGroup") {
+        if (card.device.metrics) {
+          if (card.device.metrics.primary) metric(() => card.device.metrics.primary, null, true);
+          card.device.metrics.secondary.forEach((_, index) => metric(() => card.device.metrics.secondary[index]));
+        } else if (card.device.type === "light" || card.device.type === "lightGroup") {
           metric(roles.brightnessStatus ? "brightnessStatus" : "brightnessSet", roles.brightnessStatus ? "Očitana svjetlina" : "Očitana zadana svjetlina", true);
-          lightToggle();
-          range("brightnessSet", demoMode ? "Svjetlina · simulacija" : "Svjetlina");
         } else if (card.device.type === "climate") {
           metric("temperature", "Temperatura", true);
           metric("humidity");
           metric("co2");
           metric("modeStatus", "Način rada uređaja");
-          stepper("setpoint", "Zadana temperatura");
-          selection("modeSet", "Način rada");
-          selection("fanSpeed", "Ventilator");
-          selection("power", "Napajanje");
         } else if (card.device.type === "blind") {
           metric(roles.positionStatus ? "positionStatus" : "positionSet", roles.positionStatus ? "Očitani položaj" : "Očitani zadani položaj", true);
-          range("positionSet", demoMode ? "Položaj · simulacija" : "Položaj");
-          range("slatSet", demoMode ? "Položaj lamela · simulacija" : "Položaj lamela");
         } else if (card.device.type === "sensor" || card.device.type === "zone") {
           metric("illuminance", "Osvijetljenost", true);
           metric("occupancy");
@@ -492,10 +489,22 @@
           metric("humidity");
           metric("co2");
         }
+        if (card.device.type === "light" || card.device.type === "lightGroup") {
+          lightToggle();
+          range("brightnessSet", demoMode ? "Svjetlina · simulacija" : "Svjetlina");
+        } else if (card.device.type === "climate") {
+          stepper("setpoint", "Zadana temperatura");
+          selection("modeSet", "Način rada");
+          selection("fanSpeed", "Ventilator");
+          selection("power", "Napajanje");
+        } else if (card.device.type === "blind") {
+          range("positionSet", demoMode ? "Položaj · simulacija" : "Položaj");
+          range("slatSet", demoMode ? "Kut lamela · simulacija" : "Kut lamela");
+        }
         if (!body.childElementCount) {
           const list = el("div", "dc-generic-readings");
           body.append(list);
-          const readings = (card.device.primary || []).slice(0, 3);
+          const readings = card.device.metrics ? [] : (card.device.primary || []).slice(0, 3);
           for (const original of readings) {
             const row = el("div", "dc-generic-reading");
             const label = el("span", "", original.label);
@@ -562,12 +571,12 @@
           command.status = "readback";
           drafts.delete(draftKey(command.role));
         }
-        const signature = JSON.stringify([device.type, demoMode, Object.entries(device.roles || {}).map(([role, point]) => [role, point.id, point.control]), (device.primary || []).map((point) => point.id)]);
+        const signature = JSON.stringify([device.type, demoMode, Object.entries(device.roles || {}).map(([role, point]) => [role, point.id, point.control]), (device.primary || []).map((point) => point.id), device.metrics ? [[device.metrics.primary?.id, device.metrics.primary?.unit, device.metrics.primary?.unitOverridden], device.metrics.secondary.map((point) => point.id)] : null]);
         if (signature !== card.signature) { card.signature = signature; renderBody(); }
         for (const binding of card.bindings) binding();
         card.forceControlSync = null;
         states.replaceChildren();
-        const points = [...(device.primary || []), ...(device.diagnostics || []), ...Object.values(device.roles || {})];
+        const points = [...(device.primary || []), ...(device.diagnostics || []), ...Object.values(device.roles || {}), device.metrics?.primary, ...(device.metrics?.secondary || [])].filter(Boolean);
         const forced = points.some((point) => Number(point.state) === 2);
         const failed = points.some((point) => point.error || [1, 3, 4].includes(Number(point.state)));
         if (connection !== "connected") states.append(el("span", "dc-state dc-state-warning", "Bez svježih očitanja"));
@@ -592,7 +601,7 @@
       return card;
     }
 
-    function update({ widgets = [], status = "idle", metadataById = {}, roomByZone = {}, demo = false, warnings = [], readAt, syncedAt, settingsEnabled: editingEnabled = false } = {}) {
+    function update({ widgets = [], status = "idle", metadataById = {}, roomByZone = {}, deviceSettings = [], demo = false, warnings = [], readAt, syncedAt, settingsEnabled: editingEnabled = false } = {}) {
       if (destroyed) return;
       settingsEnabled = editingEnabled === true;
       if (demoMode !== Boolean(demo)) { drafts.clear(); commands.clear(); }
@@ -610,7 +619,7 @@
       readWarning.hidden = warningTexts.length === 0;
       readWarning.textContent = warningTexts[0] || "";
       readWarning.title = warningTexts.join("\n");
-      const result = globalThis.IoTDeviceModel?.buildDevices(widgets, { metadataById, roomByZone });
+      const result = globalThis.IoTDeviceModel?.buildDevices(widgets, { metadataById, roomByZone, deviceSettings });
       devices = Array.isArray(result) ? result : result?.devices || [];
       const present = new Set(devices.map((device) => device.key));
       for (const [key, card] of cards) {
@@ -638,7 +647,7 @@
     }
 
     update();
-    return { update, destroy() { destroyed = true; drafts.clear(); commands.clear(); cards.clear(); container.replaceChildren(); } };
+    return { update, getDevices() { return devices.slice(); }, destroy() { destroyed = true; drafts.clear(); commands.clear(); cards.clear(); devices = []; container.replaceChildren(); } };
   }
 
   const api = { create };

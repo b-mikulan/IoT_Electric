@@ -310,3 +310,171 @@ test("real command validation enforces numeric bounds and controller enum option
     assert.equal(validateDeviceCommand(target, max + 0.5).allowed, false);
   }
 });
+
+test("device metrics preserve automatic card defaults and expose their source IDs without granting writes", () => {
+  const values = [
+    point(light, "LtPct"), point(light, "LtVal", { value: 14 }),
+    point(blind, "BlndPos"), point(blind, "BlndVal", { value: 50 }), point(blind, "BlndSlt"),
+    point(ac, "RmTmp", { value: 24.1, unit: "°C" }), point(ac, "RmRh", { value: 52, unit: "%RH" }),
+    point(ac, "RmCO2", { value: 580, unit: "ppm" }), point(ac, "SysMdSts"), point(ac, "EffSpt", { value: 22, unit: "°C" }),
+  ];
+  const devices = buildDevices(values);
+  const climate = devices.find((device) => device.key === ac);
+  assert.equal(climate.metrics.primary.id, point(ac, "RmTmp").id);
+  assert.deepEqual(climate.defaultMetrics, {
+    primaryPointId: climate.roles.temperature.id,
+    secondaryPointIds: [climate.roles.humidity.id, climate.roles.co2.id, climate.roles.modeStatus.id],
+  });
+  assert.deepEqual(climate.metrics.secondary.map((metric) => metric.role), ["humidity", "co2", "modeStatus"]);
+  assert.equal(climate.metrics.primary.command, false);
+  assert.equal(climate.metrics.primary.control, null);
+  assert.equal(climate.metrics.primary.writeAllowed, false);
+  assert.equal(climate.roles.setpoint.command, true);
+  assert.equal(devices.find((device) => device.key === light).metrics.primary.role, "brightnessStatus");
+  assert.equal(devices.find((device) => device.key === blind).metrics.primary.role, "positionStatus");
+  assert.equal(devices.find((device) => device.key === blind).roles.slatSet.label, "Zadani kut lamela");
+});
+
+test("persisted display overrides can select cross-device readings and commands without moving controls or owners", () => {
+  const brightness = point(light, "LtPct", { value: 17 });
+  const temperature = point(ac, "RmTmp", { value: 24.1, unit: "°C" });
+  const values = [brightness, point(light, "LtVal", { value: 14 }), temperature];
+  const options = {
+    metadataById: metadata(brightness.id), roomByZone: { [zone]: "Kitchen" },
+    deviceSettings: [{ key: light, label: "Dining light", room: "Dining room", primaryPointId: temperature.id, secondaryPointIds: [brightness.id] }],
+  };
+  const original = JSON.stringify([values, options]);
+  const [device] = buildDevices(values, options);
+  assert.equal(device.key, light);
+  assert.equal(device.label, "Dining light");
+  assert.equal(device.automaticLabel, "L3307");
+  assert.deepEqual(device.automaticRoom, { label: "Kitchen", source: zone });
+  assert.equal(device.room.label, "Dining room");
+  assert.equal(device.metrics.primary.id, temperature.id);
+  assert.equal(device.metrics.primary.value, 24.1);
+  assert.equal(device.metrics.secondary[0].id, brightness.id);
+  assert.equal(device.metrics.secondary[0].value, 17);
+  assert.equal(device.metrics.secondary[0].unit, "%");
+  assert.equal(device.metrics.secondary[0].command, false);
+  assert.equal(device.metrics.secondary[0].liveControlAvailable, false);
+  assert.equal(validateDeviceCommand(device.metrics.secondary[0], 40).allowed, false);
+  assert.equal(device.roles.brightnessSet.id, brightness.id);
+  assert.equal(device.roles.brightnessSet.command, true);
+  assert.equal(device.roles.brightnessSet.liveControlAvailable, true);
+  assert.equal(device.roles.temperature, undefined);
+  assert.equal(device.type, "light");
+  assert.equal(JSON.stringify([values, options]), original);
+});
+
+test("metric choices keep visible alias observations distinct from their deduplicated native source", () => {
+  const source = point(ac, "FanSpd", { value: 3 });
+  const alias = { ...source, id: `11/${ac}/Values/FanSpd/Value`, value: 0, state: 2, error: "Alias read failed" };
+  const target = point(light, "LtPct");
+  const [climate, targetDevice] = buildDevices([source, alias, target], {
+    metadataById: { ...metadata(source.id, { description: "Fan speed: 0=Auto, 1=High, 2=Med, 3=Low" }), ...metadata(alias.id, { description: "Value" }) },
+    deviceSettings: [{ key: light, primaryPointId: alias.id }, { key: ac, secondaryPointIds: [alias.id] }],
+  });
+  assert.equal(climate.roles.fanSpeed.id, source.id);
+  assert.equal(climate.roles.fanSpeed.value, 3);
+  assert.equal(targetDevice.metrics.primary.id, alias.id);
+  assert.equal(targetDevice.metrics.primary.value, 0);
+  assert.equal(targetDevice.metrics.primary.state, 2);
+  assert.equal(targetDevice.metrics.primary.error, "Alias read failed");
+  assert.equal(targetDevice.metrics.primary.metadata.enumValues[0].label, "Auto");
+  assert.equal(targetDevice.metrics.primary.liveControlAvailable, false);
+  assert.equal(climate.metrics.secondary[0].id, alias.id);
+  assert.equal(climate.metrics.secondary[0].value, 0);
+  assert.equal(climate.metrics.secondary[0].state, 2);
+  assert.equal(climate.metrics.secondary[0].error, "Alias read failed");
+});
+
+test("secondary metrics exclude saved foreign owners even when names or custom raw groups match", () => {
+  const own = point(ac, "RmRh", { value: 52, unit: "%RH" });
+  const temperature = point(ac, "RmTmp", { value: 24, unit: "°C" });
+  const otherController = point(ac.replace("RP31", "RP99"), "RmRh", { group: ac, value: 80 });
+  const otherDevice = point(light, "LtVal", { group: ac, value: 15 });
+  const foreignAlias = { ...otherController, id: `11/${ac.replace("RP31", "RP99")}/Values/RmRh/Value` };
+  const settings = [{ key: ac, primaryPointId: otherDevice.id, secondaryPointIds: [otherController.id, own.id, foreignAlias.id] }];
+  const original = JSON.stringify(settings);
+  const device = buildDevices([temperature, own, otherController, otherDevice, foreignAlias], { deviceSettings: settings })
+    .find((entry) => entry.key === ac);
+  assert.equal(device.metrics.primary.id, otherDevice.id);
+  assert.deepEqual(device.metrics.secondary.map((metric) => metric.id), [own.id]);
+  assert.equal(JSON.stringify(settings), original);
+});
+
+test("missing and hidden metric references stay unavailable and null overrides restore automatic choices", () => {
+  const brightness = point(light, "LtPct");
+  const feedback = point(light, "LtVal", { value: 14 });
+  const hidden = point(ac, "RmTmp", { visible: false, unit: "°C", value: 24.1 });
+  const missingOwn = point(light, "RemovedReading").id;
+  const values = [brightness, feedback, hidden];
+  const options = { roomByZone: { [zone]: "Kitchen" } };
+  const [unavailable] = buildDevices(values, { ...options, deviceSettings: [{
+    key: light, room: "", primaryPointId: hidden.id, secondaryPointIds: [missingOwn, "01/deleted-point", hidden.id],
+  }] });
+  assert.equal(unavailable.room, null);
+  assert.equal(unavailable.metrics.primary.id, hidden.id);
+  assert.equal(unavailable.metrics.primary.missing, true);
+  assert.equal(unavailable.metrics.primary.value, null);
+  assert.equal(unavailable.metrics.primary.liveControlAvailable, false);
+  assert.equal(unavailable.metrics.secondary.length, 1);
+  assert.equal(unavailable.metrics.secondary[0].id, missingOwn);
+  assert.equal(unavailable.metrics.secondary[0].missing, true);
+  const [emptySecondary] = buildDevices(values, { ...options, deviceSettings: [{ key: light, secondaryPointIds: [] }] });
+  assert.deepEqual(emptySecondary.metrics.secondary, []);
+  const [automatic] = buildDevices(values, { ...options, deviceSettings: [{ key: light, label: null, room: null, primaryPointId: null, secondaryPointIds: null }] });
+  assert.equal(automatic.label, automatic.automaticLabel);
+  assert.equal(automatic.room.label, "Kitchen");
+  assert.equal(automatic.metrics.primary.id, feedback.id);
+  assert.equal(automatic.metrics.primary.value, 14);
+  assert.equal(automatic.metrics.primary.metricLabel, "Očitana svjetlina");
+});
+
+test("a custom primary reading is excluded from automatic secondary readings", () => {
+  const temperature = point(ac, "RmTmp", { value: 24, unit: "°C" });
+  const humidity = point(ac, "RmRh", { value: 52, unit: "%RH" });
+  const co2 = point(ac, "RmCO2", { value: 580, unit: "ppm" });
+  const [device] = buildDevices([temperature, humidity, co2], {
+    deviceSettings: [{ key: ac, primaryPointId: humidity.id, secondaryPointIds: null }],
+  });
+  assert.equal(device.metrics.primary.id, humidity.id);
+  assert.deepEqual(device.metrics.secondary.map((metric) => metric.id), [co2.id]);
+});
+
+test("primary display unit overrides affect only the display clone and retain automatic fallbacks and controller semantics", () => {
+  const height = point(blind, "BlndPos", { value: 50, unit: "None" });
+  const actual = point(blind, "BlndVal", { value: 50.581, unit: "None" });
+  const slats = point(blind, "BlndSlt", { value: 50 });
+  const angle = point(blind, "BlndAng", { value: 49 });
+  const options = { metadataById: { ...metadata(height.id), ...metadata(slats.id) } };
+  const values = [height, actual, slats, angle];
+  const original = JSON.stringify([values, options]);
+  const [automatic] = buildDevices(values, options);
+  assert.equal(automatic.primaryAutomaticUnit, "%");
+  assert.equal(automatic.metrics.primary.unit, "%");
+  assert.equal(automatic.metrics.primary.unitOverridden, undefined);
+  for (const [supplied, expected] of [["  degrees  ", "degrees"], ["", ""], [null, "%"]]) {
+    const [custom] = buildDevices(values, { ...options, deviceSettings: [{ key: blind, primaryUnit: supplied, secondaryPointIds: [angle.id] }] });
+    assert.equal(custom.metrics.primary.unit, expected);
+    assert.equal(custom.metrics.primary.unitOverridden, supplied === null ? undefined : true);
+    assert.equal(custom.primaryAutomaticUnit, "%");
+    assert.equal(custom.metrics.primary.value, 50.581);
+    assert.equal(custom.metrics.primary.metadata.unit, "None");
+    assert.equal(custom.metrics.secondary[0].unit, "");
+    assert.equal(custom.metrics.secondary[0].unitOverridden, undefined);
+    assert.deepEqual(custom.roles, automatic.roles);
+    assert.deepEqual(validateDeviceCommand(custom.roles.positionSet, 50), { allowed: true, value: 50 });
+    assert.equal(validateDeviceCommand(custom.metrics.primary, 50).allowed, false);
+  }
+  assert.equal(JSON.stringify([values, options]), original);
+  const [group] = buildDevices([point(light, "GrpPct", { value: 80 })]);
+  assert.equal(group.primaryAutomaticUnit, "%");
+  assert.equal(group.metrics.primary.unit, "%");
+  const [humidity] = buildDevices([point(ac, "RmRh", { value: 52, unit: "%RH" })], {
+    deviceSettings: [{ key: ac, primaryPointId: point(ac, "RmRh").id, primaryUnit: "%RH" }],
+  });
+  assert.equal(humidity.primaryAutomaticUnit, "%");
+  assert.equal(humidity.metrics.primary.unit, "%RH");
+  assert.equal(humidity.roles.humidity.unit, "%RH");
+});

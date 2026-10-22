@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "devices": [
+    {
+      "key": "ES/Application/Items/AC1",
+      "label": "Klima dnevnog boravka",
+      "room": "Dnevni boravak",
+      "primaryPointId": "01/ES/Application/Items/AC1/Values/RmTmp",
+      "primaryUnit": "°C",
+      "secondaryPointIds": [
+        "01/ES/Application/Items/AC1/Values/RmRh",
+        "01/ES/Application/Items/AC1/Values/RmCO2"
+      ]
+    },
+    {
+      "key": "ES/Application/Items/Light1",
+      "label": null,
+      "room": null,
+      "primaryPointId": null,
+      "primaryUnit": null,
+      "secondaryPointIds": null
+    }
+  ]
+}

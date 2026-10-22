@@ -772,6 +772,42 @@ h1 {
   background: #f2f6f5;
 }
 
+.device-settings-dialog { width: min(680px, calc(100% - 32px)); }
+.device-settings-dialog .discovery-shell { max-height: min(88vh, 980px); overflow-y: auto; }
+.device-settings-form { margin-top: 24px; }
+.device-settings-form .settings-field { min-width: 0; }
+.device-primary-settings { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 8px 16px; align-items: start; }
+.device-unit-field { margin-top: 10px; }
+.device-settings-form select { width: 100%; min-height: 44px; height: auto; padding: 9px 30px 9px 12px; border: 1px solid var(--border); border-radius: 9px; background-color: #fafcfb; color: var(--ink); font: inherit; font-size: .86rem; }
+.device-settings-form input[type="text"], .device-settings-form input[type="search"] { box-sizing: border-box; padding: 0 12px; border: 1px solid var(--border); border-radius: 9px; background: #fafcfb; font-size: .9rem; }
+.device-settings-form input:focus, .device-settings-form select:focus-visible { border-color: var(--brand); outline: 2px solid #00857720; outline-offset: 1px; box-shadow: none !important; }
+.device-settings-section { padding-top: 19px; border-top: 1px solid var(--border); }
+.device-settings-section h3 { margin: 0 0 7px; color: var(--ink); font-size: .94rem; font-weight: 700; }
+.device-settings-section p { margin: 0; color: var(--muted); font-size: .81rem; line-height: 1.6; }
+.device-metric-options { max-height: 232px; overflow-y: auto; display: grid; gap: 5px; padding: 9px 0; margin-top: 5px; }
+.device-metric-options .device-metric-option { display: flex; align-items: center; gap: 11px; margin: 0 !important; padding: 10px 11px; border-radius: 9px; background: #f6f9f7; cursor: pointer; color: var(--ink) !important; font-weight: 500 !important; }
+.device-metric-option:hover { background: #edf5f1; }
+.device-metric-option input[type="checkbox"] { appearance: auto; position: relative; opacity: 1; pointer-events: auto; flex: 0 0 18px; height: 18px; width: 18px; margin: 0; accent-color: var(--brand); }
+/* Use the native checkbox; Materialize's absolute pseudo-elements escape the scrolling list. */
+.device-metric-option input[type="checkbox"]::before,
+.device-metric-option input[type="checkbox"]::after { content: none; display: none; }
+.device-metric-option input:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.device-metric-option span { display: block; min-width: 0; font-size: .8rem; overflow-wrap: anywhere; }
+.device-metric-option small { font-size: .7rem; font-weight: 400; margin-top: 3px; }
+.device-metric-option:has(input:disabled) { opacity: .55; cursor: default; }
+.device-settings-tools { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 7px; padding-top: 12px; border-top: 1px solid var(--border); }
+.device-settings-tools .btn-flat { height: auto; padding: 7px 9px; line-height: 1.5; font-size: .76rem; text-transform: none; color: var(--brand); }
+.device-settings-form .settings-actions { padding-top: 0; }
+.device-settings-form .settings-actions .btn { color: #fff; }
+@media (max-width: 650px) {
+  .device-settings-dialog { width: calc(100% - 20px); }
+  .device-settings-dialog .discovery-shell { max-height: 90vh; }
+  .device-settings-tools { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 480px) {
+  .device-primary-settings { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+}
+
 .settings-field small {
   display: block;
   margin-top: 6px;

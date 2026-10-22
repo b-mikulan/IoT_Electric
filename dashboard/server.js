@@ -4,6 +4,7 @@ const { createApp } = require("./app");
 const { loadConfig } = require("./lib/config");
 const { PointPoller } = require("./lib/pointPoller");
 const { WidgetStore } = require("./lib/widgetStore");
+const { DeviceWidgetStore } = require("./lib/deviceWidgetStore");
 
 function createRuntime(env = process.env) {
   const config = loadConfig(env);
@@ -17,9 +18,10 @@ function createRuntime(env = process.env) {
     demoMode: config.demoMode,
   });
   const widgetStore = new WidgetStore(config.demoMode ? "" : config.widgetsFile);
-  const app = createApp({ poller, config, widgetStore });
+  const deviceWidgetStore = new DeviceWidgetStore(config.demoMode ? "" : config.deviceWidgetsFile, { protectedFilePath: config.widgetsFile });
+  const app = createApp({ poller, config, widgetStore, deviceWidgetStore });
 
-  return { app, config, poller, widgetStore };
+  return { app, config, poller, widgetStore, deviceWidgetStore };
 }
 
 if (require.main === module) {

@@ -43,6 +43,7 @@ test("parses real widget configuration and requires client credentials", () => {
   assert.equal(config.widgets[0].writable, true);
   assert.equal(config.widgets[0].visible, true);
   assert.equal(config.widgetsFile, "");
+  assert.equal(config.deviceWidgetsFile, "");
 });
 
 test("keeps widgets read-only unless writable is an explicit boolean", () => {
@@ -87,6 +88,14 @@ test("loads widget configuration from a JSON file", () => {
     config.widgetsFile,
     path.join(__dirname, "fixtures", "widgets.json")
   );
+  assert.equal(config.deviceWidgetsFile, path.join(__dirname, "fixtures", "device-widgets.json"));
+});
+
+test("supports an explicit card settings file with inline points and rejects sharing the raw file", () => {
+  const base = { DEMO_MODE: "false", MIDDLEWARE_USER: "client", MIDDLEWARE_PASSWORD: "secret", WIDGETS_JSON: '[{"id":"temperature"}]' };
+  assert.equal(loadConfig({ ...base, DEVICE_WIDGETS_FILE: "./custom-cards.json" }).deviceWidgetsFile, "./custom-cards.json");
+  const widgetsFile = path.join(__dirname, "fixtures", "widgets.json");
+  assert.throws(() => loadConfig({ ...base, WIDGETS_JSON: "", WIDGETS_FILE: widgetsFile, DEVICE_WIDGETS_FILE: widgetsFile }), /must be separate/);
 });
 
 test("prefers inline widget JSON over a configured file", () => {

@@ -261,6 +261,79 @@
       </div>
     </dialog>
 
+    <dialog id="device-settings-dialog" class="discovery-dialog device-settings-dialog" aria-labelledby="device-settings-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <div>
+            <p class="eyebrow">Kartica uređaja</p>
+            <h2 id="device-settings-title">Postavke kartice</h2>
+          </div>
+          <button id="device-settings-close" class="dialog-close" type="button" aria-label="Zatvori postavke kartice">×</button>
+        </header>
+        <form id="device-settings-form" class="settings-form device-settings-form">
+          <div class="settings-field">
+            <label for="device-settings-label">Naziv kartice</label>
+            <input id="device-settings-label" type="text" maxlength="160" />
+            <small id="device-settings-label-hint">Prazno polje koristi automatski naziv uređaja.</small>
+          </div>
+          <div class="settings-field">
+            <label for="device-settings-room">Prostorija</label>
+            <select id="device-settings-room" class="browser-default"></select>
+          </div>
+          <div id="device-settings-new-room-field" class="settings-field settings-field-wide" hidden>
+            <label for="device-settings-new-room">Naziv nove prostorije</label>
+            <input id="device-settings-new-room" type="text" maxlength="160" placeholder="npr. Dnevni boravak" />
+          </div>
+          <div class="device-settings-section settings-field-wide">
+            <h3>Očitanja na kartici</h3>
+            <p>Odaberi glavni podatak i dodatna očitanja koja želiš vidjeti uz njega.</p>
+          </div>
+          <div class="device-primary-settings settings-field-wide">
+            <div class="settings-field">
+              <label for="device-settings-primary">Glavno očitanje</label>
+              <select id="device-settings-primary" class="browser-default"></select>
+            </div>
+            <div class="settings-field">
+              <label for="device-settings-unit-mode">Mjerna jedinica</label>
+              <select id="device-settings-unit-mode" class="browser-default">
+                <option value="auto">Automatski</option>
+                <option value="none">Bez jedinice</option>
+                <option value="custom">Vlastita jedinica</option>
+              </select>
+              <div id="device-settings-unit-field" class="device-unit-field" hidden>
+                <label for="device-settings-unit">Vlastita mjerna jedinica</label>
+                <input id="device-settings-unit" type="text" maxlength="40" placeholder="npr. %, °C, lx" />
+              </div>
+            </div>
+            <small id="device-settings-unit-hint" class="settings-context settings-field-wide"></small>
+          </div>
+          <div class="settings-field settings-field-wide">
+            <label for="device-settings-secondary-mode">Sekundarna očitanja</label>
+            <select id="device-settings-secondary-mode" class="browser-default">
+              <option value="auto">Automatski odabir za ovaj uređaj</option>
+              <option value="custom">Odaberi očitanja</option>
+            </select>
+            <small id="device-settings-secondary-hint"></small>
+          </div>
+          <div id="device-settings-secondary-field" class="settings-field settings-field-wide" hidden>
+            <label for="device-settings-search">Pronađi očitanje</label>
+            <input id="device-settings-search" type="search" placeholder="Naziv podatka ovog uređaja" autocomplete="off" />
+            <div id="device-settings-secondary-list" class="device-metric-options" role="group" aria-label="Odabir sekundarnih očitanja"></div>
+            <small id="device-settings-secondary-count">Najviše 12 dodatnih očitanja.</small>
+          </div>
+          <div class="device-settings-tools settings-field-wide">
+            <button id="device-settings-functions" class="btn-flat" type="button">Postavke funkcija uređaja</button>
+            <button id="device-settings-reset" class="btn-flat" type="button">Vrati automatski odabir</button>
+          </div>
+          <div class="settings-actions settings-field-wide">
+            <button id="device-settings-cancel" class="btn-flat" type="button">Odustani</button>
+            <button id="device-settings-save" class="btn" type="submit">Spremi karticu</button>
+          </div>
+        </form>
+        <p id="device-settings-status" class="discovery-status" role="status" aria-live="polite"></p>
+      </div>
+    </dialog>
+
     <dialog id="settings-dialog" class="discovery-dialog settings-dialog" aria-labelledby="settings-title">
       <div class="discovery-shell">
         <header class="discovery-header">

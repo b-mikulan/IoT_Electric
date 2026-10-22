@@ -5,6 +5,8 @@ const { widgetGroup } = require("./lib/config");
 const { DeviceMetadataClient } = require("./lib/deviceMetadata");
 const { createDeviceDemo } = require("./lib/deviceDemo");
 const { DeviceCommandService } = require("./lib/deviceCommands");
+const { DeviceWidgetStore } = require("./lib/deviceWidgetStore");
+const { buildDevices } = require("./public/deviceModel");
 
 const publicDirectory = path.join(__dirname, "public");
 const materializeDirectory = path.dirname(
@@ -88,7 +90,19 @@ function parseWidgetSettings(body) {
   };
 }
 
-function createApp({ poller, config, widgetStore = null, telemetry = new TelemetryClient(config), deviceMetadata = new DeviceMetadataClient(config), deviceCommands = new DeviceCommandService({ poller, config, deviceMetadata }) }) {
+function createApp({
+  poller,
+  config,
+  widgetStore = null,
+  deviceWidgetStore = new DeviceWidgetStore(
+    config.demoMode ? "" : config.deviceWidgetsFile ||
+      (config.widgetsFile ? path.join(path.dirname(config.widgetsFile), "device-widgets.json") : ""),
+    { protectedFilePath: config.widgetsFile }
+  ),
+  telemetry = new TelemetryClient(config),
+  deviceMetadata = new DeviceMetadataClient(config),
+  deviceCommands = new DeviceCommandService({ poller, config, deviceMetadata }),
+}) {
   if (!poller) throw new Error("A point poller is required.");
   if (!config) throw new Error("Dashboard configuration is required.");
 
@@ -111,6 +125,20 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
         response.end();
       }
     }
+  }
+
+  function deviceSettingsContext() {
+    return {
+      deviceKeys: buildDevices(config.widgets).map((device) => device.key),
+      pointIds: config.widgets.filter((widget) => widget.visible !== false).map((widget) => widget.id),
+    };
+  }
+
+  async function synchronizeDeviceSettings() {
+    const previous = JSON.stringify(deviceWidgetStore.devices);
+    const devices = await deviceWidgetStore.synchronize(deviceSettingsContext().deviceKeys);
+    if (JSON.stringify(devices) !== previous) broadcast("device-settings", { devices });
+    return devices;
   }
 
   poller.on("update", (payload) => broadcast("update", payload));
@@ -137,7 +165,14 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
   }
   poller.on("status", (payload) => broadcast("status", payload));
   poller.on("sync", (payload) => broadcast("sync", payload));
-  poller.on("config", (payload) => broadcast("config", payload));
+  poller.on("config", (payload) => {
+    broadcast("config", payload);
+    // The route updates config.widgets immediately after the poller event.
+    // Deferring synchronization includes newly discovered devices as well.
+    queueMicrotask(() => synchronizeDeviceSettings().catch((error) => {
+      broadcast("device-settings-error", { error: error.message, code: error.code || "DEVICE_SETTINGS_FAILED" });
+    }));
+  });
   poller.on("removed", (payload) => broadcast("removed", payload));
 
   app.get("/health", (request, response) => {
@@ -161,17 +196,44 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
     });
   });
 
-  app.get("/api/config", (request, response) => {
-    response.json({
-      title: "IoT Electric · PLC pregled",
-      demoMode: config.demoMode,
-      intervalMs: config.intervalMs,
-      discoveryEnabled: !config.demoMode,
-      widgetEditingEnabled:
-        !config.demoMode && Boolean(widgetStore?.enabled),
-      autoDiscovery,
-      widgets: config.widgets.map(publicWidget),
-    });
+  app.get("/api/config", async (request, response) => {
+    try {
+      const deviceSettings = await synchronizeDeviceSettings();
+      return response.json({
+        title: "IoT Electric · PLC pregled",
+        demoMode: config.demoMode,
+        intervalMs: config.intervalMs,
+        discoveryEnabled: !config.demoMode,
+        widgetEditingEnabled:
+          !config.demoMode && Boolean(widgetStore?.enabled),
+        deviceSettingsEnabled: Boolean(deviceWidgetStore.enabled),
+        deviceSettings,
+        autoDiscovery,
+        widgets: config.widgets.map(publicWidget),
+      });
+    } catch (error) {
+      return sendOperationError(response, error, "DEVICE_SETTINGS_FAILED", "Device card settings could not be loaded.");
+    }
+  });
+
+  app.get("/api/devices/settings", async (request, response) => {
+    response.set("Cache-Control", "no-store");
+    try {
+      return response.json({ enabled: Boolean(deviceWidgetStore.enabled), devices: await synchronizeDeviceSettings() });
+    } catch (error) {
+      return sendOperationError(response, error, "DEVICE_SETTINGS_FAILED", "Device card settings could not be loaded.");
+    }
+  });
+
+  app.post("/api/devices/settings", requireJson, express.json({ limit: "64kb" }), async (request, response) => {
+    response.set("Cache-Control", "no-store");
+    try {
+      const device = await deviceWidgetStore.save(request.body, deviceSettingsContext());
+      broadcast("device-settings", { devices: deviceWidgetStore.devices });
+      return response.json({ device });
+    } catch (error) {
+      return sendOperationError(response, error, "DEVICE_SETTINGS_UPDATE_FAILED", "Device card settings could not be saved.");
+    }
   });
 
   app.get("/api/snapshot", (request, response) => {
@@ -589,6 +651,7 @@ function createApp({ poller, config, widgetStore = null, telemetry = new Telemet
 
     sendEvent(response, "snapshot", poller.getSnapshot());
     sendEvent(response, "discovery", autoDiscovery);
+    sendEvent(response, "device-settings", { devices: deviceWidgetStore.devices });
     eventClients.add(response);
     const heartbeat = setInterval(() => response.write(": heartbeat\n\n"), 25_000);
 
