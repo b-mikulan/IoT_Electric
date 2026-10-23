@@ -25,6 +25,7 @@ jobs:
   test:
     name: Run tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Check out repository
@@ -46,6 +47,7 @@ jobs:
         run: npm ci --prefix dashboard
 
       - name: Run all tests
+        timeout-minutes: 5
         run: npm test
 
       - name: Validate Docker Compose files

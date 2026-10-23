@@ -8,7 +8,40 @@ const { createApp } = require("../app");
 const { createRuntime } = require("../server");
 const { PointPoller } = require("../lib/pointPoller");
 const { WidgetStore } = require("../lib/widgetStore");
+const { DeviceWidgetStore } = require("../lib/deviceWidgetStore");
 const { loadConfig } = require("../lib/config");
+
+function persistedDashboardCleanup(t, directory, widgetFile) {
+  const deviceWidgetStore = new DeviceWidgetStore(
+    path.join(directory, "device-widgets.json"),
+    { protectedFilePath: widgetFile }
+  );
+  let server;
+  t.after(async () => {
+    try {
+      if (server) {
+        await new Promise((resolve) => {
+          server.close(resolve);
+          server.closeAllConnections?.();
+        });
+      }
+    } finally {
+      try {
+        // Configuration events enqueue card settings writes after the HTTP
+        // response. Wait for that queue before deleting its directory.
+        await deviceWidgetStore.synchronize([]);
+      } finally {
+        await fs.rm(directory, {
+          recursive: true, force: true, maxRetries: 5, retryDelay: 20,
+        });
+      }
+    }
+  });
+  return {
+    deviceWidgetStore,
+    trackServer(value) { server = value; return server; },
+  };
+}
 
 class FakePoller extends EventEmitter {
   constructor() {
@@ -469,17 +502,16 @@ test("bulk deletion keeps widgets when saving fails and blocks overlapping autom
 
 async function startPersistedDashboard(t, widgets) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "dashboard-bulk-"));
-  t.after(() => fs.rm(directory, { recursive: true, force: true }));
   const widgetFile = path.join(directory, "widgets.json");
+  const cleanup = persistedDashboardCleanup(t, directory, widgetFile);
   await fs.writeFile(widgetFile, JSON.stringify(widgets));
   const env = { DEMO_MODE: "false", MIDDLEWARE_USER: "client", MIDDLEWARE_PASSWORD: "secret", WIDGETS_FILE: widgetFile };
   const config = loadConfig(env);
   const poller = new PointPoller({ ...config, fetchImpl: async () => ({ ok: true, json: async () => ({ values: widgets.map(({ id }) => ({ id, value: 42 })) }) }) });
   await poller.poll();
   const store = new WidgetStore(widgetFile);
-  const server = createApp({ poller, config, widgetStore: store }).listen(0, "127.0.0.1");
+  const server = cleanup.trackServer(createApp({ poller, config, widgetStore: store, deviceWidgetStore: cleanup.deviceWidgetStore }).listen(0, "127.0.0.1"));
   await new Promise((resolve) => server.once("listening", resolve));
-  t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections?.(); }));
   return { baseUrl: `http://127.0.0.1:${server.address().port}`, widgetFile, env, poller, config, store };
 }
 
@@ -731,17 +763,16 @@ test("group renaming shares the bulk lock with deletions and automatic discovery
 
 test("last-widget deletion persists across restart and broadcasts removal to open clients", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "dashboard-delete-"));
-  t.after(() => fs.rm(directory, { recursive: true, force: true }));
   const widgetFile = path.join(directory, "widgets.json");
+  const cleanup = persistedDashboardCleanup(t, directory, widgetFile);
   await fs.writeFile(widgetFile, JSON.stringify([{ id: "last", label: "Last", writable: true }]));
   const env = { DEMO_MODE: "false", MIDDLEWARE_USER: "client", MIDDLEWARE_PASSWORD: "secret", WIDGETS_FILE: widgetFile };
   const config = loadConfig(env);
   const poller = new PointPoller({ ...config, fetchImpl: async () => ({ ok: true, json: async () => ({ values: [{ id: "last", value: 1 }] }) }) });
   await poller.poll();
-  const app = createApp({ poller, config, widgetStore: new WidgetStore(widgetFile) });
-  const server = app.listen(0, "127.0.0.1");
+  const app = createApp({ poller, config, widgetStore: new WidgetStore(widgetFile), deviceWidgetStore: cleanup.deviceWidgetStore });
+  const server = cleanup.trackServer(app.listen(0, "127.0.0.1"));
   await new Promise((resolve) => server.once("listening", resolve));
-  t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections?.(); }));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
   const readers = await Promise.all([1, 2].map(async () => {
     const response = await fetch(`${baseUrl}/events`, { signal: AbortSignal.timeout(4000) });
@@ -774,8 +805,8 @@ test("last-widget deletion persists across restart and broadcasts removal to ope
 
 test("automatic discovery runs in the background, broadcasts additions, keeps existing settings and returns a tree", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "dashboard-auto-"));
-  t.after(() => fs.rm(directory, { recursive: true, force: true }));
   const widgetFile = path.join(directory, "widgets.json");
+  const cleanup = persistedDashboardCleanup(t, directory, widgetFile);
   const existing = { id: "existing", label: "Custom name", precision: 2, visible: false, writable: true };
   await fs.writeFile(widgetFile, JSON.stringify([existing]));
   const config = loadConfig({ DEMO_MODE: "false", MIDDLEWARE_USER: "client", MIDDLEWARE_PASSWORD: "secret", WIDGETS_FILE: widgetFile });
@@ -792,9 +823,8 @@ test("automatic discovery runs in the background, broadcasts additions, keeps ex
       : { containers: [{ valueItems: [{ id: `${id}/temperature`, name: "Temperature", unit: "°C", writeable: 1 }] }] } };
   } });
   const store = new WidgetStore(widgetFile);
-  const server = createApp({ poller, config, widgetStore: store }).listen(0, "127.0.0.1");
+  const server = cleanup.trackServer(createApp({ poller, config, widgetStore: store, deviceWidgetStore: cleanup.deviceWidgetStore }).listen(0, "127.0.0.1"));
   await new Promise((resolve) => server.once("listening", resolve));
-  t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections?.(); }));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
   const start = () => fetch(`${baseUrl}/api/discovery/auto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   async function completed() {
