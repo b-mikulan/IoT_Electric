@@ -12,6 +12,33 @@ function jsonResponse(body, status = 200) {
   };
 }
 
+test("changed values are published before fresh read and connection events, including recovery", async () => {
+  let value = 40;
+  let failed = false;
+  const poller = new PointPoller({ middlewareUrl: "http://fixture", widgets: [{ id: "point" }], fetchImpl: async () => {
+    if (failed) throw new Error("offline");
+    return jsonResponse({ values: [{ id: "point", value, state: 0 }] });
+  } });
+  const events = [];
+  for (const name of ["update", "status", "sync"]) poller.on(name, () => events.push(name));
+  await poller.poll();
+  assert.deepEqual(events, ["update", "status", "sync"]);
+  events.length = 0;
+  await poller.poll();
+  assert.deepEqual(events, ["sync"]);
+  events.length = 0;
+  value = 41;
+  await poller.poll();
+  assert.deepEqual(events, ["update", "sync"]);
+  failed = true;
+  await poller.poll();
+  events.length = 0;
+  failed = false;
+  value = 42;
+  await poller.poll();
+  assert.deepEqual(events, ["update", "status", "sync"]);
+});
+
 test("posts widget ids with Basic auth and exposes values without credentials", async () => {
   const requests = [];
   const updates = [];
@@ -682,10 +709,36 @@ test("automatic discovery traverses nested containers once and keeps all values 
   assert.deepEqual(poller.getSnapshot().widgets, []);
 });
 
-test("automatic discovery still fails when the root cannot be read", async () => {
+test("automatic discovery starts at a selected container and traverses only its children, including non-path IDs", async () => {
+  const requests = [];
+  const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets: [], fetchImpl: async (url) => {
+    const id = new URL(url).searchParams.get("id");
+    requests.push(id);
+    assert.ok(["00/floor & room", "opaque-child"].includes(id));
+    return jsonResponse({ containers: [{
+      containerItems: id === "00/floor & room" ? [{ id, name: "Self" }, { id: "opaque-child", name: "Child" }] : [],
+      valueItems: [{ id: `01/${id}/temperature`, name: "Temperature" }],
+    }] });
+  } });
+  const result = await poller.discoverAllValues({ containerId: " 00/floor & room " });
+  assert.deepEqual(requests, ["00/floor & room", "opaque-child"]);
+  assert.deepEqual(result.values.map((item) => item.id), ["01/00/floor & room/temperature", "01/opaque-child/temperature"]);
+  assert.deepEqual(result.tree[0], { id: "00/floor & room", name: "00/floor & room", kind: "container", parentId: null });
+  assert.equal(result.tree.find((item) => item.id === "opaque-child").parentId, "00/floor & room");
+});
+
+test("automatic discovery rejects invalid starting IDs without contacting middleware", async () => {
+  const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets: [], fetchImpl: async () => assert.fail("Unexpected middleware request") });
+  for (const containerId of [42, {}, "x".repeat(1025), "floor\nroom", "floor\0room"]) {
+    await assert.rejects(poller.discoverAllValues({ containerId }), { code: "INVALID_DISCOVERY_QUERY" });
+  }
+});
+
+test("automatic discovery fails when its root or selected starting container cannot be read", async () => {
   for (const payload of [{ containers: [], errors: [{ id: "root", message: "unavailable" }] }, {}]) {
     const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets: [], fetchImpl: async () => jsonResponse(payload) });
     await assert.rejects(poller.discoverAllValues(), { code: "INCOMPLETE_DISCOVERY" });
+    await assert.rejects(poller.discoverAllValues({ containerId: "floor" }), { code: "INCOMPLETE_DISCOVERY" });
   }
   const demo = new PointPoller({ demoMode: true, widgets: [] });
   await assert.rejects(demo.discoverAllValues(), { code: "DEMO_MODE" });
@@ -747,4 +800,49 @@ test("polls a large discovered dashboard in bounded requests and emits one compl
   assert.equal(snapshot.widgets.every((widget) => widget.value === 42 && widget.error === null), true);
   assert.equal(updates.length, 1);
   assert.equal(updates[0].widgets.length, 502);
+});
+
+test("configured smaller batches never overlap and leave the requested idle gap before the next read", async () => {
+  const widgets = Array.from({ length: 130 }, (_, index) => ({ id: `point-${index}` }));
+  const starts = [];
+  const ends = [];
+  const sizes = [];
+  let active = 0;
+  let peak = 0;
+  const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets, readBatchSize: 64, readBatchDelayMs: 20,
+    fetchImpl: async (_url, options) => {
+      starts.push(performance.now());
+      const { ids } = JSON.parse(options.body);
+      sizes.push(ids.length);
+      peak = Math.max(peak, ++active);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      active -= 1;
+      ends.push(performance.now());
+      return jsonResponse({ values: ids.map((id) => ({ id, value: 42, state: 0 })) });
+    } });
+  const [snapshot] = await Promise.all([poller.poll(), poller.poll()]);
+  assert.deepEqual(sizes, [64, 64, 2]);
+  assert.equal(peak, 1);
+  for (let index = 1; index < starts.length; index += 1) assert.ok(starts[index] - ends[index - 1] >= 18);
+  assert.equal(snapshot.widgets.filter((w) => w.value === 42).length, 130);
+});
+
+test("stopping during a read prevents subsequent batches from being sent", async () => {
+  let release;
+  let notifyStarted;
+  const started = new Promise((resolve) => { notifyStarted = resolve; });
+  let calls = 0;
+  const poller = new PointPoller({ middlewareUrl: "http://middleware", widgets: [{ id: "first" }, { id: "second" }], readBatchSize: 1, readBatchDelayMs: 10,
+    fetchImpl: async () => {
+      calls += 1;
+      notifyStarted();
+      await new Promise((resolve) => { release = resolve; });
+      return jsonResponse({ values: [{ id: "first", value: 42 }] });
+    } });
+  const operation = poller.poll();
+  await started;
+  poller.stop();
+  release();
+  await operation;
+  assert.equal(calls, 1);
 });

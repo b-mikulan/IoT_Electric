@@ -16,7 +16,7 @@ async function serve(t, config, deviceMetadata) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 
-test("demo dashboard keeps existing value widgets and supplies four synthetic device cards without controller access", async (t) => {
+test("demo dashboard preserves configured points on a separate technical page and supplies four synthetic device cards", async (t) => {
   const config = { demoMode: true, widgets: [{ id: "original-point", label: "Existing value" }], intervalMs: 1000 };
   const base = await serve(t, config, { read() { throw new Error("Demo must not contact middleware"); } });
   const metadata = await (await fetch(`${base}/api/devices/metadata`)).json();
@@ -32,7 +32,11 @@ test("demo dashboard keeps existing value widgets and supplies four synthetic de
   assert.equal(publicConfig.widgets.length, 1);
   assert.equal(publicConfig.widgets[0].id, "original-point");
   const html = await (await fetch(base)).text();
-  assert.ok(html.indexOf('id="device-cards-section"') < html.indexOf('id="raw-widgets-panel"'));
+  assert.match(html, /id="device-cards-section"/);
+  assert.doesNotMatch(html, /id="raw-widgets-panel"/);
+  const technical = await (await fetch(`${base}/technical.html`)).text();
+  assert.match(technical, /id="raw-widgets-panel"/);
+  assert.match(technical, /id="widget-grid"/);
   for (const resource of ["deviceModel.js", "deviceCards.js", "deviceCards.css"]) assert.equal((await fetch(`${base}/${resource}`)).status, 200);
 });
 

@@ -20,6 +20,7 @@
   const typeLabels = { light: "Svjetlo", lightGroup: "Grupa rasvjete", climate: "Klima", blind: "Roleta", sensor: "Senzor", zone: "Pregled zone", generic: "Uređaj" };
   const formatter = new Intl.NumberFormat("hr-HR", { maximumFractionDigits: 1 });
   const preciseFormatter = new Intl.NumberFormat("hr-HR", { maximumFractionDigits: 3 });
+  const CARD_BATCH_SIZE = 24;
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -98,7 +99,7 @@
     return ({ 0: "U redu", 1: "Nesigurno očitanje", 2: "Forsirano", 3: "Izvan mreže", 4: "Greška" })[String(point?.state)] || "Stanje nije poznato";
   }
 
-  function create({ container, onWrite, onSettings }) {
+  function create({ container, onWrite, onSettings, onRooms, onMove }) {
     if (!container || typeof container.append !== "function") throw new TypeError("Device cards need a DOM container.");
     const cards = new Map();
     const drafts = new Map();
@@ -112,13 +113,19 @@
     let latestReadAt;
     let readClockAvailable = false;
     let settingsEnabled = false;
+    let roomEditingEnabled = false;
+    let registeredRooms = [];
+    let selectionMode = false;
+    const selectedKeys = new Set();
+    let devicesByKey = new Map();
+    let filteredDevices = [];
+    let searchIndex = new Map();
+    let displayLimit = CARD_BATCH_SIZE;
+    let filterSignature = "";
+    let deviceIndex = null;
+    let devicePositions = new Map();
 
     container.classList.add("device-cards-section");
-    const header = el("div", "dc-section-heading");
-    const headingCopy = el("div", "dc-section-copy");
-    headingCopy.append(el("p", "dc-eyebrow", "Uređaji na jednom mjestu"), el("h2", "dc-heading", "Probne kartice uređaja"));
-    const explanation = el("p", "dc-section-description", "Funkcije istog uređaja objedinjene su u jednu karticu. Očitanja dolaze iz dodanih vrijednosti; isprobavanje kontrola ostaje samo na ovom prikazu.");
-    headingCopy.append(explanation);
     const headerActions = el("div", "dc-header-actions");
     const simulationBadge = el("span", "dc-simulation-badge", "Simulacija upravljanja");
     const reset = el("button", "dc-reset", "Vrati simulaciju");
@@ -131,44 +138,199 @@
       announce.textContent = "Simulacija je vraćena na trenutačna očitanja.";
     });
     headerActions.append(simulationBadge, reset);
-    header.append(headingCopy, headerActions);
+    const searchTools = el("div", "dc-search-tools");
+    const searchField = el("label", "dc-search-field");
+    const search = el("input", "dc-search");
+    search.type = "search";
+    search.value = "";
+    search.placeholder = "Naziv, prostorija ili putanja";
+    search.setAttribute("aria-label", "Pretraži uređaje");
+    search.addEventListener("input", applyFilter);
+    searchField.append(el("span", "dc-filter-label", "Pretraži uređaje"), search);
+    const typeField = el("label", "dc-type-field");
+    const typeFilter = el("select", "dc-type-filter");
+    typeFilter.setAttribute("aria-label", "Vrsta uređaja");
+    for (const [value, label] of [["all", "Sve vrste"], ...Object.entries(typeLabels)]) {
+      const option = el("option", "", label);
+      option.value = value;
+      typeFilter.append(option);
+    }
+    typeFilter.value = "all";
+    typeFilter.addEventListener("change", applyFilter);
+    typeField.append(el("span", "dc-filter-label", "Vrsta uređaja"), typeFilter);
+    searchTools.append(searchField, typeField, headerActions);
+    const management = el("div", "dc-management");
+    const manageRooms = el("button", "dc-manage-rooms", "Prostorije");
+    manageRooms.type = "button";
+    manageRooms.addEventListener("click", () => { if (roomEditingEnabled && typeof onRooms === "function") onRooms(); });
+    const selectDevices = el("button", "dc-select-devices", "Odaberi uređaje");
+    selectDevices.type = "button";
+    selectDevices.addEventListener("click", () => {
+      if (!roomEditingEnabled) return;
+      selectionMode = !selectionMode;
+      if (!selectionMode) selectedKeys.clear();
+      managementStatus.hidden = true;
+      applyFilter();
+    });
+    management.append(manageRooms, selectDevices);
+    const selectionActions = el("div", "dc-selection-actions");
+    const selectionCount = el("span", "dc-selection-count");
+    const selectShown = el("button", "dc-select-shown", "Odaberi sve rezultate");
+    const clearSelected = el("button", "dc-clear-selection", "Poništi odabir");
+    const moveSelected = el("button", "dc-move-selection", "Premjesti u prostoriju");
+    for (const button of [selectShown, clearSelected, moveSelected]) button.type = "button";
+    selectShown.addEventListener("click", () => {
+      if (!selectionMode || !roomEditingEnabled) return;
+      // Selection covers the complete filter result, including cards that
+      // have not been mounted by progressive scrolling yet.
+      for (const device of filteredDevices) selectedKeys.add(device.key);
+      applyFilter();
+    });
+    clearSelected.addEventListener("click", () => { selectedKeys.clear(); applyFilter(); });
+    moveSelected.addEventListener("click", () => {
+      if (roomEditingEnabled && selectedKeys.size && typeof onMove === "function") onMove([...selectedKeys].map((key) => devicesByKey.get(key)).filter(Boolean));
+    });
+    selectionActions.append(selectionCount, selectShown, clearSelected, moveSelected);
+    const managementStatus = el("p", "dc-management-status");
+    managementStatus.setAttribute("role", "status");
+    managementStatus.hidden = true;
     const filters = el("div", "dc-room-filters");
     filters.setAttribute("role", "group");
     filters.setAttribute("aria-label", "Prikaz uređaja po prostoriji");
+    const roomPanel = el("details", "dc-room-panel");
+    const roomSummary = el("summary", "", "Prostorije: sve");
+    roomPanel.append(roomSummary, filters);
     const summary = el("p", "dc-summary");
     const readWarning = el("p", "dc-read-warning");
     readWarning.setAttribute("role", "status");
     readWarning.hidden = true;
     const grid = el("div", "dc-grid");
+    const loadMore = el("div", "dc-load-more");
+    const loadCount = el("p", "dc-load-count");
+    const loadButton = el("button", "dc-load-button", "Prikaži još uređaja");
+    loadButton.type = "button";
+    loadButton.addEventListener("click", showMore);
+    loadMore.append(loadCount, loadButton);
     const empty = el("div", "dc-empty");
-    empty.append(icon("generic"), el("h3", "", "Kartice čekaju vrijednosti"), el("p", "", "Dodaj vrijednosti uređaja u postojeći prikaz. Njihove prepoznate funkcije pojavit će se zajedno ovdje."));
+    const emptyTitle = el("h3", "", "Kartice čekaju vrijednosti");
+    const emptyDescription = el("p", "", "Dodaj vrijednosti uređaja u postojeći prikaz. Njihove prepoznate funkcije pojavit će se zajedno ovdje.");
+    empty.append(icon("generic"), emptyTitle, emptyDescription);
     const announce = el("div", "dc-sr-only");
     announce.setAttribute("role", "status");
     announce.setAttribute("aria-live", "polite");
-    container.replaceChildren(header, filters, summary, readWarning, grid, empty, announce);
+    container.replaceChildren(searchTools, management, selectionActions, managementStatus, roomPanel, summary, readWarning, grid, loadMore, empty, announce);
+    const scrollObserver = typeof IntersectionObserver === "function" ? new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting) && !loadMore.hidden) showMore();
+    }, { rootMargin: "0px 0px 500px 0px" }) : null;
+    scrollObserver?.observe(loadMore);
 
     function roomKey(device) {
       return device.room?.label ? `room:${device.room.label}` : "unassigned";
     }
 
-    function applyFilter() {
-      let count = 0;
-      for (const card of cards.values()) {
-        const shown = selectedRoom === "all" || roomKey(card.device) === selectedRoom;
-        card.node.hidden = !shown;
-        if (shown) count += 1;
+    function searchText(value) {
+      return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("hr");
+    }
+
+    function updateSummary() {
+      const count = filteredDevices.length;
+      const shown = Math.min(count, displayLimit);
+      summary.textContent = devices.length ? `${count === devices.length ? count : `${count} od ${devices.length}`} kartica uređaja${shown < count ? ` · prikazano ${shown}` : ""}${connection !== "connected" ? " · Očitanja se trenutačno ne osvježavaju" : ""}` : "";
+    }
+
+    function reconcileCommand(device) {
+      const command = commands.get(device.key);
+      if (command?.status !== "accepted") return false;
+      const point = device.roles?.[command.role];
+      const fresh = command.usesReadClock
+        ? latestReadAt !== undefined && latestReadAt !== null && latestReadAt !== command.acceptedReadAt
+        : point?.updatedAt && point.updatedAt !== command.previousUpdatedAt;
+      if (!fresh || !point || point.error || Number(point.state) !== 0) return false;
+      if (String(point.value) !== String(command.value) && !(numeric(point.value) !== null && numeric(point.value) === numeric(command.value))) return false;
+      command.status = "readback";
+      drafts.delete(`${device.key}\u0000${command.role}`);
+      return true;
+    }
+
+    function updateCard(device) {
+      const card = cards.get(device.key);
+      if (!card) return false;
+      for (const [role, previousPoint] of Object.entries(card.device.roles || {})) {
+        const nextPoint = device.roles?.[role];
+        if (!nextPoint?.control || (previousPoint.sourceId || previousPoint.id) !== (nextPoint.sourceId || nextPoint.id)) {
+          drafts.delete(`${device.key}\u0000${role}`);
+          if (commands.get(device.key)?.role === role) commands.delete(device.key);
+        }
       }
+      if (card.node.hidden) { card.device = device; card.needsRefresh = true; return false; }
+      card.update(device);
+      return true;
+    }
+
+    function showMore() {
+      if (destroyed || displayLimit >= filteredDevices.length) return;
+      displayLimit += CARD_BATCH_SIZE;
+      applyFilter();
+    }
+
+    function applyFilter() {
+      const query = searchText(search.value.trim());
+      const signature = JSON.stringify([query, selectedRoom, typeFilter.value]);
+      if (signature !== filterSignature) { filterSignature = signature; displayLimit = CARD_BATCH_SIZE; }
+      filteredDevices = devices.filter((device) => (selectedRoom === "all" || roomKey(device) === selectedRoom)
+        && (typeFilter.value === "all" || device.type === typeFilter.value) && searchIndex.get(device.key)?.includes(query));
+      const count = filteredDevices.length;
+      const shownDevices = filteredDevices.slice(0, displayLimit);
+      const shownKeys = new Set(shownDevices.map((device) => device.key));
+      for (const device of shownDevices) {
+        if (!cards.has(device.key)) cards.set(device.key, makeCard(device));
+        const card = cards.get(device.key);
+        if (card.needsRefresh) { card.update(device); card.needsRefresh = false; }
+      }
+      for (const card of cards.values()) {
+        const device = card.device;
+        const shown = shownKeys.has(device.key);
+        card.node.hidden = !shown;
+        if (!shown) card.node.remove();
+        card.selection.hidden = !selectionMode;
+        card.checkbox.checked = selectedKeys.has(device.key);
+        card.node.classList.toggle("dc-card-selected", selectedKeys.has(device.key));
+      }
+      // Moving existing nodes preserves focused controls and their drafts.
+      // Only the requested slice belongs to the live grid.
+      for (let index = 0; index < shownDevices.length; index++) {
+        const node = cards.get(shownDevices[index].key).node;
+        if (grid.children[index] !== node) grid.insertBefore(node, grid.children[index] || null);
+      }
+      loadMore.hidden = shownDevices.length >= count;
+      loadCount.textContent = `Prikazano ${shownDevices.length} od ${count} uređaja`;
+      loadButton.disabled = loadMore.hidden;
+      selectShown.title = `Odaberi sve uređaje koji odgovaraju filtrima (${count}), uključujući one niže na popisu.`;
+      selectShown.textContent = `Odaberi sve rezultate (${count})`;
       for (const button of filters.querySelectorAll("button")) {
         button.setAttribute("aria-pressed", String(button.dataset.room === selectedRoom));
+        if (button.dataset.room === selectedRoom) roomSummary.textContent = `Prostorije: ${selectedRoom === "all" ? "sve" : button.textContent}`;
       }
-      summary.textContent = devices.length ? `${count} ${count === 1 ? "kartica" : "kartica uređaja"}${connection !== "connected" ? " · Očitanja se trenutačno ne osvježavaju" : ""}` : "";
-      empty.hidden = devices.length !== 0;
-      grid.hidden = devices.length === 0;
-      filters.hidden = devices.length === 0;
+      updateSummary();
+      emptyTitle.textContent = devices.length ? "Nema pronađenih uređaja" : "Kartice čekaju vrijednosti";
+      emptyDescription.textContent = devices.length ? "Promijeni pretragu, vrstu uređaja ili prostoriju." : "Dodaj vrijednosti uređaja u postojeći prikaz. Njihove prepoznate funkcije pojavit će se zajedno ovdje.";
+      empty.hidden = count !== 0;
+      grid.hidden = count === 0;
+      roomPanel.hidden = devices.length === 0;
+      management.hidden = !roomEditingEnabled;
+      manageRooms.hidden = !roomEditingEnabled || typeof onRooms !== "function";
+      selectDevices.hidden = !roomEditingEnabled || typeof onMove !== "function";
+      selectDevices.textContent = selectionMode ? "Gotovo" : "Odaberi uređaje";
+      selectionActions.hidden = !selectionMode || !roomEditingEnabled;
+      selectionCount.textContent = `Odabrano: ${selectedKeys.size}`;
+      clearSelected.disabled = selectedKeys.size === 0;
+      moveSelected.disabled = selectedKeys.size === 0;
+      selectShown.disabled = count === 0;
     }
 
     function updateFilters() {
       const available = new Map([["all", "Svi uređaji"]]);
+      for (const room of registeredRooms) if (typeof room === "string" && room) available.set(`room:${room}`, room);
       for (const device of devices) available.set(roomKey(device), device.room?.label || "Bez prostorije");
       const signature = JSON.stringify([...available]);
       if (signature === roomsSignature) return;
@@ -188,6 +350,17 @@
       const node = el("article", `dc-card dc-type-${initial.type}`);
       node.dataset.deviceKey = initial.key;
       const card = { node, device: initial, bindings: [], signature: "" };
+      const selectionLabel = el("label", "dc-card-selection");
+      const checkbox = el("input", "dc-device-checkbox browser-default");
+      checkbox.type = "checkbox";
+      checkbox.addEventListener("change", () => {
+        if (!selectionMode || !roomEditingEnabled) return;
+        if (checkbox.checked) selectedKeys.add(card.device.key); else selectedKeys.delete(card.device.key);
+        applyFilter();
+      });
+      selectionLabel.append(checkbox, el("span", "", "Odaberi uređaj"));
+      card.selection = selectionLabel;
+      card.checkbox = checkbox;
       const top = el("div", "dc-card-top");
       const deviceIcon = el("span", "dc-device-icon");
       deviceIcon.append(icon(initial.type));
@@ -215,7 +388,7 @@
       commandStatus.setAttribute("role", "status");
       commandStatus.setAttribute("aria-live", "polite");
       commandStatus.hidden = true;
-      node.append(top, body, states, commandStatus, details);
+      node.append(selectionLabel, top, body, states, commandStatus, details);
 
       const pointFor = (role) => card.device.roles?.[role];
       const draftKey = (role) => `${card.device.key}\u0000${role}`;
@@ -555,6 +728,7 @@
           type.textContent = typeLabels[device.type] || "Uređaj";
         }
         title.textContent = device.label;
+        checkbox.setAttribute("aria-label", `Odaberi uređaj ${device.label} · ${device.key}`);
         settings.hidden = !settingsEnabled || typeof onSettings !== "function";
         settings.setAttribute("aria-label", `Postavke uređaja ${device.label}`);
         settings.title = `Postavke uređaja ${device.label}`;
@@ -562,15 +736,7 @@
         room.classList.toggle("dc-room-unknown", !device.room);
         const command = commands.get(device.key);
         const commandedPoint = command && device.roles?.[command.role];
-        const hasFreshReadback = command && (command.usesReadClock
-          ? latestReadAt !== undefined && latestReadAt !== null && latestReadAt !== command.acceptedReadAt
-          : commandedPoint?.updatedAt && commandedPoint.updatedAt !== command.previousUpdatedAt);
-        if (command?.status === "accepted" && commandedPoint && hasFreshReadback
-          && !commandedPoint.error && Number(commandedPoint.state) === 0
-          && (String(commandedPoint.value) === String(command.value) || numeric(commandedPoint.value) !== null && numeric(commandedPoint.value) === numeric(command.value))) {
-          command.status = "readback";
-          drafts.delete(draftKey(command.role));
-        }
+        reconcileCommand(device);
         const signature = JSON.stringify([device.type, demoMode, Object.entries(device.roles || {}).map(([role, point]) => [role, point.id, point.control]), (device.primary || []).map((point) => point.id), device.metrics ? [[device.metrics.primary?.id, device.metrics.primary?.unit, device.metrics.primary?.unitOverridden], device.metrics.secondary.map((point) => point.id)] : null]);
         if (signature !== card.signature) { card.signature = signature; renderBody(); }
         for (const binding of card.bindings) binding();
@@ -601,17 +767,17 @@
       return card;
     }
 
-    function update({ widgets = [], status = "idle", metadataById = {}, roomByZone = {}, deviceSettings = [], demo = false, warnings = [], readAt, syncedAt, settingsEnabled: editingEnabled = false } = {}) {
+    function update({ widgets = [], status = "idle", metadataById = {}, roomByZone = {}, deviceSettings = [], roomRules = [], rooms = [], roomEditingEnabled: roomsEnabled = false, demo = false, warnings = [], readAt, syncedAt, settingsEnabled: editingEnabled = false } = {}) {
       if (destroyed) return;
       settingsEnabled = editingEnabled === true;
+      roomEditingEnabled = roomsEnabled === true;
+      registeredRooms = Array.isArray(rooms) ? rooms : [];
+      if (!roomEditingEnabled) { selectionMode = false; selectedKeys.clear(); }
       if (demoMode !== Boolean(demo)) { drafts.clear(); commands.clear(); }
       demoMode = Boolean(demo);
       readClockAvailable = readAt !== undefined || syncedAt !== undefined;
       latestReadAt = readAt !== undefined ? readAt : syncedAt;
       connection = typeof status === "string" ? status : status?.status || status?.state || "idle";
-      explanation.textContent = demo
-        ? "Funkcije istog uređaja objedinjene su u jednu karticu. Očitanja su izmišljeni primjeri; isprobavanje kontrola ostaje samo na ovom prikazu."
-        : "Funkcije istog uređaja objedinjene su u jednu karticu. Aktivne kontrole šalju stvarne naredbe kontroleru. Očitano stanje uređaja prikazuje se zasebno od zatražene vrijednosti.";
       simulationBadge.textContent = demoMode ? "Simulacija upravljanja" : "Stvarno upravljanje";
       simulationBadge.classList.toggle("dc-live-badge", !demoMode);
       simulationBadge.title = demoMode ? "Kontrole mijenjaju samo lokalnu simulaciju." : "Aktivne kontrole mijenjaju stvarne uređaje u stanu.";
@@ -619,35 +785,70 @@
       readWarning.hidden = warningTexts.length === 0;
       readWarning.textContent = warningTexts[0] || "";
       readWarning.title = warningTexts.join("\n");
-      const result = globalThis.IoTDeviceModel?.buildDevices(widgets, { metadataById, roomByZone, deviceSettings });
+      const modelOptions = { metadataById, roomByZone, deviceSettings, roomRules };
+      deviceIndex = globalThis.IoTDeviceModel?.createDeviceIndex?.(widgets, modelOptions) || null;
+      const result = deviceIndex ? deviceIndex.getDevices() : globalThis.IoTDeviceModel?.buildDevices(widgets, modelOptions);
       devices = Array.isArray(result) ? result : result?.devices || [];
+      devicePositions = new Map(devices.map((device, index) => [device.key, index]));
+      devicesByKey = new Map(devices.map((device) => [device.key, device]));
+      searchIndex = new Map(devices.map((device) => [device.key, searchText([device.label, device.key, device.context, device.room?.label].filter(Boolean).join(" "))]));
       const present = new Set(devices.map((device) => device.key));
+      for (const key of selectedKeys) if (!present.has(key)) selectedKeys.delete(key);
       for (const [key, card] of cards) {
         if (!present.has(key)) { card.node.remove(); cards.delete(key); commands.delete(key); }
       }
       for (const key of drafts.keys()) if (!present.has(key.split("\u0000")[0])) drafts.delete(key);
       reset.hidden = !demoMode || drafts.size === 0;
-      for (const device of devices) {
-        let card = cards.get(device.key);
-        if (!card) { card = makeCard(device); cards.set(device.key, card); grid.append(card.node); }
-        else {
-          for (const [role, previousPoint] of Object.entries(card.device.roles || {})) {
-            const nextPoint = device.roles?.[role];
-            if (!nextPoint?.control || (previousPoint.sourceId || previousPoint.id) !== (nextPoint.sourceId || nextPoint.id)) {
-              drafts.delete(`${device.key}\u0000${role}`);
-              if (commands.get(device.key)?.role === role) commands.delete(device.key);
-            }
-          }
-          card.update(device);
-        }
-      }
+      for (const device of devices) updateCard(device);
       reset.hidden = !demoMode || drafts.size === 0;
       updateFilters();
       applyFilter();
     }
 
+    function updateValues({ widgets = [], status = connection, readAt, syncedAt } = {}) {
+      if (destroyed || !deviceIndex) return { changedDevices: 0, updatedCards: 0 };
+      const nextConnection = typeof status === "string" ? status : status?.status || status?.state || connection;
+      const connectionChanged = nextConnection !== connection;
+      connection = nextConnection;
+      const nextReadAt = readAt !== undefined ? readAt : syncedAt;
+      const readChanged = nextReadAt !== undefined && nextReadAt !== latestReadAt;
+      if (nextReadAt !== undefined) { latestReadAt = nextReadAt; readClockAvailable = true; }
+      const changed = deviceIndex.updateValues(widgets);
+      const dirty = new Set();
+      let filtersChanged = false;
+      for (const device of changed) {
+        const previous = devicesByKey.get(device.key);
+        if (!previous) continue;
+        devices[devicePositions.get(device.key)] = device;
+        devicesByKey.set(device.key, device);
+        dirty.add(device.key);
+        if (previous.label !== device.label || previous.context !== device.context || previous.type !== device.type || previous.room?.label !== device.room?.label) {
+          filtersChanged = true;
+          searchIndex.set(device.key, searchText([device.label, device.key, device.context, device.room?.label].filter(Boolean).join(" ")));
+        }
+      }
+      if (readChanged) for (const key of commands.keys()) {
+        const device = devicesByKey.get(key);
+        if (device && reconcileCommand(device)) dirty.add(key);
+      }
+      if (connectionChanged) for (const [key, card] of cards) {
+        if (card.node.hidden) card.needsRefresh = true;
+        else dirty.add(key);
+      }
+      let updatedCards = 0;
+      for (const key of dirty) if (updateCard(devicesByKey.get(key))) updatedCards++;
+      if (filtersChanged) { updateFilters(); applyFilter(); }
+      else if (connectionChanged) updateSummary();
+      return { changedDevices: changed.length, updatedCards };
+    }
+
     update();
-    return { update, getDevices() { return devices.slice(); }, destroy() { destroyed = true; drafts.clear(); commands.clear(); cards.clear(); devices = []; container.replaceChildren(); } };
+    return { update, updateValues, getDevices() { return devices.slice(); },
+      clearSelection(message = "") {
+        selectedKeys.clear(); selectionMode = false; applyFilter();
+        managementStatus.textContent = message; managementStatus.hidden = !message;
+      },
+      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); cards.clear(); selectedKeys.clear(); devices = []; deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
   }
 
   const api = { create };

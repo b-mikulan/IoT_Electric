@@ -2,5 +2,8 @@
 .env
 npm-debug.log
 /config/widgets.json
+/config/widgets.json.*.tmp
 /config/device-widgets.json
 /config/device-widgets.json.*.tmp
+/config/catalog-metadata.json
+/config/catalog-metadata.json.*.tmp

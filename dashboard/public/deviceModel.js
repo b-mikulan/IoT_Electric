@@ -236,22 +236,41 @@
     };
   }
 
-  function buildDevices(widgets, { metadataById = {}, roomByZone = {}, deviceSettings = [] } = {}) {
+  function prepareDeviceContext(widgets, metadataById) {
     const known = new Map((Array.isArray(widgets) ? widgets : []).filter((widget) => widget?.id).map((widget) => [String(widget.id), widget]));
     const byPath = new Map();
+    const owners = new Map();
     for (const id of [...known.keys(), ...Object.keys(metadataById)]) {
       if (!id.startsWith("11/") && objectPath(id) !== null) byPath.set(objectPath(id), id);
     }
+    for (const id of known.keys()) owners.set(id, grouping.deriveWidgetGrouping(id));
+    return { known, byPath, owners };
+  }
+
+  function buildDevices(widgets, options = {}) {
+    return buildDeviceModels(prepareDeviceContext(widgets, options.metadataById || {}), options);
+  }
+
+  function buildDeviceModels({ known, byPath, owners }, { metadataById = {}, roomByZone = {}, deviceSettings = [], roomRules = [] } = {}, widgets = known.values()) {
+    const roomRulesByName = new Map(roomRules.map((rule) => [rule.from.normalize("NFC").toLocaleLowerCase("hr"), rule.to]));
+    const resolvedRoom = (owner) => {
+      const room = roomForOwner(owner, roomByZone);
+      if (!room) return null;
+      const key = room.label.normalize("NFC").toLocaleLowerCase("hr");
+      if (!roomRulesByName.has(key)) return room;
+      const label = roomRulesByName.get(key);
+      return label ? { ...room, label, source: `${room.source} · Naziv uređen na dashboardu` } : null;
+    };
     const devices = new Map();
     const activePoints = new Map();
     const visiblePoints = new Map();
     const propertyPoints = [];
-    for (const widget of known.values()) {
+    for (const widget of widgets) {
       if (widget.visible === false) continue;
       const id = String(widget.id);
-      const owner = grouping.deriveWidgetGrouping(id);
+      const owner = owners.get(id);
       if (!devices.has(owner.key)) devices.set(owner.key, {
-        key: owner.key, label: owner.label, type: "generic", room: roomForOwner(owner.key, roomByZone),
+        key: owner.key, label: owner.label, type: "generic", room: resolvedRoom(owner.key),
         context: owner.context, groupingKind: owner.kind, roles: {}, primary: [], diagnostics: [], other: [],
         support: [], aliases: [], pointsCount: 0, reason: "Grupiranje po punoj putanji vlasnika točaka.",
       });
@@ -318,10 +337,11 @@
       const settings = settingsByKey.get(device.key) || {};
       if (typeof settings.label === "string" && settings.label.trim()) device.label = settings.label.trim();
       if (typeof settings.room === "string") device.room = settings.room.trim() ? { label: settings.room.trim(), source: "Ručno dodijeljena prostorija" } : null;
-      const primaryId = typeof settings.primaryPointId === "string" ? settings.primaryPointId : device.defaultMetrics.primaryPointId;
+      const foreignPrimary = typeof settings.primaryPointId === "string" && grouping.deriveWidgetGrouping(settings.primaryPointId).key !== device.key;
+      const primaryId = typeof settings.primaryPointId === "string" && !foreignPrimary ? settings.primaryPointId : device.defaultMetrics.primaryPointId;
       const secondaryIds = Array.isArray(settings.secondaryPointIds) ? [...new Set(settings.secondaryPointIds)] : device.defaultMetrics.secondaryPointIds;
       device.metrics = {
-        primary: primaryId ? displayMetric(visiblePoints.get(primaryId), primaryId, settings.primaryPointId == null) : null,
+        primary: primaryId ? displayMetric(visiblePoints.get(primaryId), primaryId, settings.primaryPointId == null || foreignPrimary) : null,
         // Older settings may reference another owner. Keep those out of this
         // card while preserving unavailable references to its own points.
         secondary: secondaryIds.filter((id) => id !== primaryId && grouping.deriveWidgetGrouping(id).key === device.key)
@@ -329,7 +349,7 @@
       };
       const automaticUnit = device.metrics.primary?.unit || "";
       device.primaryAutomaticUnit = device.metrics.primary?.role === "humidity" && /^%\s*RH$/i.test(automaticUnit) ? "%" : automaticUnit;
-      if (device.metrics.primary && typeof settings.primaryUnit === "string") {
+      if (device.metrics.primary && !foreignPrimary && typeof settings.primaryUnit === "string") {
         // This is a display suffix only. Never alter source metadata, numeric
         // values or the command points used for ranges and controller writes.
         device.metrics.primary.unit = settings.primaryUnit.trim();
@@ -339,6 +359,60 @@
       delete device.groupingKind;
     }
     return [...devices.values()];
+  }
+
+  function createDeviceIndex(widgets, options = {}) {
+    const context = prepareDeviceContext(widgets, options.metadataById || {});
+    const { known, byPath, owners } = context;
+    const members = new Map();
+    const related = new Map();
+    const settings = new Map((options.deviceSettings || []).map((entry) => [entry.key, entry]));
+    for (const [id, owner] of owners) {
+      if (!members.has(owner.key)) members.set(owner.key, []);
+      members.get(owner.key).push(id);
+      related.set(owner.key, new Set());
+    }
+    // References and auxiliary properties must keep their source context,
+    // even when legacy folder grouping places them on a different card.
+    for (const id of known.keys()) {
+      let source;
+      if (id.startsWith("11/") && lastSegment(id) === "Value") source = `01/${id.slice(3, -6)}`;
+      else if (id.startsWith("11/") && properties.has(lastSegment(id))) source = byPath.get(id.slice(3, id.lastIndexOf("/")));
+      if (!known.has(source)) continue;
+      const owner = owners.get(id).key;
+      const sourceOwner = owners.get(source).key;
+      related.get(owner).add(sourceOwner);
+      related.get(sourceOwner).add(owner);
+    }
+    const devices = new Map(buildDeviceModels(context, options).map((device) => [device.key, device]));
+    return {
+      getDevices() { return [...devices.values()]; },
+      updateValues(points = []) {
+        const affected = new Set();
+        for (const point of points) {
+          const previous = known.get(point?.id);
+          if (!previous) continue;
+          const next = { ...previous };
+          let changed = false;
+          for (const field of ["value", "state", "error", "updatedAt"]) {
+            if (!Object.hasOwn(point, field)) continue;
+            if (!Object.is(previous[field], point[field])) changed = true;
+            next[field] = point[field];
+          }
+          if (!changed) continue;
+          known.set(point.id, next);
+          affected.add(owners.get(point.id).key);
+        }
+        for (const key of affected) for (const dependency of related.get(key)) affected.add(dependency);
+        if (!affected.size) return [];
+        const inputs = [];
+        for (const key of affected) for (const id of members.get(key)) inputs.push(known.get(id));
+        const scopedSettings = [...affected].map((key) => settings.get(key)).filter(Boolean);
+        const updated = buildDeviceModels(context, { ...options, deviceSettings: scopedSettings }, inputs);
+        for (const device of updated) devices.set(device.key, device);
+        return updated;
+      },
+    };
   }
 
   function validateDeviceCommand(point, value) {
@@ -359,7 +433,7 @@
     return { allowed: true, value };
   }
 
-  const api = { buildDevices, classifyPoint, normalizePoint, validateDeviceCommand };
+  const api = { buildDevices, createDeviceIndex, classifyPoint, normalizePoint, validateDeviceCommand };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.IoTDeviceModel = api;
 })();

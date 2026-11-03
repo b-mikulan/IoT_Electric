@@ -15,6 +15,8 @@ function createRuntime(env = process.env) {
     widgets: config.widgets,
     intervalMs: config.intervalMs,
     timeoutMs: config.timeoutMs,
+    readBatchSize: config.readBatchSize,
+    readBatchDelayMs: config.readBatchDelayMs,
     demoMode: config.demoMode,
   });
   const widgetStore = new WidgetStore(config.demoMode ? "" : config.widgetsFile);

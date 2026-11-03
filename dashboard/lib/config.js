@@ -59,6 +59,12 @@ function parseTimeout(value) {
   return timeoutMs;
 }
 
+function parseBoundedInteger(value, fallback, name, minimum, maximum) {
+  const parsed = value === undefined || value === "" ? fallback : Number(value);
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) throw new Error(`${name} must be an integer from ${minimum} to ${maximum}.`);
+  return parsed;
+}
+
 function readMiddlewarePassword(env) {
   if (env.MIDDLEWARE_PASSWORD) return String(env.MIDDLEWARE_PASSWORD);
   if (!env.MIDDLEWARE_PASSWORD_FILE) return "";
@@ -176,6 +182,9 @@ function loadConfig(env = process.env) {
     : String(env.WIDGETS_FILE || "").trim();
   const deviceWidgetsFile = String(env.DEVICE_WIDGETS_FILE || "").trim() ||
     (widgetsFile ? path.join(path.dirname(widgetsFile), "device-widgets.json") : "");
+  const adjacentMetadataFile = widgetsFile ? path.join(path.dirname(widgetsFile), "catalog-metadata.json") : "";
+  const deviceMetadataFile = String(env.DEVICE_METADATA_FILE || "").trim() ||
+    (adjacentMetadataFile && fs.existsSync(adjacentMetadataFile) ? adjacentMetadataFile : "");
   if (deviceWidgetsFile && widgetsFile && path.resolve(deviceWidgetsFile).toLowerCase() === path.resolve(widgetsFile).toLowerCase()) {
     throw new Error("DEVICE_WIDGETS_FILE must be separate from WIDGETS_FILE.");
   }
@@ -199,6 +208,8 @@ function loadConfig(env = process.env) {
     demoMode,
     intervalMs: parseInterval(env.POLL_INTERVAL_MS),
     timeoutMs: parseTimeout(env.MIDDLEWARE_TIMEOUT_MS),
+    readBatchSize: parseBoundedInteger(env.READ_BATCH_SIZE, 500, "READ_BATCH_SIZE", 1, 500),
+    readBatchDelayMs: parseBoundedInteger(env.READ_BATCH_DELAY_MS, 0, "READ_BATCH_DELAY_MS", 0, 60_000),
     middlewareUrl: String(
       env.MIDDLEWARE_URL || "http://127.0.0.1:3000"
     ).replace(/\/+$/, ""),
@@ -207,6 +218,7 @@ function loadConfig(env = process.env) {
     widgets,
     widgetsFile,
     deviceWidgetsFile,
+    deviceMetadataFile,
   };
 }
 

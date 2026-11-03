@@ -112,6 +112,9 @@ class PointPoller extends EventEmitter {
   #intervalMs;
 
   #timeoutMs;
+  #readBatchSize;
+  #readBatchDelayMs;
+  #readGeneration = 0;
 
   #fetch;
 
@@ -138,6 +141,8 @@ class PointPoller extends EventEmitter {
     widgets,
     intervalMs = 15_000,
     timeoutMs = 10_000,
+    readBatchSize = 500,
+    readBatchDelayMs = 0,
     fetchImpl = globalThis.fetch,
     demoMode = false,
     now = () => new Date(),
@@ -156,6 +161,8 @@ class PointPoller extends EventEmitter {
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
       throw new TypeError("timeoutMs must be a positive number");
     }
+    if (!Number.isInteger(readBatchSize) || readBatchSize < 1 || readBatchSize > 500) throw new TypeError("readBatchSize must be an integer from 1 to 500");
+    if (!Number.isInteger(readBatchDelayMs) || readBatchDelayMs < 0 || readBatchDelayMs > 60_000) throw new TypeError("readBatchDelayMs must be an integer from 0 to 60000");
 
     if (typeof now !== "function" || typeof random !== "function") {
       throw new TypeError("now and random must be functions");
@@ -177,6 +184,8 @@ class PointPoller extends EventEmitter {
     this.#widgets = widgets.map(normalizeWidget);
     this.#intervalMs = intervalMs;
     this.#timeoutMs = timeoutMs;
+    this.#readBatchSize = readBatchSize;
+    this.#readBatchDelayMs = readBatchDelayMs;
     this.#fetch = fetchImpl;
     this.#demoMode = demoMode;
     this.#now = now;
@@ -214,6 +223,7 @@ class PointPoller extends EventEmitter {
   }
 
   stop() {
+    this.#readGeneration += 1;
     if (this.#timer !== null) {
       clearInterval(this.#timer);
       this.#timer = null;
@@ -428,15 +438,19 @@ class PointPoller extends EventEmitter {
     return this.#discoveryResponse(containerId, [], payload);
   }
 
-  async discoverAllValues({ onProgress = () => {} } = {}) {
+  async discoverAllValues({ containerId: startId = "", onProgress = () => {} } = {}) {
     if (this.#demoMode) {
       throw new PointDiscoveryError("Object discovery is unavailable in demo mode.", 409, "DEMO_MODE");
     }
-    const queue = [""];
+    if (typeof startId !== "string" || startId.trim().length > 1_024 || /[\r\n\0]/.test(startId)) {
+      throw new PointDiscoveryError("Container ID is not valid.", 400, "INVALID_DISCOVERY_QUERY");
+    }
+    startId = startId.trim();
+    const queue = [startId];
     const visited = new Set(queue);
     const values = new Map();
-    const tree = [{ id: "", name: "EWS", kind: "container", parentId: null }];
-    const treeById = new Map([["", tree[0]]]);
+    const tree = [{ id: startId, name: startId || "EWS", kind: "container", parentId: null }];
+    const treeById = new Map([[startId, tree[0]]]);
     const warnings = [];
     function recordWarning(id, message) {
       warnings.push({ id, message });
@@ -448,7 +462,7 @@ class PointPoller extends EventEmitter {
       try {
         payload = await this.#fetchContainer(containerId);
         const errors = Array.isArray(payload?.errors) ? payload.errors : [];
-        if (!Array.isArray(payload?.containers) || (containerId === "" && payload.containers.length === 0 && errors.length > 0)) {
+        if (!Array.isArray(payload?.containers) || (index === 0 && payload.containers.length === 0 && errors.length > 0)) {
           throw new PointDiscoveryError(
             `Discovery could not read container "${containerId || "root"}".`,
             502, "INCOMPLETE_DISCOVERY"
@@ -458,8 +472,8 @@ class PointPoller extends EventEmitter {
           recordWarning(containerId, errors.map((error) => String(error?.message || "Unknown discovery error")).join("; "));
         }
       } catch (error) {
-        // Without the root there are no branches to scan. Individual branch failures are recoverable.
-        if (containerId === "") throw error;
+        // Without the starting container there are no branches to scan.
+        if (index === 0) throw error;
         recordWarning(containerId, error?.message || "This branch could not be read.");
         payload = null;
       }
@@ -807,6 +821,16 @@ class PointPoller extends EventEmitter {
         widgets: nextWidgets,
       };
 
+      // Publish changed values before announcing a fresh successful read.
+      // Even if a browser processes these events in separate frames, command
+      // readback must never use a new read timestamp with older point values.
+      if (changedWidgets.length > 0) {
+        this.emit("update", {
+          syncedAt,
+          widgets: clone(changedWidgets),
+        });
+      }
+
       if (previousStatus !== "connected") {
         this.emit("status", {
           status: "connected",
@@ -820,13 +844,6 @@ class PointPoller extends EventEmitter {
         syncedAt,
         error: null,
       });
-
-      if (changedWidgets.length > 0) {
-        this.emit("update", {
-          syncedAt,
-          widgets: clone(changedWidgets),
-        });
-      }
 
       return this.getSnapshot();
     } catch (error) {
@@ -854,12 +871,13 @@ class PointPoller extends EventEmitter {
   }
 
   async #fetchPoints() {
+    const generation = this.#readGeneration;
     const batches = [];
     let batch = [];
     let bytes = 12;
     for (const { id } of this.#widgets) {
       const size = Buffer.byteLength(JSON.stringify(id), "utf8") + 1;
-      if (batch.length > 0 && (batch.length >= 500 || bytes + size > 60_000)) {
+      if (batch.length > 0 && (batch.length >= this.#readBatchSize || bytes + size > 60_000)) {
         batches.push(batch);
         batch = [];
         bytes = 12;
@@ -869,8 +887,10 @@ class PointPoller extends EventEmitter {
     }
     if (batch.length > 0) batches.push(batch);
     const points = new Map();
-    for (const ids of batches) {
-      if (this.#widgets.length === 0) break;
+    for (const [index, ids] of batches.entries()) {
+      if (this.#widgets.length === 0 || generation !== this.#readGeneration) break;
+      if (index > 0 && this.#readBatchDelayMs) await new Promise((resolve) => setTimeout(resolve, this.#readBatchDelayMs));
+      if (this.#widgets.length === 0 || generation !== this.#readGeneration) break;
       for (const [id, point] of await this.#fetchPointBatch(ids)) points.set(id, point);
     }
     return points;

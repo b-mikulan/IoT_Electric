@@ -1,5 +1,6 @@
 const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
+const { randomUUID } = require("node:crypto");
 
 const { parseWidgets, widgetGroup } = require("./config");
 
@@ -122,13 +123,15 @@ class WidgetStore {
   }
 
   async #writeWidgets(widgets) {
+    const temporaryPath = `${this.#filePath}.${randomUUID()}.tmp`;
     try {
       const normalized = parseWidgets(JSON.stringify(widgets), false);
       await fs.writeFile(
-        this.#filePath,
+        temporaryPath,
         `${JSON.stringify(widgets, null, 2)}\n`,
-        "utf8"
+        { encoding: "utf8", flag: "wx" }
       );
+      await fs.rename(temporaryPath, this.#filePath);
       return normalized;
     } catch (error) {
       throw new WidgetStoreError(
@@ -136,6 +139,8 @@ class WidgetStore {
         500,
         "WIDGET_FILE_WRITE_FAILED"
       );
+    } finally {
+      await fs.unlink(temporaryPath).catch(() => {});
     }
   }
 

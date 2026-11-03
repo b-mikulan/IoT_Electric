@@ -224,10 +224,12 @@ test("serves the dashboard and exposes only public configuration", async (t) => 
   const page = await pageResponse.text();
   assert.match(page, /<html lang="hr" theme="light">/);
   assert.match(page, /PLC vrijednosti uživo/);
-  assert.match(page, /<details class="control-disclosure">/);
-  assert.match(page, /<summary class="control-summary">/);
+  assert.doesNotMatch(page, /id="raw-widgets-panel"/);
+  const technicalPage = await (await fetch(`${baseUrl}/technical.html`)).text();
+  assert.match(technicalPage, /<details class="control-disclosure">/);
+  assert.match(technicalPage, /<summary class="control-summary">/);
   assert.match(page, /Čekam prvu uspješnu provjeru servera/);
-  assert.match(page, /Promjena: —/);
+  assert.match(technicalPage, /Promjena: —/);
   assert.match(page, /Osvježavanje podataka nije uspjelo/);
   assert.equal(materializeResponse.status, 200);
   assert.match(materializeResponse.headers.get("content-type"), /text\/css/);
@@ -813,9 +815,11 @@ test("automatic discovery runs in the background, broadcasts additions, keeps ex
   let releaseRoot;
   const rootGate = new Promise((resolve) => { releaseRoot = resolve; });
   let failBranch = false;
+  const discoveryRequests = [];
   const poller = new PointPoller({ ...config, fetchImpl: async (url) => {
     if (String(url).includes("/api/values/read")) return { ok: true, json: async () => ({ values: [] }) };
     const id = new URL(url).searchParams.get("id");
+    discoveryRequests.push(id);
     await rootGate;
     return { ok: true, json: async () => id === ""
       ? { containers: [{ containerItems: [{ id: "floor", name: "Floor" }, ...(failBranch ? [{ id: "other", name: "Other" }] : [])], valueItems: [{ id: "existing", name: "EWS name" }] }] }
@@ -826,7 +830,7 @@ test("automatic discovery runs in the background, broadcasts additions, keeps ex
   const server = cleanup.trackServer(createApp({ poller, config, widgetStore: store, deviceWidgetStore: cleanup.deviceWidgetStore }).listen(0, "127.0.0.1"));
   await new Promise((resolve) => server.once("listening", resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
-  const start = () => fetch(`${baseUrl}/api/discovery/auto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  const start = (containerId) => fetch(`${baseUrl}/api/discovery/auto`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ containerId }) });
   async function completed() {
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const state = await (await fetch(`${baseUrl}/api/discovery/auto`)).json();
@@ -836,6 +840,12 @@ test("automatic discovery runs in the background, broadcasts additions, keeps ex
     assert.fail("Automatic discovery did not finish");
   }
   assert.equal((await fetch(`${baseUrl}/api/discovery/auto`, { method: "POST" })).status, 415);
+  for (const invalidId of [42, {}, "x".repeat(1025), "floor\nroom", "floor\0room"]) {
+    const invalid = await start(invalidId);
+    assert.equal(invalid.status, 400);
+    assert.equal((await invalid.json()).code, "INVALID_DISCOVERY_QUERY");
+  }
+  assert.deepEqual(discoveryRequests, []);
   const events = await fetch(`${baseUrl}/events`, { signal: AbortSignal.timeout(4000) });
   const reader = events.body.getReader();
   await reader.read();
@@ -873,6 +883,19 @@ test("automatic discovery runs in the background, broadcasts additions, keeps ex
   assert.equal((await (await fetch(`${baseUrl}/api/config`)).json()).autoDiscovery.state, "done");
   assert.equal((await start()).status, 202);
   assert.equal((await completed()).added, 0);
+  discoveryRequests.length = 0;
+  const scopedStart = await start(" floor ");
+  assert.equal(scopedStart.status, 202);
+  assert.equal((await scopedStart.json()).containerId, "floor");
+  const scoped = await completed();
+  assert.equal(scoped.state, "done");
+  assert.equal(scoped.containerId, "floor");
+  assert.equal(scoped.containers, 1);
+  assert.equal(scoped.added, 0);
+  assert.equal(scoped.skipped, 1);
+  assert.deepEqual(discoveryRequests, ["floor"]);
+  assert.equal(scoped.tree[0].id, "floor");
+  assert.equal(scoped.tree[0].parentId, null);
   failBranch = true;
   assert.equal((await start()).status, 202);
   const partial = await completed();

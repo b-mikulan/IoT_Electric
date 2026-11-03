@@ -141,3 +141,14 @@ test("reports an unreadable widget configuration file", () => {
     /Unable to read WIDGETS_FILE/
   );
 });
+
+test("configures bounded sequential reads while retaining the existing defaults", () => {
+  const defaults = loadConfig({});
+  assert.equal(defaults.readBatchSize, 500);
+  assert.equal(defaults.readBatchDelayMs, 0);
+  const configured = loadConfig({ READ_BATCH_SIZE: "64", READ_BATCH_DELAY_MS: "1000" });
+  assert.equal(configured.readBatchSize, 64);
+  assert.equal(configured.readBatchDelayMs, 1000);
+  for (const value of ["0", "501", "NaN", "1.5"]) assert.throws(() => loadConfig({ READ_BATCH_SIZE: value }), /READ_BATCH_SIZE/);
+  for (const value of ["-1", "60001", "NaN"]) assert.throws(() => loadConfig({ READ_BATCH_DELAY_MS: value }), /READ_BATCH_DELAY_MS/);
+});

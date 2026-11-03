@@ -18,6 +18,23 @@ function invalidSettings(message = "Device card settings are not valid.") {
   return new DeviceWidgetStoreError(message, 400, "INVALID_DEVICE_SETTINGS");
 }
 
+function roomName(value) {
+  if (typeof value !== "string" || !value.trim() || value.trim().length > 160) throw invalidSettings("A room name of 1 to 160 characters is required.");
+  return value.trim().normalize("NFC");
+}
+
+const roomKey = (value) => value.normalize("NFC").toLocaleLowerCase("hr");
+
+function registerRoom(document, name) {
+  const normalized = roomName(name);
+  const rooms = document.rooms ||= [];
+  const known = [...rooms, ...document.devices.map((device) => device.room).filter(Boolean)]
+    .find((room) => room.toLocaleLowerCase("hr") === normalized.toLocaleLowerCase("hr"));
+  const canonical = known || normalized;
+  if (!rooms.includes(canonical)) rooms.push(canonical);
+  return canonical;
+}
+
 function normalizeSettings(value, { requireFields = false } = {}) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw invalidSettings();
   const key = typeof value.key === "string" ? value.key.trim() : "";
@@ -56,6 +73,13 @@ function parseDocument(raw) {
   try {
     document = JSON.parse(raw.replace(/^\uFEFF/, ""));
     if (!document || typeof document !== "object" || Array.isArray(document) || document.version !== 1 || !Array.isArray(document.devices)) throw new Error("Unsupported structure or version.");
+    if (document.rooms !== undefined) {
+      if (!Array.isArray(document.rooms) || document.rooms.some((room) => roomName(room) !== room)
+        || new Set(document.rooms.map((room) => room.toLocaleLowerCase("hr"))).size !== document.rooms.length) throw new Error("Invalid room registry.");
+    }
+    if (document.roomRules !== undefined && (!Array.isArray(document.roomRules)
+      || document.roomRules.some((rule) => !rule || roomName(rule.from) !== rule.from || rule.to !== "" && roomName(rule.to) !== rule.to)
+      || new Set(document.roomRules.map((rule) => roomKey(rule.from))).size !== document.roomRules.length)) throw new Error("Invalid room rules.");
     const keys = new Set();
     for (const device of document.devices) {
       const { key } = normalizeSettings(device);
@@ -73,6 +97,8 @@ class DeviceWidgetStore {
   #fs;
   #operation = Promise.resolve();
   #devices = [];
+  #rooms = [];
+  #roomRules = [];
 
   constructor(filePath, { fsImpl = fs, protectedFilePath = "" } = {}) {
     this.#filePath = String(filePath || "").trim();
@@ -85,6 +111,14 @@ class DeviceWidgetStore {
   get enabled() { return Boolean(this.#filePath); }
 
   get devices() { return structuredClone(this.#devices); }
+  get rooms() { return this.#rooms.slice(); }
+  get roomRules() { return structuredClone(this.#roomRules); }
+
+  #publish(document) {
+    this.#devices = document.devices.map((device) => normalizeSettings(device));
+    this.#rooms = [...(document.rooms || [])];
+    this.#roomRules = structuredClone(document.roomRules || []);
+  }
 
   synchronize(keys) {
     return this.#enqueue(async () => {
@@ -100,7 +134,7 @@ class DeviceWidgetStore {
         changed = true;
       }
       if (changed) await this.#write(document);
-      this.#devices = document.devices.map((device) => normalizeSettings(device));
+      this.#publish(document);
       return this.devices;
     });
   }
@@ -114,10 +148,11 @@ class DeviceWidgetStore {
       if ([entry.primaryPointId, ...(entry.secondaryPointIds || [])].some((id) => id !== null && !configuredPoints.has(id))) {
         throw invalidSettings("Readings must reference visible, configured dashboard points.");
       }
-      if ((entry.secondaryPointIds || []).some((id) => deriveWidgetGrouping(id).key !== entry.key)) {
-        throw invalidSettings("Secondary readings must belong to this device.");
+      if ([entry.primaryPointId, ...(entry.secondaryPointIds || [])].some((id) => id !== null && deriveWidgetGrouping(id).key !== entry.key)) {
+        throw invalidSettings("All readings must belong to this device.");
       }
       const { document } = await this.#read();
+      if (entry.room) entry.room = registerRoom(document, entry.room);
       const known = new Set(document.devices.map((device) => normalizeSettings(device).key));
       for (const key of deviceKeys) {
         if (!known.has(key)) {
@@ -129,9 +164,92 @@ class DeviceWidgetStore {
       if (index < 0) document.devices.push(entry);
       else document.devices[index] = { ...document.devices[index], ...entry };
       await this.#write(document);
-      this.#devices = document.devices.map((device) => normalizeSettings(device));
+      this.#publish(document);
       return structuredClone(entry);
     });
+  }
+
+  createRoom(name) {
+    return this.#enqueue(async () => {
+      this.#assertEnabled();
+      const normalized = roomName(name);
+      const { document } = await this.#read();
+      if ((document.rooms || []).some((room) => room.toLocaleLowerCase("hr") === normalized.toLocaleLowerCase("hr"))) {
+        throw new DeviceWidgetStoreError("A room with this name already exists.", 409, "ROOM_ALREADY_EXISTS");
+      }
+      const room = registerRoom(document, normalized);
+      await this.#write(document);
+      this.#publish(document);
+      return room;
+    });
+  }
+
+  assignRoom(keys, room, { deviceKeys }) {
+    return this.#enqueue(async () => {
+      this.#assertEnabled();
+      if (!Array.isArray(keys) || keys.length < 1 || keys.length > 1000 || keys.some((key) => typeof key !== "string" || !key.trim() || key.length > 4096)
+        || new Set(keys).size !== keys.length) throw invalidSettings("Select 1 to 1000 distinct devices.");
+      if (room !== null && room !== "") roomName(room);
+      const current = new Set(deviceKeys);
+      if (keys.some((key) => !current.has(key))) throw new DeviceWidgetStoreError("A selected device is no longer present on the dashboard.", 404, "DEVICE_NOT_FOUND");
+      const { document } = await this.#read();
+      const target = room ? registerRoom(document, room) : room;
+      const entries = new Map(document.devices.map((device) => [normalizeSettings(device).key, device]));
+      for (const key of keys) {
+        if (!entries.has(key)) {
+          const entry = normalizeSettings({ key });
+          document.devices.push(entry);
+          entries.set(key, entry);
+        }
+        entries.get(key).room = target;
+      }
+      await this.#write(document);
+      this.#publish(document);
+      return { moved: keys.length, room: target };
+    });
+  }
+
+  renameRoom(name, newName, context = {}) {
+    return this.#changeRoom(name, newName, context);
+  }
+
+  deleteRoom(name, context = {}) {
+    return this.#changeRoom(name, "", context, true);
+  }
+
+  #changeRoom(name, target, { roomNames = [] }, deleting = false) {
+    return this.#enqueue(async () => {
+      this.#assertEnabled();
+      const requested = roomName(name);
+      if (!deleting) target = roomName(target);
+      const { document } = await this.#read();
+      const rules = document.roomRules ||= [];
+      const ruleMap = new Map(rules.map((rule) => [roomKey(rule.from), rule.to]));
+      const automaticRooms = roomNames.map((room) => ruleMap.has(roomKey(room)) ? ruleMap.get(roomKey(room)) : room);
+      const available = [...(document.rooms || []), ...document.devices.map((device) => device.room), ...automaticRooms].filter(Boolean);
+      const previousName = available.find((room) => roomKey(room) === roomKey(requested));
+      if (!previousName) throw new DeviceWidgetStoreError("Prostorija više ne postoji. Osvježi popis prostorija.", 404, "ROOM_NOT_FOUND");
+      const previousKey = roomKey(previousName);
+      if (target && roomKey(target) !== previousKey && available.some((room) => roomKey(room) === roomKey(target))) {
+        throw new DeviceWidgetStoreError("Prostorija s tim nazivom već postoji.", 409, "ROOM_ALREADY_EXISTS");
+      }
+      // Preserve every other card preference, including settings for devices
+      // temporarily absent from the dashboard.
+      for (const device of document.devices) if (device.room && roomKey(device.room) === previousKey) device.room = target;
+      document.rooms = (document.rooms || []).filter((room) => roomKey(room) !== previousKey);
+      for (const rule of rules) if (rule.to && roomKey(rule.to) === previousKey) rule.to = target;
+      const sourceRule = rules.find((rule) => roomKey(rule.from) === previousKey);
+      if (sourceRule) sourceRule.to = target;
+      else rules.push({ from: previousName, to: target });
+      if (target) registerRoom(document, target);
+      await this.#write(document);
+      this.#publish(document);
+      return { previousName, room: target };
+    });
+  }
+
+  #assertEnabled() {
+    if (!this.enabled) throw new DeviceWidgetStoreError("Room settings require a writable device configuration file.", 409, "DEVICE_WIDGET_FILE_UNAVAILABLE");
   }
 
   #enqueue(operation) {

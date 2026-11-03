@@ -613,6 +613,20 @@ h1 {
   background: #deefec;
 }
 
+.discovery-item-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.discovery-item-actions .discovery-action {
+  height: auto;
+  min-height: 32px;
+  padding: 6px 12px;
+  line-height: 1.4;
+}
+
 .discovery-action:hover,
 .discovery-action:focus-visible {
   background: #c7e4df;

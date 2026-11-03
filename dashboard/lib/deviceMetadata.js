@@ -1,3 +1,5 @@
+const fs = require("node:fs");
+
 const MAX_IDS = 2_000;
 const BATCH_SIZE = 32;
 const MAX_ENUMS = 16;
@@ -34,11 +36,20 @@ class DeviceMetadataClient {
   #timeoutMs;
   #fetch;
   #demoMode;
+  #catalog = null;
   #cache = new Map();
   #inFlight = new Map();
 
   constructor(config, { fetchImpl = globalThis.fetch } = {}) {
     this.#demoMode = config.demoMode === true;
+    if (!this.#demoMode && config.deviceMetadataFile) {
+      try {
+        const saved = JSON.parse(fs.readFileSync(config.deviceMetadataFile, "utf8").replace(/^\uFEFF/, ""));
+        if (saved?.schemaVersion !== 1 || !saved.metadataById || Array.isArray(saved.metadataById) || typeof saved.metadataById !== "object"
+          || !saved.roomByZone || Array.isArray(saved.roomByZone) || typeof saved.roomByZone !== "object") throw new Error("Invalid catalog metadata format");
+        this.#catalog = saved;
+      } catch { throw new Error("Unable to load DEVICE_METADATA_FILE. Re-export the catalog descriptions or check its path."); }
+    }
     if (!this.#demoMode && typeof fetchImpl !== "function") throw new TypeError("fetchImpl must be a function");
     this.#fetch = fetchImpl;
     this.#middlewareUrl = String(config.middlewareUrl || "").replace(/\/+$/, "");
@@ -49,6 +60,21 @@ class DeviceMetadataClient {
   async read(widgets) {
     if (this.#demoMode) return { metadataById: {}, roomByZone: {}, warnings: [] };
     const configured = [...new Set(asArray(widgets).map((widget) => typeof widget === "string" ? widget.trim() : scalar(widget?.id).trim()).filter(Boolean))].sort();
+    if (this.#catalog) {
+      const metadataById = Object.create(null);
+      const roomByZone = Object.create(null);
+      let missing = 0;
+      for (const id of configured) {
+        const descriptor = Object.hasOwn(this.#catalog.metadataById, id) ? this.#catalog.metadataById[id] : null;
+        if (descriptor && typeof descriptor === "object" && !Array.isArray(descriptor) && descriptor.id === id) metadataById[id] = structuredClone(descriptor);
+        else missing += 1;
+        const zone = zonePath(id);
+        const label = Object.hasOwn(this.#catalog.roomByZone, zone) ? this.#catalog.roomByZone[zone] : null;
+        if (typeof label === "string" && label.trim()) roomByZone[zone] = label;
+      }
+      return { metadataById, roomByZone, warnings: missing ? [`Za ${missing} vrijednosti nedostaje opis u spremljenom katalogu.`] : [],
+        source: "catalog", capturedAt: this.#catalog.catalog?.capturedAt || null };
+    }
     const ids = configured.slice(0, MAX_IDS);
     const truncated = configured.length > MAX_IDS;
     const key = JSON.stringify([ids, truncated]);

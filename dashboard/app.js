@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("node:path");
 const { TelemetryClient } = require("./lib/telemetry");
 const { widgetGroup } = require("./lib/config");
+const { deriveWidgetGrouping } = require("./public/widgetGrouping");
 const { DeviceMetadataClient } = require("./lib/deviceMetadata");
 const { createDeviceDemo } = require("./lib/deviceDemo");
 const { DeviceCommandService } = require("./lib/deviceCommands");
@@ -111,6 +112,7 @@ function createApp({
   const discoveredById = new Map();
   let autoDiscovery = { state: "idle" };
   let clearingWidgets = false;
+  let automaticRoomNames = [];
   app.disable("x-powered-by");
 
   function broadcast(event, payload) {
@@ -129,15 +131,16 @@ function createApp({
 
   function deviceSettingsContext() {
     return {
+      roomNames: automaticRoomNames,
       deviceKeys: buildDevices(config.widgets).map((device) => device.key),
       pointIds: config.widgets.filter((widget) => widget.visible !== false).map((widget) => widget.id),
     };
   }
 
   async function synchronizeDeviceSettings() {
-    const previous = JSON.stringify(deviceWidgetStore.devices);
+    const previous = JSON.stringify([deviceWidgetStore.devices, deviceWidgetStore.rooms, deviceWidgetStore.roomRules]);
     const devices = await deviceWidgetStore.synchronize(deviceSettingsContext().deviceKeys);
-    if (JSON.stringify(devices) !== previous) broadcast("device-settings", { devices });
+    if (JSON.stringify([devices, deviceWidgetStore.rooms, deviceWidgetStore.roomRules]) !== previous) broadcast("device-settings", { devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
     return devices;
   }
 
@@ -147,9 +150,10 @@ function createApp({
     broadcast("discovery", autoDiscovery);
   }
 
-  async function runAutoDiscovery() {
+  async function runAutoDiscovery(containerId) {
     try {
       const { values, tree, warnings } = await poller.discoverAllValues({
+        containerId,
         onProgress: (progress) => updateAutoDiscovery(progress),
       });
       updateAutoDiscovery({ phase: "saving", pending: 0, found: values.length });
@@ -208,6 +212,7 @@ function createApp({
           !config.demoMode && Boolean(widgetStore?.enabled),
         deviceSettingsEnabled: Boolean(deviceWidgetStore.enabled),
         deviceSettings,
+        rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules,
         autoDiscovery,
         widgets: config.widgets.map(publicWidget),
       });
@@ -219,7 +224,7 @@ function createApp({
   app.get("/api/devices/settings", async (request, response) => {
     response.set("Cache-Control", "no-store");
     try {
-      return response.json({ enabled: Boolean(deviceWidgetStore.enabled), devices: await synchronizeDeviceSettings() });
+      return response.json({ enabled: Boolean(deviceWidgetStore.enabled), devices: await synchronizeDeviceSettings(), rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
     } catch (error) {
       return sendOperationError(response, error, "DEVICE_SETTINGS_FAILED", "Device card settings could not be loaded.");
     }
@@ -229,11 +234,59 @@ function createApp({
     response.set("Cache-Control", "no-store");
     try {
       const device = await deviceWidgetStore.save(request.body, deviceSettingsContext());
-      broadcast("device-settings", { devices: deviceWidgetStore.devices });
-      return response.json({ device });
+      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
+      return response.json({ device, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
     } catch (error) {
       return sendOperationError(response, error, "DEVICE_SETTINGS_UPDATE_FAILED", "Device card settings could not be saved.");
     }
+  });
+
+  app.post("/api/rooms", requireJson, express.json({ limit: "4kb" }), async (request, response) => {
+    try {
+      const room = await deviceWidgetStore.createRoom(request.body?.name);
+      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
+      return response.status(201).json({ room, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
+    } catch (error) { return sendOperationError(response, error, "ROOM_CREATE_FAILED", "Prostoriju nije moguće stvoriti."); }
+  });
+
+  for (const action of ["rename", "delete"]) {
+    app.post(`/api/rooms/${action}`, requireJson, express.json({ limit: "4kb" }), async (request, response) => {
+      try {
+        const result = action === "rename"
+          ? await deviceWidgetStore.renameRoom(request.body?.name, request.body?.newName, deviceSettingsContext())
+          : await deviceWidgetStore.deleteRoom(request.body?.name, deviceSettingsContext());
+        const state = { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules };
+        broadcast("device-settings", state);
+        return response.json({ ...result, ...state });
+      } catch (error) { return sendOperationError(response, error, "ROOM_UPDATE_FAILED", "Prostoriju nije moguće promijeniti."); }
+    });
+  }
+
+  app.post("/api/devices/rooms", requireJson, express.json({ limit: "1mb" }), async (request, response) => {
+    try {
+      const result = await deviceWidgetStore.assignRoom(request.body?.keys, request.body?.room, deviceSettingsContext());
+      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
+      return response.json({ ...result, devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
+    } catch (error) { return sendOperationError(response, error, "DEVICE_ROOM_MOVE_FAILED", "Uređaje nije moguće premjestiti."); }
+  });
+
+  app.delete("/api/devices", requireJson, express.json({ limit: "8kb" }), async (request, response) => {
+    if (config.demoMode || !widgetStore?.enabled) return response.status(409).json({ error: "Uklanjanje uređaja zahtijeva spremanje widgeta.", code: "WIDGET_FILE_UNAVAILABLE" });
+    const key = request.body?.key;
+    if (typeof key !== "string" || !key.trim() || key.length > 4096) return response.status(400).json({ error: "Odaberi uređaj za uklanjanje.", code: "INVALID_DEVICE_KEY" });
+    if (clearingWidgets || autoDiscovery.state === "running") return response.status(409).json({ error: "Pričekaj završetak trenutačne promjene widgeta.", code: "WIDGET_OPERATION_IN_PROGRESS" });
+    const ids = config.widgets.filter((widget) => deriveWidgetGrouping(widget.id).key === key).map((widget) => widget.id);
+    if (!ids.length) return response.status(404).json({ error: "Uređaj nije pronađen na dashboardu.", code: "DEVICE_NOT_FOUND" });
+    clearingWidgets = true;
+    try {
+      await widgetStore.removeMany(ids);
+      poller.removeWidgets(ids);
+      const removed = new Set(ids);
+      config.widgets = config.widgets.filter((widget) => !removed.has(widget.id));
+      for (const id of ids) discoveredById.delete(id);
+      return response.json({ key, removed: ids.length, ids });
+    } catch (error) { return sendOperationError(response, error, "DEVICE_REMOVE_FAILED", "Karticu uređaja nije moguće ukloniti."); }
+    finally { clearingWidgets = false; }
   });
 
   app.get("/api/snapshot", (request, response) => {
@@ -247,7 +300,9 @@ function createApp({
       return response.json({ metadataById: demo.metadataById, roomByZone: demo.roomByZone, demoWidgets: demo.widgets, warnings: [] });
     }
     try {
-      return response.json(await deviceMetadata.read(config.widgets));
+      const metadata = await deviceMetadata.read(config.widgets);
+      automaticRoomNames = Object.values(metadata.roomByZone || {}).map((room) => typeof room === "string" ? room : room?.label).filter((name) => typeof name === "string" && name.trim());
+      return response.json(metadata);
     } catch {
       return response.status(502).json({ error: "Opisi uređaja trenutačno nisu dostupni.", code: "DEVICE_METADATA_FAILED" });
     }
@@ -504,6 +559,10 @@ function createApp({
 
   app.get("/api/discovery/auto", (request, response) => response.json(autoDiscovery));
   app.post("/api/discovery/auto", requireJson, express.json({ limit: "4kb" }), (request, response) => {
+    const containerId = request.body?.containerId ?? "";
+    if (typeof containerId !== "string" || containerId.trim().length > 1_024 || /[\r\n\0]/.test(containerId)) {
+      return response.status(400).json({ error: "Container ID is not valid.", code: "INVALID_DISCOVERY_QUERY" });
+    }
     if (config.demoMode || !widgetStore?.enabled) {
       return response.status(409).json({ error: "Automatic discovery requires a writable WIDGETS_FILE and a live EWS connection.", code: "WIDGET_FILE_UNAVAILABLE" });
     }
@@ -513,10 +572,10 @@ function createApp({
     if (clearingWidgets) {
       return response.status(409).json({ error: "A bulk widget change is still in progress.", code: "WIDGET_CLEAR_IN_PROGRESS" });
     }
-    autoDiscovery = { state: "running", phase: "scanning", containers: 0, pending: 1, found: 0, failedBranches: 0 };
+    autoDiscovery = { state: "running", phase: "scanning", containerId: containerId.trim(), containers: 0, pending: 1, found: 0, failedBranches: 0 };
     broadcast("discovery", autoDiscovery);
     // Long scans continue on the server after browser closure or proxy timeouts.
-    void runAutoDiscovery();
+    void runAutoDiscovery(containerId.trim());
     return response.status(202).json(autoDiscovery);
   });
 
@@ -651,7 +710,7 @@ function createApp({
 
     sendEvent(response, "snapshot", poller.getSnapshot());
     sendEvent(response, "discovery", autoDiscovery);
-    sendEvent(response, "device-settings", { devices: deviceWidgetStore.devices });
+    sendEvent(response, "device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
     eventClients.add(response);
     const heartbeat = setInterval(() => response.write(": heartbeat\n\n"), 25_000);
 

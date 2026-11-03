@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="hr" theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Live pregled vrijednosti s IoT Electric PLC kontrolera"
+    />
+    <title>IoT Electric · Tehnički prikaz vrijednosti</title>
+    <link rel="stylesheet" href="/vendor/materialize/materialize.min.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/deviceCards.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="container header-content">
+        <div class="brand" aria-label="IoT Electric">
+          <span class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+          <span class="brand-name">IoT Electric</span>
+        </div>
+
+        <div class="connection" aria-live="polite">
+          <span id="connection-dot" class="connection-dot is-connecting"></span>
+          <span id="connection-label">Povezivanje…</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="container dashboard-shell">
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Nadzor sustava</p>
+          <h1 id="page-title">Tehnički prikaz vrijednosti</h1>
+          <p
+            id="last-sync"
+            class="last-sync"
+            title="Vrijeme posljednje uspješne provjere svih konfiguriranih točaka."
+          >Čekam prvu uspješnu provjeru servera.</p>
+        </div>
+        <div class="intro-actions">
+          <a class="btn" href="/">Natrag na uređaje</a>
+          <div id="demo-badge" class="demo-badge" hidden>Demo podaci</div>
+          <button
+            id="visibility-open"
+            class="dashboard-menu-open"
+            type="button"
+            title="Uredi prikaz dashboarda"
+            aria-label="Uredi prikaz dashboarda"
+            hidden
+          >
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+          </button>
+          <button
+            id="discovery-open"
+            class="discovery-open"
+            type="button"
+            title="Pronađi nove objekte"
+            aria-label="Pronađi nove objekte"
+            hidden
+          >
+            <span class="discovery-icon" aria-hidden="true">↻</span>
+          </button>
+        </div>
+      </section>
+
+      <div id="error-banner" class="error-banner" role="alert" hidden>
+        <strong>Osvježavanje podataka nije uspjelo.</strong>
+        <span id="error-message">Prikazane su zadnje dostupne vrijednosti. Servis će pokušati ponovno.</span>
+      </div>
+
+
+      <details id="raw-widgets-panel" class="raw-widgets-panel" open>
+        <summary>Tehnički prikaz vrijednosti</summary>
+        <div class="raw-widgets-content">
+          <section id="control-panel" class="control-panel" aria-labelledby="control-title" hidden>
+            <details class="control-disclosure">
+              <summary class="control-summary">
+                <span>
+                  <span class="eyebrow">Upravljanje</span>
+                  <span id="control-title" class="control-title">Postavi vrijednost</span>
+                </span>
+                <span class="control-chevron" aria-hidden="true"></span>
+              </summary>
+
+              <div class="control-body">
+                <p class="control-description">Prikazani su samo widgeti koji u widgets.json imaju <code>"writable": true</code>.</p>
+
+                <form id="write-form" class="write-form">
+                  <div class="write-field">
+                    <label for="write-widget">Widget</label>
+                    <select id="write-widget" class="browser-default" required>
+                      <option value="">Odaberi widget</option>
+                    </select>
+                  </div>
+
+                  <div class="write-field">
+                    <label id="write-value-label" for="write-value">Nova vrijednost</label>
+                    <input id="write-value" type="text" maxlength="1000" required />
+                  </div>
+
+                  <button id="write-submit" class="btn waves-effect waves-light" type="submit">
+                    Pošalji
+                  </button>
+                </form>
+                <p class="write-warning">Promjena se šalje stvarnom kontroleru. Prije slanja provjeri odabrani widget i vrijednost.</p>
+                <p id="write-status" class="write-status" role="status" aria-live="polite"></p>
+              </div>
+            </details>
+          </section>
+
+          <section aria-labelledby="widgets-heading">
+            <h2 id="widgets-heading" class="visually-hidden">Mjerne točke</h2>
+            <div id="widget-grid" class="widget-grid" aria-live="polite"></div>
+          </section>
+
+          <div id="empty-state" class="empty-state" hidden>
+            <span class="empty-icon" aria-hidden="true">◇</span>
+            <h2>Nema vidljivih točaka</h2>
+            <p>Uključi postojeći widget kroz izbornik prikaza ili dodaj nove vrijednosti kroz pretragu i automatsko otkrivanje.</p>
+          </div>
+
+        </div>
+      </details>
+    </main>
+
+    <dialog id="discovery-dialog" class="discovery-dialog" aria-labelledby="discovery-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <div>
+            <p class="eyebrow">EWS objekti</p>
+            <h2 id="discovery-title">Dodaj vrijednost na dashboard</h2>
+          </div>
+          <button
+            id="discovery-close"
+            class="dialog-close"
+            type="button"
+            aria-label="Zatvori"
+          >×</button>
+        </header>
+
+        <p class="discovery-description">
+          Upiši container ID za pregled njegove neposredne djece, zalijepi puni ID vrijednosti ili ostavi prazno za početak od root containera.
+        </p>
+
+        <form id="discovery-form" class="discovery-form">
+          <div class="discovery-field">
+            <label for="discovery-query">Container ili object ID</label>
+            <input
+              id="discovery-query"
+              type="text"
+              maxlength="1024"
+              autocomplete="off"
+              placeholder="npr. 01/ES/Test4EWS/Values"
+            />
+          </div>
+          <button id="discovery-search" class="btn waves-effect waves-light" type="submit">
+            <span class="button-spinner" aria-hidden="true">↻</span>
+            <span>Traži</span>
+          </button>
+        </form>
+
+        <p id="discovery-status" class="discovery-status" role="status" aria-live="polite">
+          Pretraga još nije pokrenuta.
+        </p>
+        <div id="discovery-results" class="discovery-results"></div>
+        <div id="automatic-discovery" class="automatic-discovery" hidden>
+          <button id="discovery-auto" class="btn waves-effect waves-light" type="button">Automatski dodaj sve vrijednosti</button>
+          <p>Pretražuje cijeli EWS od korijena i dodaje sve vrijednosti. Za pretragu od određene mape odaberi „Automatski dodaj iz ove mape” uz container u rezultatima. Uključene su sve podmape. Postojeći widgeti zadržavaju svoje postavke.</p>
+          <p id="discovery-auto-status" class="discovery-status" role="status" aria-live="polite"></p>
+          <div id="discovery-tree" class="discovery-tree" aria-label="Pronađena EWS struktura" hidden></div>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="visibility-dialog" class="discovery-dialog visibility-dialog" aria-labelledby="visibility-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <div>
+            <p class="eyebrow">Prikaz dashboarda</p>
+            <h2 id="visibility-title">Prikaz i widgeti</h2>
+          </div>
+          <button
+            id="visibility-close"
+            class="dialog-close"
+            type="button"
+            aria-label="Zatvori"
+          >×</button>
+        </header>
+
+        <p class="discovery-description">
+          Skriveni widget ostaje spremljen u widgets.json i može se ponovno uključiti u bilo kojem trenutku.
+        </p>
+        <div class="widgets-clear-controls">
+          <button id="widgets-clear" class="btn-flat danger-action" type="button">Obriši sve widgete</button>
+          <div class="group-management">
+            <div class="discovery-field">
+              <label for="widgets-group-select">Grupa za uređivanje</label>
+              <select id="widgets-group-select" class="browser-default">
+                <option value="">Odaberi grupu</option>
+              </select>
+            </div>
+            <button id="widgets-group-rename" class="btn-flat" type="button" disabled>Preimenuj</button>
+            <button id="widgets-group-clear" class="btn-flat danger-action" type="button" disabled>Obriši grupu</button>
+          </div>
+          <div id="widgets-clear-confirmation" class="settings-delete-confirmation" hidden>
+            <p id="widgets-clear-message"></p>
+            <p>Brišu se i skriveni widgeti. Vrijednosti možeš ponovno dodati kroz discovery; podaci na kontroleru ostaju sačuvani.</p>
+            <div class="settings-delete-actions">
+              <button id="widgets-clear-cancel" class="btn-flat" type="button">Zadrži widgete</button>
+              <button id="widgets-clear-confirm" class="btn" type="button">Da, obriši sve</button>
+            </div>
+          </div>
+          <p id="widgets-clear-status" class="discovery-status" role="status" aria-live="polite"></p>
+        </div>
+        <div id="visibility-list" class="visibility-list"></div>
+        <p id="visibility-status" class="discovery-status" role="status" aria-live="polite"></p>
+      </div>
+    </dialog>
+
+    <dialog id="group-clear-dialog" class="discovery-dialog" aria-labelledby="group-clear-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <h2 id="group-clear-title">Obriši grupu</h2>
+          <button id="group-clear-close" class="dialog-close" type="button" aria-label="Zatvori">×</button>
+        </header>
+        <p id="group-clear-message"></p>
+        <p>Brišu se svi widgeti iz ove grupe, uključujući skrivene. Ostale grupe i podaci na kontroleru ostaju sačuvani.</p>
+        <div class="settings-delete-actions">
+          <button id="group-clear-cancel" class="btn-flat" type="button">Zadrži grupu</button>
+          <button id="group-clear-confirm" class="btn" type="button">Da, obriši grupu</button>
+        </div>
+        <p id="group-clear-status" class="discovery-status" role="status" aria-live="polite"></p>
+      </div>
+    </dialog>
+
+    <dialog id="group-rename-dialog" class="discovery-dialog" aria-labelledby="group-rename-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <h2 id="group-rename-title">Preimenuj grupu</h2>
+          <button id="group-rename-close" class="dialog-close" type="button" aria-label="Zatvori">×</button>
+        </header>
+        <p id="group-rename-message"></p>
+        <form id="group-rename-form" class="group-rename-form">
+          <div class="discovery-field">
+            <label for="group-rename-name">Novi naziv grupe</label>
+            <input id="group-rename-name" type="text" maxlength="1024" autocomplete="off" required />
+          </div>
+          <p>Novi naziv primjenjuje se na sve widgete u grupi, uključujući skrivene.</p>
+          <div class="group-rename-actions">
+            <button id="group-rename-cancel" class="btn-flat" type="button">Odustani</button>
+            <button id="group-rename-save" class="btn" type="submit">Spremi naziv</button>
+          </div>
+        </form>
+        <p id="group-rename-status" class="discovery-status" role="status" aria-live="polite"></p>
+      </div>
+    </dialog>
+
+    <dialog id="device-settings-dialog" class="discovery-dialog device-settings-dialog" aria-labelledby="device-settings-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <div>
+            <p class="eyebrow">Kartica uređaja</p>
+            <h2 id="device-settings-title">Postavke kartice</h2>
+          </div>
+          <button id="device-settings-close" class="dialog-close" type="button" aria-label="Zatvori postavke kartice">×</button>
+        </header>
+        <form id="device-settings-form" class="settings-form device-settings-form">
+          <div class="settings-field">
+            <label for="device-settings-label">Naziv kartice</label>
+            <input id="device-settings-label" type="text" maxlength="160" />
+            <small id="device-settings-label-hint">Prazno polje koristi automatski naziv uređaja.</small>
+          </div>
+          <div class="settings-field">
+            <label for="device-settings-room">Prostorija</label>
+            <select id="device-settings-room" class="browser-default"></select>
+          </div>
+          <div id="device-settings-new-room-field" class="settings-field settings-field-wide" hidden>
+            <label for="device-settings-new-room">Naziv nove prostorije</label>
+            <input id="device-settings-new-room" type="text" maxlength="160" placeholder="npr. Dnevni boravak" />
+          </div>
+          <div class="device-settings-section settings-field-wide">
+            <h3>Očitanja na kartici</h3>
+            <p>Odaberi glavni podatak i dodatna očitanja koja želiš vidjeti uz njega.</p>
+          </div>
+          <div class="device-primary-settings settings-field-wide">
+            <div class="settings-field">
+              <label for="device-settings-primary">Glavno očitanje</label>
+              <select id="device-settings-primary" class="browser-default"></select>
+            </div>
+            <div class="settings-field">
+              <label for="device-settings-unit-mode">Mjerna jedinica</label>
+              <select id="device-settings-unit-mode" class="browser-default">
+                <option value="auto">Automatski</option>
+                <option value="none">Bez jedinice</option>
+                <option value="custom">Vlastita jedinica</option>
+              </select>
+              <div id="device-settings-unit-field" class="device-unit-field" hidden>
+                <label for="device-settings-unit">Vlastita mjerna jedinica</label>
+                <input id="device-settings-unit" type="text" maxlength="40" placeholder="npr. %, °C, lx" />
+              </div>
+            </div>
+            <small id="device-settings-unit-hint" class="settings-context settings-field-wide"></small>
+          </div>
+          <div class="settings-field settings-field-wide">
+            <label for="device-settings-secondary-mode">Sekundarna očitanja</label>
+            <select id="device-settings-secondary-mode" class="browser-default">
+              <option value="auto">Automatski odabir za ovaj uređaj</option>
+              <option value="custom">Odaberi očitanja</option>
+            </select>
+            <small id="device-settings-secondary-hint"></small>
+          </div>
+          <div id="device-settings-secondary-field" class="settings-field settings-field-wide" hidden>
+            <label for="device-settings-search">Pronađi očitanje</label>
+            <input id="device-settings-search" type="search" placeholder="Naziv podatka ovog uređaja" autocomplete="off" />
+            <div id="device-settings-secondary-list" class="device-metric-options" role="group" aria-label="Odabir sekundarnih očitanja"></div>
+            <small id="device-settings-secondary-count">Najviše 12 dodatnih očitanja.</small>
+          </div>
+          <div class="device-settings-tools settings-field-wide">
+            <button id="device-settings-functions" class="btn-flat" type="button">Postavke funkcija uređaja</button>
+            <button id="device-settings-reset" class="btn-flat" type="button">Vrati automatski odabir</button>
+            <button id="device-settings-remove" class="btn-flat danger-action" type="button">Ukloni karticu uređaja</button>
+          </div>
+          <div id="device-settings-remove-confirmation" class="settings-delete-confirmation settings-field-wide" hidden>
+            <p id="device-settings-remove-message"></p>
+            <p class="settings-context">Uređaj ostaje na serveru i u katalogu zgrade. Uklanjaju se samo njegovi widgeti s ovog dashboarda.</p>
+            <div class="settings-delete-actions">
+              <button id="device-settings-remove-cancel" class="btn-flat" type="button">Zadrži uređaj</button>
+              <button id="device-settings-remove-confirm" class="btn" type="button">Da, ukloni karticu</button>
+            </div>
+          </div>
+          <div class="settings-actions settings-field-wide">
+            <button id="device-settings-cancel" class="btn-flat" type="button">Odustani</button>
+            <button id="device-settings-save" class="btn" type="submit">Spremi karticu</button>
+          </div>
+        </form>
+        <p id="device-settings-status" class="discovery-status" role="status" aria-live="polite"></p>
+      </div>
+    </dialog>
+
+    <dialog id="rooms-dialog" class="discovery-dialog settings-dialog" aria-labelledby="rooms-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <div><p class="eyebrow">Organizacija uređaja</p><h2 id="rooms-title">Prostorije</h2></div>
+          <button id="rooms-close" class="dialog-close" type="button" aria-label="Zatvori prostorije">×</button>
+        </header>
+        <p class="settings-context">Stvori prostoriju, zatim odaberi uređaje i premjesti ih zajedno. Prostorije ostaju spremljene i dok su prazne.</p>
+        <form id="rooms-form" class="room-create-form">
+          <label class="room-field-label" for="rooms-name">Naziv nove prostorije</label>
+          <div class="room-input-row">
+            <input id="rooms-name" type="text" maxlength="160" required placeholder="npr. Ured 101" />
+            <button id="rooms-create" class="btn" type="submit">Stvori prostoriju</button>
+          </div>
+        </form>
+        <p id="rooms-status" class="discovery-status" role="status" aria-live="polite"></p>
+        <div class="room-registry-heading"><h3>Postojeće prostorije</h3><span id="rooms-count"></span></div>
+        <ul id="rooms-list" class="room-registry-list" aria-label="Postojeće prostorije"></ul>
+        <section id="rooms-editor" class="room-editor" aria-labelledby="rooms-selected" hidden>
+          <h3 id="rooms-selected"></h3>
+          <p id="rooms-summary" class="settings-context"></p>
+          <form id="rooms-rename-form" class="room-edit-form">
+            <label class="room-field-label" for="rooms-rename-name">Naziv odabrane prostorije</label>
+            <div class="room-input-row">
+              <input id="rooms-rename-name" type="text" maxlength="160" required />
+              <button id="rooms-rename" class="btn" type="submit">Spremi naziv</button>
+            </div>
+          </form>
+          <button id="rooms-delete" class="btn-flat danger-action" type="button">Izbriši prostoriju</button>
+          <div id="rooms-delete-confirmation" class="room-delete-confirmation" hidden>
+            <p id="rooms-delete-message"></p>
+            <div class="room-delete-actions">
+              <button id="rooms-delete-cancel" class="btn-flat" type="button">Zadrži prostoriju</button>
+              <button id="rooms-delete-confirm" class="btn danger-action" type="button">Da, izbriši prostoriju</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </dialog>
+
+    <dialog id="device-room-dialog" class="discovery-dialog settings-dialog" aria-labelledby="device-room-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <div><p class="eyebrow">Odabrani uređaji</p><h2 id="device-room-title">Premjesti u prostoriju</h2></div>
+          <button id="device-room-close" class="dialog-close" type="button" aria-label="Zatvori premještanje">×</button>
+        </header>
+        <p id="device-room-summary" class="settings-context"></p>
+        <form id="device-room-form" class="settings-form">
+          <div class="settings-field settings-field-wide"><label for="device-room-target">Prostorija</label><select id="device-room-target" class="browser-default" required></select></div>
+          <div id="device-room-new-field" class="settings-field settings-field-wide" hidden><label for="device-room-new">Naziv nove prostorije</label><input id="device-room-new" type="text" maxlength="160" /></div>
+          <div class="settings-actions settings-field-wide">
+            <button id="device-room-cancel" class="btn-flat" type="button">Odustani</button>
+            <button id="device-room-save" class="btn" type="submit">Premjesti uređaje</button>
+          </div>
+        </form>
+        <p id="device-room-status" class="discovery-status" role="status" aria-live="polite"></p>
+      </div>
+    </dialog>
+
+    <dialog id="settings-dialog" class="discovery-dialog settings-dialog" aria-labelledby="settings-title">
+      <div class="discovery-shell">
+        <header class="discovery-header">
+          <div>
+            <p class="eyebrow">Postavke widgeta</p>
+            <h2 id="settings-title">Uredi widget</h2>
+          </div>
+          <button
+            id="settings-close"
+            class="dialog-close"
+            type="button"
+            aria-label="Zatvori"
+          >×</button>
+        </header>
+
+        <form id="settings-form" class="settings-form">
+          <div id="settings-point-field" class="settings-field settings-field-wide" hidden>
+            <label for="settings-point">Funkcija uređaja</label>
+            <select id="settings-point" class="browser-default"></select>
+          </div>
+          <p id="settings-context" class="settings-field-wide settings-context" hidden>Postavke se odnose na odabranu funkciju uređaja.</p>
+          <div id="settings-source-field" class="settings-field settings-field-wide">
+            <label for="settings-id">Controller ID</label>
+            <input id="settings-id" type="text" readonly />
+            <small>ID se ne mijenja ovdje; za drugi datapoint koristi discovery.</small>
+          </div>
+
+          <div class="settings-field">
+            <label for="settings-label">Naziv</label>
+            <input id="settings-label" type="text" maxlength="160" required />
+          </div>
+
+          <div class="settings-field">
+            <label for="settings-description">Opis</label>
+            <input id="settings-description" type="text" maxlength="500" />
+          </div>
+
+          <div id="settings-group-field" class="settings-field settings-field-wide">
+            <label for="settings-group">Grupa</label>
+            <input id="settings-group" type="text" maxlength="1024" />
+            <small>Prazno polje grupira widget prema njegovoj EWS mapi.</small>
+          </div>
+
+          <div class="settings-field">
+            <label for="settings-unit">Jedinica</label>
+            <input id="settings-unit" type="text" maxlength="32" placeholder="npr. °C, %, kW" />
+          </div>
+
+          <div class="settings-field">
+            <label for="settings-precision">Broj decimala</label>
+            <input id="settings-precision" type="number" min="0" max="6" step="1" placeholder="Automatski" />
+          </div>
+
+          <label class="settings-check">
+            <input id="settings-writable" class="browser-default" type="checkbox" />
+            <span>Dozvoli upis vrijednosti</span>
+          </label>
+
+          <p id="settings-write-hint" class="settings-field-wide settings-context" hidden></p>
+
+          <label class="settings-check">
+            <input id="settings-visible" class="browser-default" type="checkbox" />
+            <span>Prikaži na dashboardu</span>
+          </label>
+
+          <div class="settings-actions settings-field-wide">
+            <button id="settings-delete" class="btn-flat settings-delete" type="button">Obriši widget</button>
+            <button id="settings-cancel" class="btn-flat" type="button">Odustani</button>
+            <button id="settings-save" class="btn waves-effect waves-light" type="submit">Spremi</button>
+          </div>
+        </form>
+        <div id="settings-delete-confirmation" class="settings-delete-confirmation" hidden>
+          <p id="settings-delete-message"></p>
+          <p>Vrijednost možeš ponovno dodati kroz pretragu. Podaci na kontroleru ostaju sačuvani.</p>
+          <div class="settings-delete-actions">
+            <button id="settings-delete-cancel" class="btn-flat" type="button">Zadrži widget</button>
+            <button id="settings-delete-confirm" class="btn" type="button">Da, obriši</button>
+          </div>
+        </div>
+        <p id="settings-status" class="discovery-status" role="status" aria-live="polite"></p>
+      </div>
+    </dialog>
+
+    <footer class="container app-footer">
+      <span>Automatsko osvježavanje bez ponovnog učitavanja stranice</span>
+      <span id="poll-interval"></span>
+    </footer>
+
+    <template id="widget-template">
+      <div class="col s12 m6 l4 widget-column">
+        <article class="card widget-card">
+          <div class="widget-accent"></div>
+          <div class="card-content">
+            <button class="widget-settings-button" type="button" aria-label="Uredi widget" hidden>
+              <span aria-hidden="true">⚙</span>
+            </button>
+            <div class="widget-heading">
+              <span class="widget-icon" aria-hidden="true"></span>
+              <div>
+                <h3 class="widget-label"></h3>
+                <p class="widget-description"></p>
+              </div>
+            </div>
+            <div class="widget-reading">
+              <span class="widget-value">—</span>
+              <span class="widget-unit"></span>
+            </div>
+            <div class="widget-meta">
+              <span class="widget-state">Čekanje podataka</span>
+              <span class="widget-time">Promjena: —</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </template>
+
+    <template id="discovery-item-template">
+      <article class="discovery-item">
+        <div class="discovery-item-copy">
+          <div class="discovery-item-heading">
+            <span class="discovery-kind"></span>
+            <strong class="discovery-name"></strong>
+          </div>
+          <code class="discovery-id"></code>
+          <p class="discovery-item-description"></p>
+        </div>
+        <button class="discovery-action btn-small waves-effect" type="button"></button>
+      </article>
+    </template>
+
+    <template id="visibility-item-template">
+      <article class="visibility-item">
+        <div class="visibility-copy">
+          <strong class="visibility-name"></strong>
+          <code class="visibility-id"></code>
+        </div>
+        <label class="visibility-switch">
+          <input class="visibility-checkbox" type="checkbox" />
+          <span class="visibility-track" aria-hidden="true">
+            <span class="visibility-thumb"></span>
+          </span>
+        </label>
+      </article>
+    </template>
+
+    <noscript>
+      <div class="noscript">Za prikaz vrijednosti potrebno je uključiti JavaScript.</div>
+    </noscript>
+    <script src="/widgetGrouping.js" defer></script>
+    <script src="/deviceModel.js" defer></script>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

@@ -20,6 +20,124 @@ const alias = `11/${deviceKeys[0]}/Values/RmTmp/Value`;
 const otherTemperature = `01/${deviceKeys[1]}/Values/RmTmp`;
 const context = { deviceKeys, pointIds: [temperature, humidity, co2, alias, otherTemperature] };
 
+test("room rename preserves card preferences and historical owners, supports casing and rejects conflicts", async (t) => {
+  const { file } = await fixture(t);
+  const saved = { ...automatic(deviceKeys[0]), label: "My AC", room: "Old", primaryPointId: temperature, primaryUnit: "custom", secondaryPointIds: [humidity] };
+  await fs.writeFile(file, JSON.stringify({ version: 1, custom: true, rooms: ["Old", "Taken"], devices: [saved, { ...automatic("Retired"), room: "Old", custom: 7 }] }));
+  const store = new DeviceWidgetStore(file);
+  await store.synchronize(deviceKeys);
+  await store.renameRoom("Old", "New", context);
+  assert.deepEqual(store.devices[0], { ...saved, room: "New" });
+  assert.equal(store.devices.find((d) => d.key === "Retired").room, "New");
+  const persisted = JSON.parse(await fs.readFile(file, "utf8"));
+  assert.equal(persisted.custom, true);
+  assert.equal(persisted.devices[1].custom, 7);
+  await store.renameRoom("NEW", "new", context);
+  assert.ok(store.rooms.includes("new"));
+  const before = await fs.readFile(file, "utf8");
+  await assert.rejects(store.renameRoom("new", "TAKEN", context), { code: "ROOM_ALREADY_EXISTS" });
+  await assert.rejects(store.renameRoom("Old", "Elsewhere", context), { code: "ROOM_NOT_FOUND" });
+  await assert.rejects(store.renameRoom("new", "", context), { code: "INVALID_DEVICE_SETTINGS" });
+  assert.equal(await fs.readFile(file, "utf8"), before);
+});
+
+test("automatic room renames and deletion stay resolved after restart and apply to future devices", async (t) => {
+  const { file } = await fixture(t);
+  const store = new DeviceWidgetStore(file);
+  await store.synchronize(deviceKeys);
+  const rooms = { ...context, roomNames: ["Server room"] };
+  await store.renameRoom("Server room", "Office", rooms);
+  await store.renameRoom("Office", "New office", rooms);
+  assert.equal(store.devices[0].room, null);
+  assert.deepEqual(store.roomRules, [{ from: "Server room", to: "New office" }, { from: "Office", to: "New office" }]);
+  const restarted = new DeviceWidgetStore(file);
+  await restarted.synchronize([]);
+  assert.deepEqual(restarted.roomRules, store.roomRules);
+  await restarted.deleteRoom("New office", rooms);
+  assert.deepEqual(restarted.rooms, []);
+  assert.ok(restarted.roomRules.every((rule) => rule.to === ""));
+  await assert.rejects(restarted.deleteRoom("Server room", rooms), { code: "ROOM_NOT_FOUND" });
+  const { buildDevices } = require("../public/deviceModel");
+  const future = buildDevices([{ id: "01/ES/Future/Values/RmTmp" }], { roomByZone: { ES: "Server room" }, roomRules: restarted.roomRules });
+  assert.equal(future[0].room, null);
+});
+
+test("deleting a populated room unassigns all members without removing their cards or other rooms", async (t) => {
+  const { file } = await fixture(t);
+  const store = new DeviceWidgetStore(file);
+  await store.synchronize(deviceKeys);
+  const saved = { ...automatic(deviceKeys[0]), room: "Office", label: "My AC", primaryPointId: temperature };
+  await store.save(saved, context);
+  await store.assignRoom([deviceKeys[1]], "Other", context);
+  await store.deleteRoom("Office", context);
+  assert.deepEqual(store.devices[0], { ...saved, room: "" });
+  assert.equal(store.devices.length, 2);
+  assert.equal(store.devices[1].room, "Other");
+  assert.deepEqual(store.rooms, ["Other"]);
+  assert.deepEqual(store.roomRules, [{ from: "Office", to: "" }]);
+});
+
+test("failed room writes cannot partially rename or delete a room", async (t) => {
+  const { file } = await fixture(t);
+  const store = new DeviceWidgetStore(file);
+  await store.synchronize(deviceKeys);
+  await store.assignRoom(deviceKeys, "Office", context);
+  const before = await fs.readFile(file, "utf8");
+  const failing = new DeviceWidgetStore(file, { fsImpl: { ...fs, async rename() { throw new Error("disk unavailable"); } } });
+  await failing.synchronize([]);
+  await assert.rejects(failing.renameRoom("Office", "Unwritten", context), { code: "DEVICE_WIDGET_FILE_WRITE_FAILED" });
+  await assert.rejects(failing.deleteRoom("Office", context), { code: "DEVICE_WIDGET_FILE_WRITE_FAILED" });
+  assert.equal(await fs.readFile(file, "utf8"), before);
+  assert.deepEqual(failing.rooms, ["Office"]);
+  assert.deepEqual(failing.roomRules, []);
+  assert.equal(failing.devices[0].room, "Office");
+});
+
+test("empty rooms persist independently and bulk assignment preserves all other device settings", async (t) => {
+  const { file } = await fixture(t);
+  const store = new DeviceWidgetStore(file);
+  await store.synchronize(deviceKeys);
+  assert.equal(await store.createRoom("  Empty room  "), "Empty room");
+  assert.deepEqual(store.rooms, ["Empty room"]);
+  await assert.rejects(store.createRoom("empty ROOM"), { code: "ROOM_ALREADY_EXISTS" });
+  const saved = { ...automatic(deviceKeys[0]), label: "Custom AC", primaryPointId: temperature, primaryUnit: "custom", secondaryPointIds: [humidity] };
+  await store.save(saved, context);
+  const moved = await store.assignRoom(deviceKeys, "New room", context);
+  assert.deepEqual(moved, { moved: 2, room: "New room" });
+  assert.deepEqual(store.devices[0], { ...saved, room: "New room" });
+  assert.equal(store.devices[1].room, "New room");
+  assert.deepEqual(store.rooms, ["Empty room", "New room"]);
+  const restarted = new DeviceWidgetStore(file);
+  await restarted.synchronize([]);
+  assert.deepEqual(restarted.rooms, store.rooms);
+  assert.deepEqual(restarted.devices, store.devices);
+  await store.assignRoom([deviceKeys[0]], " new ROOM ", context);
+  assert.equal(store.devices[0].room, "New room");
+  await store.assignRoom([deviceKeys[0]], null, context);
+  assert.equal(store.devices[0].room, null);
+  await store.assignRoom([deviceKeys[0]], "", context);
+  assert.equal(store.devices[0].room, "");
+});
+
+test("bulk room validation and failed persistence cannot partially move devices or create phantom rooms", async (t) => {
+  const { file } = await fixture(t);
+  let fail = false;
+  const store = new DeviceWidgetStore(file, { fsImpl: { ...fs, async rename(...args) { if (fail) throw new Error("disk unavailable"); return fs.rename(...args); } } });
+  await store.synchronize(deviceKeys);
+  const before = await fs.readFile(file, "utf8");
+  for (const [keys, room] of [[[], "A"], [[deviceKeys[0], deviceKeys[0]], "A"], [deviceKeys, undefined], [deviceKeys, 42], [deviceKeys, "x".repeat(161)]]) {
+    await assert.rejects(store.assignRoom(keys, room, context), { code: "INVALID_DEVICE_SETTINGS" });
+  }
+  await assert.rejects(store.assignRoom([deviceKeys[0], "missing"], "A", context), { code: "DEVICE_NOT_FOUND" });
+  assert.equal(await fs.readFile(file, "utf8"), before);
+  fail = true;
+  await assert.rejects(store.assignRoom(deviceKeys, "Unwritten room", context), { code: "DEVICE_WIDGET_FILE_WRITE_FAILED" });
+  await assert.rejects(store.createRoom("Unwritten empty room"), { code: "DEVICE_WIDGET_FILE_WRITE_FAILED" });
+  assert.equal(await fs.readFile(file, "utf8"), before);
+  assert.deepEqual(store.rooms, []);
+  assert.deepEqual(store.devices, deviceKeys.map(automatic));
+});
+
 test("materializes separate device entries and preserves overrides across restart and point removals", async (t) => {
   const { directory, file } = await fixture(t);
   const rawFile = path.join(directory, "widgets.json");
@@ -27,7 +145,7 @@ test("materializes separate device entries and preserves overrides across restar
   await fs.writeFile(rawFile, raw);
   const store = new DeviceWidgetStore(file, { protectedFilePath: rawFile });
   assert.deepEqual(await store.synchronize(context.deviceKeys), context.deviceKeys.map(automatic));
-  const saved = { key: context.deviceKeys[0], label: "Living room AC", room: "Living room", primaryPointId: otherTemperature, primaryUnit: null, secondaryPointIds: [humidity, co2, alias] };
+  const saved = { key: context.deviceKeys[0], label: "Living room AC", room: "Living room", primaryPointId: temperature, primaryUnit: null, secondaryPointIds: [humidity, co2, alias] };
   assert.deepEqual(await store.save(saved, context), saved);
   const restarted = new DeviceWidgetStore(file);
   assert.deepEqual(await restarted.synchronize([]), [saved, automatic(context.deviceKeys[1])]);
@@ -66,6 +184,7 @@ test("validates all overrides before changing the file or settings snapshot", as
   for (const change of [
     { label: 1 }, { label: "x".repeat(161) }, { room: "x".repeat(161) },
     { primaryPointId: "" }, { primaryPointId: "missing-or-hidden" },
+    { primaryPointId: otherTemperature },
     { primaryUnit: 1 }, { primaryUnit: {} }, { primaryUnit: "x".repeat(41) },
     { secondaryPointIds: "humidity" }, { secondaryPointIds: [humidity, humidity] },
     { primaryPointId: temperature, secondaryPointIds: [temperature] },

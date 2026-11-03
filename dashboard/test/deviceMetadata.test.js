@@ -1,6 +1,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { DeviceMetadataClient } = require("../lib/deviceMetadata");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { loadConfig } = require("../lib/config");
 
 const config = { middlewareUrl: "http://middleware:3000/", username: "client", password: "secret", timeoutMs: 500 };
 const first = "01/ES/Network/RP31/Application/Zones/Z312/L3307/Values/LtPct";
@@ -8,6 +12,55 @@ const second = "01/ES/Network/RP32/Application/Zones/Z312/L3307/Values/LtPct";
 const result = (payload) => ({ ok: true, json: async () => payload });
 const itemResponse = (items) => ({ GetItemsItems: { ValueItems: { ValueItem: items } }, GetItemsErrorResults: "" });
 const item = (id, extra = {}) => ({ Id: id, Name: "LtPct", Description: "Brightness", Type: "double", Unit: "%", Writeable: 1, Forceable: "0", ...extra });
+
+test("catalog display metadata covers more than 2000 configured points without controller reads and still refreshes commands live", async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "iot-catalog-descriptors-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const filename = path.join(directory, "catalog-metadata.json");
+  const ids = Array.from({ length: 3525 }, (_, index) => `01/ES/Zones/Z1/Light${index}/Values/LtPct`);
+  fs.writeFileSync(filename, JSON.stringify({ schemaVersion: 1, catalog: { capturedAt: "2026-10-28T18:27:07Z" },
+    metadataById: Object.fromEntries(ids.map((id) => [id, { id, name: "LtPct", writeable: true, unit: "%" }])),
+    roomByZone: { "ES/Zones/Z1": "Kitchen", "Other/Zones/Z1": "Unrelated" } }));
+  let calls = 0;
+  const client = new DeviceMetadataClient({ ...config, deviceMetadataFile: filename }, { fetchImpl: async (url, options) => {
+    calls += 1;
+    assert.ok(url.endsWith("/api/items/read"));
+    assert.deepEqual(JSON.parse(options.body).ids, [ids[0]]);
+    return result(itemResponse(item(ids[0], { Writeable: 0, Value: 12, State: 0 })));
+  } });
+  const displayed = await client.read(ids);
+  assert.equal(calls, 0);
+  assert.equal(Object.keys(displayed.metadataById).length, 3525);
+  assert.deepEqual({ ...displayed.roomByZone }, { "ES/Zones/Z1": "Kitchen" });
+  assert.deepEqual(displayed.warnings, []);
+  assert.equal(displayed.source, "catalog");
+  assert.equal(displayed.capturedAt, "2026-10-28T18:27:07Z");
+  displayed.metadataById[ids[0]].writeable = false;
+  assert.equal((await client.read([ids[0]])).metadataById[ids[0]].writeable, true);
+  const missing = await client.read(["01/unmapped"]);
+  assert.equal(Object.keys(missing.metadataById).length, 0);
+  assert.equal(missing.warnings.length, 1);
+  assert.equal(calls, 0);
+  const fresh = await client.readFreshPoint(ids[0]);
+  assert.equal(calls, 1);
+  assert.equal(fresh.metadata.writeable, false);
+  assert.equal(fresh.widget.value, 12);
+});
+
+test("detects adjacent catalog metadata, validates files and leaves demo mode independent", async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "iot-catalog-config-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const widgetsFile = path.join(directory, "widgets.json");
+  const metadataFile = path.join(directory, "catalog-metadata.json");
+  fs.writeFileSync(widgetsFile, "[]");
+  fs.writeFileSync(metadataFile, "{}");
+  const settings = loadConfig({ WIDGETS_FILE: widgetsFile, DEMO_MODE: "false", MIDDLEWARE_USER: "client", MIDDLEWARE_PASSWORD: "secret" });
+  assert.equal(settings.deviceMetadataFile, metadataFile);
+  assert.throws(() => new DeviceMetadataClient(settings), /Unable to load DEVICE_METADATA_FILE/);
+  assert.equal(loadConfig({ DEMO_MODE: "true", WIDGETS_JSON: "[]", DEVICE_METADATA_FILE: "explicit.json" }).deviceMetadataFile, "explicit.json");
+  const demo = new DeviceMetadataClient({ demoMode: true, deviceMetadataFile: "missing.json" });
+  assert.deepEqual(await demo.read([first]), { metadataById: {}, roomByZone: {}, warnings: [] });
+});
 
 test("reads only configured IDs, preserves exact enum zero and derives rooms from the full controller path", async () => {
   const calls = [];

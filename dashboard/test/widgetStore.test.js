@@ -6,6 +6,21 @@ const path = require("node:path");
 
 const { WidgetStore } = require("../lib/widgetStore");
 
+test("failed atomic replacement during bulk removal retains every point and cleans its temporary file", async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "widget-store-atomic-"));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, "widgets.json");
+  const original = JSON.stringify([{ id: "first" }, { id: "second" }]);
+  await fs.writeFile(filePath, original);
+  const store = new WidgetStore(filePath);
+  const rename = fs.rename;
+  fs.rename = async (from, to) => { if (to === filePath) throw new Error("Disk unavailable"); return rename(from, to); };
+  try { await assert.rejects(store.removeMany(["first"]), { code: "WIDGET_FILE_WRITE_FAILED" }); }
+  finally { fs.rename = rename; }
+  assert.equal(await fs.readFile(filePath, "utf8"), original);
+  assert.deepEqual(await fs.readdir(directory), ["widgets.json"]);
+});
+
 test("appends a validated widget without changing existing entries", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "widget-store-"));
   const filePath = path.join(directory, "widgets.json");

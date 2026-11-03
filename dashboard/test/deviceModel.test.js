@@ -12,6 +12,18 @@ const blind = `${rp("RP31")}/Application/Items/B301`;
 const point = (owner, name, extra = {}) => ({ id: `01/${owner}/Values/${name}`, value: 0, state: 0, writable: true, visible: true, ...extra });
 const metadata = (id, extra = {}) => ({ [id]: { id, writeable: 1, ...extra } });
 
+test("room rules rename automatic rooms, suppress deleted rooms and preserve explicit device assignments", () => {
+  const widgets = [point(light, "LtVal"), point(ac, "RmTmp"), point(blind, "BlndPos")];
+  const roomByZone = { [light]: "Old room", [ac]: "Deleted", [blind]: "Deleted" };
+  const roomRules = [{ from: "OLD ROOM", to: "New room" }, { from: "Deleted", to: "" }];
+  const devices = buildDevices(widgets, { roomByZone, roomRules, deviceSettings: [{ key: blind, room: "Manual room" }] });
+  assert.equal(devices.find((d) => d.key === light).room.label, "New room");
+  assert.equal(devices.find((d) => d.key === light).automaticRoom.label, "New room");
+  assert.equal(devices.find((d) => d.key === ac).room, null);
+  assert.equal(devices.find((d) => d.key === blind).automaticRoom, null);
+  assert.equal(devices.find((d) => d.key === blind).room.label, "Manual room");
+});
+
 test("keeps commands, feedback and diagnostics in one device without treating every writeable value as a control", () => {
   const values = [point(light, "LtPct"), point(light, "LtVal"), point(light, "LtFlt"), point(light, "LtCol", { value: "#42B4E6" }), point(light, "AnythingElse")];
   const [device] = buildDevices(values);
@@ -335,7 +347,7 @@ test("device metrics preserve automatic card defaults and expose their source ID
   assert.equal(devices.find((device) => device.key === blind).roles.slatSet.label, "Zadani kut lamela");
 });
 
-test("persisted display overrides can select cross-device readings and commands without moving controls or owners", () => {
+test("legacy foreign primary readings fall back to the device's own metric without moving controls or owners", () => {
   const brightness = point(light, "LtPct", { value: 17 });
   const temperature = point(ac, "RmTmp", { value: 24.1, unit: "°C" });
   const values = [brightness, point(light, "LtVal", { value: 14 }), temperature];
@@ -350,8 +362,8 @@ test("persisted display overrides can select cross-device readings and commands 
   assert.equal(device.automaticLabel, "L3307");
   assert.deepEqual(device.automaticRoom, { label: "Kitchen", source: zone });
   assert.equal(device.room.label, "Dining room");
-  assert.equal(device.metrics.primary.id, temperature.id);
-  assert.equal(device.metrics.primary.value, 24.1);
+  assert.equal(device.metrics.primary.id, point(light, "LtVal").id);
+  assert.equal(device.metrics.primary.value, 14);
   assert.equal(device.metrics.secondary[0].id, brightness.id);
   assert.equal(device.metrics.secondary[0].value, 17);
   assert.equal(device.metrics.secondary[0].unit, "%");
@@ -372,20 +384,19 @@ test("metric choices keep visible alias observations distinct from their dedupli
   const target = point(light, "LtPct");
   const [climate, targetDevice] = buildDevices([source, alias, target], {
     metadataById: { ...metadata(source.id, { description: "Fan speed: 0=Auto, 1=High, 2=Med, 3=Low" }), ...metadata(alias.id, { description: "Value" }) },
-    deviceSettings: [{ key: light, primaryPointId: alias.id }, { key: ac, secondaryPointIds: [alias.id] }],
+    deviceSettings: [{ key: light, primaryPointId: alias.id }, { key: ac, primaryPointId: alias.id, secondaryPointIds: [source.id] }],
   });
   assert.equal(climate.roles.fanSpeed.id, source.id);
   assert.equal(climate.roles.fanSpeed.value, 3);
-  assert.equal(targetDevice.metrics.primary.id, alias.id);
-  assert.equal(targetDevice.metrics.primary.value, 0);
-  assert.equal(targetDevice.metrics.primary.state, 2);
-  assert.equal(targetDevice.metrics.primary.error, "Alias read failed");
-  assert.equal(targetDevice.metrics.primary.metadata.enumValues[0].label, "Auto");
-  assert.equal(targetDevice.metrics.primary.liveControlAvailable, false);
-  assert.equal(climate.metrics.secondary[0].id, alias.id);
-  assert.equal(climate.metrics.secondary[0].value, 0);
-  assert.equal(climate.metrics.secondary[0].state, 2);
-  assert.equal(climate.metrics.secondary[0].error, "Alias read failed");
+  assert.equal(targetDevice.metrics.primary.id, target.id);
+  assert.equal(climate.metrics.primary.id, alias.id);
+  assert.equal(climate.metrics.primary.value, 0);
+  assert.equal(climate.metrics.primary.state, 2);
+  assert.equal(climate.metrics.primary.error, "Alias read failed");
+  assert.equal(climate.metrics.primary.metadata.enumValues[0].label, "Auto");
+  assert.equal(climate.metrics.primary.liveControlAvailable, false);
+  assert.equal(climate.metrics.secondary[0].id, source.id);
+  assert.equal(climate.metrics.secondary[0].value, 3);
 });
 
 test("secondary metrics exclude saved foreign owners even when names or custom raw groups match", () => {
@@ -398,7 +409,7 @@ test("secondary metrics exclude saved foreign owners even when names or custom r
   const original = JSON.stringify(settings);
   const device = buildDevices([temperature, own, otherController, otherDevice, foreignAlias], { deviceSettings: settings })
     .find((entry) => entry.key === ac);
-  assert.equal(device.metrics.primary.id, otherDevice.id);
+  assert.equal(device.metrics.primary.id, temperature.id);
   assert.deepEqual(device.metrics.secondary.map((metric) => metric.id), [own.id]);
   assert.equal(JSON.stringify(settings), original);
 });
@@ -406,7 +417,7 @@ test("secondary metrics exclude saved foreign owners even when names or custom r
 test("missing and hidden metric references stay unavailable and null overrides restore automatic choices", () => {
   const brightness = point(light, "LtPct");
   const feedback = point(light, "LtVal", { value: 14 });
-  const hidden = point(ac, "RmTmp", { visible: false, unit: "°C", value: 24.1 });
+  const hidden = point(light, "RmTmp", { visible: false, unit: "°C", value: 24.1 });
   const missingOwn = point(light, "RemovedReading").id;
   const values = [brightness, feedback, hidden];
   const options = { roomByZone: { [zone]: "Kitchen" } };

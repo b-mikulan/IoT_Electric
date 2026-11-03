@@ -64,7 +64,7 @@ const json = (value) => JSON.parse(JSON.stringify(value));
 const response = (payload, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => json(payload) });
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-function setup({ saved = [], enabled = true, editable = true } = {}) {
+function setup({ saved = [], enabled = true, editable = true, technical = true } = {}) {
   const nodes = new Map();
   const node = (selector) => {
     if (!nodes.has(selector)) nodes.set(selector, new Element());
@@ -77,12 +77,16 @@ function setup({ saved = [], enabled = true, editable = true } = {}) {
     ? response({ device: JSON.parse(options.body) })
     : response({ devices: saved, enabled });
   let models = [];
+  let index;
+  let fullUpdates = 0;
+  const valueUpdates = [];
   const view = {
-    update(input) { models = deviceModel.buildDevices(input.widgets, input); },
+    update(input) { fullUpdates++; index = deviceModel.createDeviceIndex(input.widgets, input); models = index.getDevices(); },
+    updateValues(input) { valueUpdates.push(json(input)); index.updateValues(input.widgets); models = index.getDevices(); },
     getDevices() { return models.slice(); },
   };
   const context = vm.createContext({
-    document: { querySelector: node, createElement: (tag) => new Element(tag) },
+    document: { querySelector: (selector) => !technical && ["#widget-grid", "#widget-template", "#empty-state", "#control-panel", "#write-form", "#write-widget", "#write-value", "#write-value-label", "#write-submit", "#write-status"].includes(selector) ? null : node(selector), createElement: (tag) => new Element(tag) },
     IoTWidgetGrouping: grouping, IoTDeviceModel: deviceModel,
     IoTDeviceCards: { create: () => view },
     Option: function Option(label, value) { const option = new Element("option"); option.textContent = label; option.value = value; return option; },
@@ -114,6 +118,7 @@ function setup({ saved = [], enabled = true, editable = true } = {}) {
   return {
     node, cardNode, context, run, open, checkbox, posts, requests, eventSources,
     models: () => view.getDevices(),
+    renders: () => ({ fullUpdates, valueUpdates }),
     setHandler(handler) { requestHandler = handler; },
     boot(config = {}) { releaseBoot(response({ widgets: [], intervalMs: 15000, widgetEditingEnabled: editable, deviceSettingsEnabled: enabled, deviceSettings: saved, ...config })); },
     saved: () => json(run("[...deviceSettingsByKey.values()]")),
@@ -156,11 +161,97 @@ test("card settings save custom identity and device-local secondary readings thr
   assert.match(fixture.cardNode("status").textContent, /spremljeni/);
 });
 
+test("dashboard without the technical view retains readings, configuration and visibility across live events", async () => {
+  const fixture = setup({ technical: false });
+  fixture.boot({ widgets });
+  await flush();
+  assert.equal(fixture.eventSources.length, 1);
+  const stream = fixture.eventSources[0];
+  stream.emit("snapshot", { widgets, status: "connected", syncedAt: "first" });
+  assert.equal(fixture.run("elementsById.size"), 0);
+  assert.equal(fixture.run("visibilityInputsById.size"), 0);
+  assert.equal(fixture.run("configById.size"), widgets.length);
+  assert.equal(fixture.models().find((entry) => entry.key === owner).metrics.primary.value, temperature.value);
+  stream.emit("update", { widgets: [{ ...temperature, value: 26.2 }], syncedAt: "second" });
+  assert.equal(fixture.models().find((entry) => entry.key === owner).metrics.primary.value, 26.2);
+  stream.emit("visibility", { id: temperature.id, visible: false });
+  assert.equal(fixture.run(`configById.get(${JSON.stringify(temperature.id)}).visible`), false);
+  assert.notEqual(fixture.models().find((entry) => entry.key === owner).metrics.primary?.id, temperature.id);
+  stream.emit("visibility", { id: temperature.id, visible: true });
+  stream.emit("removed", { ids: [illuminance.id] });
+  assert.equal(fixture.models().length, 1);
+  assert.equal(fixture.run("elementsById.size"), 0);
+  assert.equal(fixture.run("latestValuesById.size"), widgets.length - 1);
+});
+
+test("consecutive live events share one device render per animation frame", async () => {
+  const fixture = setup({ technical: false });
+  fixture.boot();
+  await flush();
+  fixture.run("let pendingFrame; let frames = 0; requestAnimationFrame = (callback) => { frames++; pendingFrame = callback; };");
+  const stream = fixture.eventSources[0];
+  stream.emit("sync", { status: "connected", syncedAt: "new-read" });
+  stream.emit("update", { widgets: [{ ...temperature, value: 27.4 }], syncedAt: "new-read" });
+  assert.equal(fixture.run("frames"), 1);
+  fixture.run("pendingFrame()");
+  assert.equal(fixture.models().find((entry) => entry.key === owner).metrics.primary.value, 27.4);
+});
+
+test("live event bursts send only their latest changed points without rebuilding structure", async () => {
+  const f = setup({ technical: false });
+  f.boot();
+  await flush();
+  const fullBefore = f.renders().fullUpdates;
+  f.run("let pendingFrame; requestAnimationFrame = (callback) => { pendingFrame = callback; };");
+  const stream = f.eventSources[0];
+  stream.emit("sync", { status: "connected", syncedAt: "new" });
+  stream.emit("update", { widgets: [{ ...temperature, value: 25 }], syncedAt: "new" });
+  stream.emit("update", { widgets: [{ ...temperature, value: 26 }, { ...humidity, value: 55 }], syncedAt: "new" });
+  f.run("pendingFrame()");
+  assert.equal(f.renders().fullUpdates, fullBefore);
+  const updates = f.renders().valueUpdates;
+  assert.equal(updates.length, 1);
+  assert.deepEqual(updates[0].widgets.map(({ id, value }) => ({ id, value })), [{ id: temperature.id, value: 26 }, { id: humidity.id, value: 55 }]);
+  const unchanged = f.models()[0];
+  stream.emit("sync", { status: "connected", syncedAt: "next" });
+  f.run("pendingFrame()");
+  assert.equal(f.renders().valueUpdates[1].widgets.length, 0);
+  assert.equal(f.models()[0], unchanged);
+  stream.emit("device-settings", { devices: [{ ...automaticEntry, label: "New name" }], rooms: [] });
+  f.run("pendingFrame()");
+  assert.equal(f.renders().fullUpdates, fullBefore + 1);
+  assert.equal(f.models()[0].label, "New name");
+  assert.equal(f.models()[0].roles.temperature.value, 26);
+});
+
+test("a queued live update cannot restore a device removed before the next frame", async () => {
+  const f = setup({ technical: false });
+  f.boot();
+  await flush();
+  f.run("let pendingFrame; requestAnimationFrame = (callback) => { pendingFrame = callback; };");
+  const stream = f.eventSources[0];
+  stream.emit("update", { widgets: [{ ...temperature, value: 30 }] });
+  stream.emit("removed", { ids: widgets.filter((widget) => grouping.deriveWidgetGrouping(widget.id).key === owner).map((widget) => widget.id) });
+  f.run("pendingFrame()");
+  assert.equal(f.models().length, 1);
+  assert.equal(f.models()[0].key, foreignOwner);
+});
+
+test("technical value view lives on its own page instead of the main dashboard", () => {
+  const main = fs.readFileSync(path.join(__dirname, "../public/index.html"), "utf8");
+  const technical = fs.readFileSync(path.join(__dirname, "../public/technical.html"), "utf8");
+  assert.doesNotMatch(main, /id="(?:raw-widgets-panel|widget-grid|widget-template|write-form)"/);
+  assert.match(technical, /id="widget-grid"/);
+  assert.match(technical, /id="widget-template"/);
+  assert.match(technical, /href="\/">Natrag na uređaje/);
+  assert.doesNotMatch(technical, /id="device-cards-section"/);
+});
+
 test("secondary choices exclude other devices, including legacy selections and search results", async () => {
   const entry = { ...automaticEntry, secondaryPointIds: [co2.id, illuminance.id] };
   const fixture = setup({ saved: [entry] });
   fixture.open();
-  assert.equal(fixture.cardNode("primary").options.some((option) => option.value === illuminance.id), true);
+  assert.equal(fixture.cardNode("primary").options.some((option) => option.value === illuminance.id), false);
   assert.equal(fixture.checkbox(illuminance.id), undefined);
   assert.equal(fixture.checkbox(co2.id).checked, true);
   assert.equal(fixture.cardNode("secondary-count").textContent.startsWith("1 / 12"), true);
@@ -171,8 +262,12 @@ test("secondary choices exclude other devices, including legacy selections and s
   fixture.cardNode("primary").value = illuminance.id;
   fixture.cardNode("primary").dispatch("change");
   await fixture.cardNode("form").dispatch("submit");
+  assert.equal(fixture.posts().length, 0);
+  assert.match(fixture.cardNode("status").textContent, /ovog uređaja/);
+  fixture.cardNode("primary").value = humidity.id;
+  await fixture.cardNode("form").dispatch("submit");
   const saved = JSON.parse(fixture.posts()[0].options.body);
-  assert.equal(saved.primaryPointId, illuminance.id);
+  assert.equal(saved.primaryPointId, humidity.id);
   assert.deepEqual(saved.secondaryPointIds, [co2.id]);
 });
 
@@ -233,9 +328,9 @@ test("automatic unit follows the selected primary while a custom suffix remains 
   assert.match(automaticOption(), /%/);
   assert.equal(fixture.cardNode("unit-mode").value, "custom");
   assert.equal(fixture.cardNode("unit").value, "m²");
-  fixture.cardNode("primary").value = illuminance.id;
+  fixture.cardNode("primary").value = co2.id;
   fixture.cardNode("primary").dispatch("change");
-  assert.match(automaticOption(), /lx/);
+  assert.match(automaticOption(), /ppm/);
 });
 
 test("empty and oversized custom unit drafts are rejected before posting", async () => {
@@ -404,4 +499,155 @@ test("a delayed POST cannot overwrite newer SSE settings and reconciles with a f
   assert.equal(fixture.models()[0].room.label, "Living room");
   assert.equal(fixture.cardNode("title").textContent, "Postavke kartice Current database name");
   assert.deepEqual(fixture.posts().map((request) => request.url), ["/api/devices/settings"]);
+});
+
+test("legacy foreign primary selection is excluded from the picker and its display unit resets to automatic", () => {
+  const fixture = setup({ saved: [{ ...automaticEntry, primaryPointId: illuminance.id, primaryUnit: "lx" }] });
+  fixture.open();
+  assert.equal(fixture.cardNode("primary").value, "auto");
+  assert.equal(fixture.cardNode("primary").options.some((option) => option.value === illuminance.id), false);
+  assert.equal(fixture.cardNode("unit-mode").value, "auto");
+  assert.equal(fixture.models().find((d) => d.key === owner).metrics.primary.id, temperature.id);
+});
+
+test("creates a persistent empty room and offers it in individual card settings", async () => {
+  const fixture = setup();
+  fixture.setHandler(() => response({ room: "New office", rooms: ["New office"] }, 201));
+  fixture.run("openRoomsDialog()");
+  fixture.node("#rooms-name").value = " New office ";
+  await fixture.node("#rooms-form").dispatch("submit");
+  assert.deepEqual(fixture.posts().map((request) => request.url), ["/api/rooms"]);
+  assert.deepEqual(JSON.parse(fixture.posts()[0].options.body), { name: "New office" });
+  assert.deepEqual(json(fixture.run("storedRooms")), ["New office"]);
+  fixture.open();
+  assert.ok(fixture.cardNode("room").options.some((option) => option.value === "room:New office"));
+});
+
+function selectRoom(fixture, name) {
+  const row = fixture.node("#rooms-list").children.find((entry) => entry.children[0].children[0].textContent === name);
+  assert.ok(row, `Room ${name} is available`);
+  row.children[0].dispatch("click");
+}
+
+test("selecting and renaming an automatic room updates its cards, choices and selected editor", async () => {
+  const f = setup();
+  f.run("openRoomsDialog()");
+  selectRoom(f, "Office");
+  assert.equal(f.node("#rooms-editor").hidden, false);
+  assert.equal(f.node("#rooms-selected").textContent, "Office");
+  assert.match(f.node("#rooms-summary").textContent, /Uređaja u prostoriji: 1/);
+  f.node("#rooms-rename-name").value = "New office";
+  f.setHandler(() => response({ room: "New office", rooms: ["New office"], devices: [], roomRules: [{ from: "Office", to: "New office" }] }));
+  await f.node("#rooms-rename-form").dispatch("submit");
+  assert.deepEqual(f.posts().map((request) => request.url), ["/api/rooms/rename"]);
+  assert.deepEqual(JSON.parse(f.posts()[0].options.body), { name: "Office", newName: "New office" });
+  assert.equal(f.models()[0].room.label, "New office");
+  assert.equal(f.node("#rooms-selected").textContent, "New office");
+  assert.equal(f.node("#rooms-list").children.length, 1);
+  assert.equal(f.node("#rooms-rename").disabled, false);
+  f.open();
+  assert.ok(f.cardNode("room").options.some((option) => option.value === "room:New office"));
+  assert.ok(!f.cardNode("room").options.some((option) => option.value === "room:Office"));
+});
+
+test("room deletion requires confirmation and suppresses automatic reassignment without deleting cards", async () => {
+  const f = setup();
+  f.run("openRoomsDialog()");
+  selectRoom(f, "Office");
+  f.node("#rooms-delete").dispatch("click");
+  assert.equal(f.node("#rooms-delete-confirmation").hidden, false);
+  assert.match(f.node("#rooms-delete-message").textContent, /Bez prostorije/);
+  assert.equal(f.posts().length, 0);
+  f.node("#rooms-delete-cancel").dispatch("click");
+  assert.equal(f.node("#rooms-delete-confirmation").hidden, true);
+  f.node("#rooms-delete").dispatch("click");
+  f.setHandler(() => response({ room: "", rooms: [], devices: [], roomRules: [{ from: "Office", to: "" }] }));
+  await f.node("#rooms-delete-confirm").dispatch("click");
+  assert.deepEqual(f.posts().map((request) => request.url), ["/api/rooms/delete"]);
+  assert.equal(f.models().length, 2);
+  assert.equal(f.models()[0].room, null);
+  assert.equal(f.node("#rooms-editor").hidden, true);
+  assert.equal(f.node("#rooms-list").children.length, 0);
+});
+
+test("failed room changes retain the selected room and editable draft", async () => {
+  const f = setup();
+  f.run("openRoomsDialog()");
+  selectRoom(f, "Office");
+  f.node("#rooms-rename-name").value = "Unwritten room";
+  f.setHandler(() => response({ error: "Disk unavailable" }, 500));
+  await f.node("#rooms-rename-form").dispatch("submit");
+  assert.equal(f.models()[0].room.label, "Office");
+  assert.equal(f.node("#rooms-rename-name").value, "Unwritten room");
+  assert.equal(f.node("#rooms-selected").textContent, "Office");
+  assert.match(f.node("#rooms-status").textContent, /Disk unavailable/);
+  f.node("#rooms-delete").dispatch("click");
+  await f.node("#rooms-delete-confirm").dispatch("click");
+  assert.equal(f.node("#rooms-delete-confirmation").hidden, false);
+  assert.equal(f.node("#rooms-delete-confirm").disabled, false);
+  assert.equal(f.models()[0].room.label, "Office");
+});
+
+test("conflicting or empty room rename drafts are rejected before saving", async () => {
+  const f = setup();
+  f.run("storedRooms = ['Office', 'Taken']; openRoomsDialog()");
+  selectRoom(f, "Office");
+  for (const name of ["TAKEN", " ", "x".repeat(161)]) {
+    f.node("#rooms-rename-name").value = name;
+    await f.node("#rooms-rename-form").dispatch("submit");
+    assert.ok(f.node("#rooms-status").textContent);
+  }
+  assert.equal(f.posts().length, 0);
+});
+
+test("bulk room form sends selected device keys in one update and preserves their other card settings", async () => {
+  const saved = [{ ...automaticEntry, label: "My climate", primaryPointId: humidity.id }];
+  const fixture = setup({ saved });
+  fixture.setHandler((_url, options) => {
+    const body = JSON.parse(options.body);
+    const devices = [saved[0], { ...automaticEntry, key: foreignOwner }].map((entry) => ({ ...entry, room: body.room }));
+    return response({ moved: body.keys.length, devices, rooms: [body.room] });
+  });
+  fixture.run("openBulkRoomDialog(cardSettingsDevices())");
+  fixture.node("#device-room-target").value = "new";
+  fixture.node("#device-room-target").dispatch("change");
+  fixture.node("#device-room-new").value = "Conference room";
+  await fixture.node("#device-room-form").dispatch("submit");
+  assert.deepEqual(fixture.posts().map((request) => request.url), ["/api/devices/rooms"]);
+  assert.deepEqual(JSON.parse(fixture.posts()[0].options.body), { keys: [owner, foreignOwner], room: "Conference room" });
+  assert.ok(fixture.models().every((device) => device.room.label === "Conference room"));
+  assert.equal(fixture.models()[0].label, "My climate");
+  assert.equal(fixture.models()[0].metrics.primary.id, humidity.id);
+  assert.equal(fixture.node("#device-room-dialog").open, false);
+});
+
+test("failed bulk room save leaves cards unchanged and keeps the room dialog available", async () => {
+  const fixture = setup({ saved: [{ ...automaticEntry, room: "Existing room" }] });
+  fixture.setHandler(() => response({ error: "Disk unavailable" }, 500));
+  fixture.run("openBulkRoomDialog(cardSettingsDevices())");
+  fixture.node("#device-room-target").value = "new";
+  fixture.node("#device-room-new").value = "Unwritten room";
+  await fixture.node("#device-room-form").dispatch("submit");
+  assert.equal(fixture.models()[0].room.label, "Existing room");
+  assert.equal(fixture.node("#device-room-dialog").open, true);
+  assert.match(fixture.node("#device-room-status").textContent, /Disk unavailable/);
+});
+
+test("device removal requires confirmation and removes only the confirmed card's point configuration", async () => {
+  const fixture = setup();
+  fixture.open();
+  fixture.cardNode("remove").dispatch("click");
+  assert.equal(fixture.cardNode("remove-confirmation").hidden, false);
+  assert.equal(fixture.requests.filter((request) => request.options.method === "DELETE").length, 0);
+  fixture.cardNode("remove-cancel").dispatch("click");
+  assert.equal(fixture.cardNode("remove-confirmation").hidden, true);
+  fixture.setHandler((_url, options) => response({ key: JSON.parse(options.body).key, ids: widgets.filter((w) => grouping.deriveWidgetGrouping(w.id).key === owner).map((w) => w.id) }));
+  fixture.cardNode("remove").dispatch("click");
+  await fixture.cardNode("remove-confirm").dispatch("click");
+  const deletes = fixture.requests.filter((request) => request.options.method === "DELETE");
+  assert.equal(deletes.length, 1);
+  assert.equal(deletes[0].url, "/api/devices");
+  assert.deepEqual(JSON.parse(deletes[0].options.body), { key: owner });
+  assert.equal(fixture.models().some((device) => device.key === owner), false);
+  assert.equal(fixture.models().some((device) => device.key === foreignOwner), true);
 });

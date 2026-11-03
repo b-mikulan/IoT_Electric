@@ -8,6 +8,7 @@
 *.knxproj
 credentials.txt
 .env
+/docker-compose.override.yml
 *.crt
 *.key
 *.p12
