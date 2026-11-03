@@ -27,6 +27,8 @@ If a later page fails, the middleware returns the collected items with an error 
 
 ## Repository layout
 
+For a large-building inventory independent of the dashboard, use the [offline topology mapper](tools/ews-topology/README.md). It saves every EWS page to a resumable checkpoint and exports JSON/CSV for inspection and the existing widget grouping preview.
+
 ```text
 .
 ├── middleware/                  # Express app, EWS client, API routes and OpenAPI document
@@ -35,6 +37,7 @@ If a later page fails, the middleware returns the collected items with an error 
 ├── scripts/                     # Repository maintenance helpers
 ├── tools/
 │   ├── ews-sandbox/             # Manual EWS experiments; not used by the application
+│   ├── ews-topology/            # Resumable Python topology mapper with JSON/CSV exports
 │   ├── gpa-translator/           # Gira project name/status translator and review UI
 │   └── knx-extractor/            # KNX project extraction utility and legacy fixtures
 ├── projects/                    # Ignored local GPA/KNX input projects
