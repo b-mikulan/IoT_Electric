@@ -29,13 +29,17 @@ If a later page fails, the middleware returns the collected items with an error 
 
 For a large-building inventory independent of the dashboard, use the [offline topology mapper](tools/ews-topology/README.md). It saves every EWS page to a resumable checkpoint and exports JSON/CSV for inspection and the existing widget grouping preview.
 
+Import its checkpoint into the [SQLite building catalog](tools/building-catalog/README.md) with `npm run catalog -- import`. The catalog stores discovered containers, points, graph links, device groups and recognized functions in a separate database, supports local search and snapshot history, and makes no EWS requests.
+
 ```text
 .
 ├── middleware/                  # Express app, EWS client, API routes and OpenAPI document
 ├── dashboard/                   # Independent PLC widget service and browser UI
+├── catalog/                     # SQLite building catalog, topology import and read/search layer
 ├── test/                        # Middleware tests
 ├── scripts/                     # Repository maintenance helpers
 ├── tools/
+│   ├── building-catalog/        # Offline catalog import and search CLI
 │   ├── ews-sandbox/             # Manual EWS experiments; not used by the application
 │   ├── ews-topology/            # Resumable Python topology mapper with JSON/CSV exports
 │   ├── gpa-translator/           # Gira project name/status translator and review UI
@@ -112,6 +116,8 @@ The dashboard needs the middleware's plaintext password because it is an API cli
 | `npm run test:dashboard` | Run only dashboard tests |
 | `npm run auth:generate` | Generate middleware login credentials |
 | `npm run knx:extract -- project.knxproj` | Extract a KNX project into ignored `output/knx-extractor/` |
+| `npm run catalog -- import` | Import the saved topology checkpoint into the SQLite building catalog |
+| `npm run catalog -- summary` | Inspect catalog coverage, device types and recognized functions |
 
 For a non-Docker dashboard preview, install its dependencies with `npm ci --prefix dashboard` and run `npm start --prefix dashboard`.
 
