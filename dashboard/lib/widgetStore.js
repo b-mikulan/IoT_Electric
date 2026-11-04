@@ -37,6 +37,12 @@ class WidgetStore {
     return this.#enabled;
   }
 
+  withExclusive(operation) {
+    const result = this.#operation.then(operation);
+    this.#operation = result.catch(() => {});
+    return result;
+  }
+
   async add(widget) {
     const operation = this.#operation.then(() => this.#add(widget));
     this.#operation = operation.catch(() => {});

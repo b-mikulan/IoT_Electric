@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="hr" theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prijenos postavki · IoT Electric</title>
+    <link rel="stylesheet" href="/vendor/materialize/materialize.min.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/transfer.css" />
+    <script src="/transfer.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header"><div class="container header-content">
+      <span class="brand-name">IoT Electric</span><a class="transfer-back" href="/">← Dashboard</a>
+    </div></header>
+    <main class="container dashboard-shell transfer-shell">
+      <div class="intro"><div><p class="eyebrow">Postavke dashboarda</p><h1>Prijenos postavki</h1>
+        <p class="last-sync">Spremi prikaz lokalno, zatim ga učitaj na serveru.</p>
+      </div></div>
+      <p id="transfer-availability" class="transfer-notice" role="status" hidden></p>
+      <div class="transfer-panels">
+        <section class="transfer-panel" aria-labelledby="export-title">
+          <span class="transfer-step" aria-hidden="true">1</span>
+          <h2 id="export-title">Spremi trenutni prikaz</h2>
+          <p>Jedna datoteka s pointovima, prostorijama, nazivima kartica, odabranim očitanjima i opisima uređaja.</p>
+          <a id="transfer-export" class="transfer-button" href="/api/dashboard-transfer/export" download="dashboard-backup.json">Preuzmi postavke</a>
+          <p class="transfer-hint">Datoteka ne sadrži lozinke ni spremljene vrijednosti očitanja.</p>
+        </section>
+        <section class="transfer-panel" aria-labelledby="import-title">
+          <span class="transfer-step" aria-hidden="true">2</span>
+          <h2 id="import-title">Učitaj spremljeni prikaz</h2>
+          <p>Na odredišnom dashboardu odaberi datoteku i pregledaj što će se uvesti.</p>
+          <label class="transfer-file-label" for="transfer-file">Datoteka s postavkama</label>
+          <input id="transfer-file" type="file" accept=".json,application/json" aria-describedby="file-hint" />
+          <p id="file-hint" class="transfer-hint">Preporučeno: dashboard-backup.json. Podržan je i widgets.json. Najviše 16 MB.</p>
+          <p id="transfer-status" class="transfer-status" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+      <section id="transfer-preview" class="transfer-panel transfer-preview" aria-labelledby="preview-title" hidden>
+        <p class="eyebrow">Pregled prije uvoza</p><h2 id="preview-title">Sadržaj datoteke</h2>
+        <p id="transfer-filename" class="transfer-hint"></p>
+        <dl id="transfer-counts" class="transfer-counts"></dl>
+        <ul id="transfer-warnings" class="transfer-warnings" hidden></ul>
+        <p>Uvoz zamjenjuje trenutne pointove i primjenjuje postavke iz datoteke. Prije spremanja automatski se izrađuje sigurnosna kopija.</p>
+        <label class="transfer-confirm"><input id="transfer-confirm" type="checkbox" /><span>Želim primijeniti ovaj prikaz na dashboard.</span></label>
+        <div class="transfer-actions"><button id="transfer-import" class="transfer-button" type="button" disabled>Uvezi postavke</button><button id="transfer-cancel" class="transfer-button transfer-secondary" type="button">Odustani</button></div>
+      </section>
+      <section id="transfer-success" class="transfer-panel transfer-success" role="status" hidden>
+        <h2>Postavke su uvezene</h2><p id="transfer-success-message"></p>
+        <p>Dashboard čita nove vrijednosti. Za veliku zgradu prva provjera može potrajati nekoliko minuta.</p>
+        <a class="transfer-button" href="/">Otvori dashboard</a>
+      </section>
+      <p class="transfer-footer">Veza s EWS serverom i raspored osvježavanja koriste postavke odredišnog servera.</p>
+    </main>
+  </body>
+</html>

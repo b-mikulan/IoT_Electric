@@ -257,6 +257,22 @@ class PointPoller extends EventEmitter {
     return clone(this.snapshot);
   }
 
+  replaceWidgets(widgets) {
+    const next = widgets.map(normalizeWidget);
+    const previous = new Map(this.snapshot.widgets.map((widget) => [widget.id, widget]));
+    this.#readGeneration += 1;
+    this.#writeRefreshGeneration += 1;
+    for (const timer of this.#writeRefreshTimers) clearTimeout(timer);
+    this.#writeRefreshTimers.clear();
+    this.#widgets = next;
+    this.snapshot = { status: "idle", syncedAt: null, error: null, widgets: next.map((widget) => ({
+      ...clone(widget), value: previous.get(widget.id)?.value ?? null,
+      state: previous.get(widget.id)?.state ?? null, error: null, updatedAt: null,
+    })) };
+    void this.#refreshAfterWidgetAdd();
+    return this.getSnapshot();
+  }
+
   addWidget(widget) {
     const normalized = normalizeWidget(widget, this.#widgets.length);
     if (this.#widgets.some((item) => item.id === normalized.id)) {
@@ -778,11 +794,13 @@ class PointPoller extends EventEmitter {
   }
 
   async #performPoll() {
+    const generation = this.#readGeneration;
     if (this.#widgets.length === 0) return this.#emptySnapshot();
     try {
       const points = this.#demoMode
         ? this.#createDemoPoints()
         : await this.#fetchPoints();
+      if (generation !== this.#readGeneration) return this.getSnapshot();
       if (this.#widgets.length === 0) return this.#emptySnapshot();
       const syncedAt = timestampFrom(this.#now);
       const previousById = new Map(
@@ -847,6 +865,7 @@ class PointPoller extends EventEmitter {
 
       return this.getSnapshot();
     } catch (error) {
+      if (generation !== this.#readGeneration) return this.getSnapshot();
       if (this.#widgets.length === 0) return this.#emptySnapshot();
       const message = error instanceof Error ? error.message : String(error);
       const previousStatus = this.snapshot.status;

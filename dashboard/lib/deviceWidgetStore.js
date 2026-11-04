@@ -114,6 +114,10 @@ class DeviceWidgetStore {
   get rooms() { return this.#rooms.slice(); }
   get roomRules() { return structuredClone(this.#roomRules); }
 
+  withExclusive(operation) { return this.#enqueue(operation); }
+
+  adoptDocument(document) { this.#publish(parseDocument(JSON.stringify(document))); }
+
   #publish(document) {
     this.#devices = document.devices.map((device) => normalizeSettings(device));
     this.#rooms = [...(document.rooms || [])];
@@ -282,4 +286,4 @@ class DeviceWidgetStore {
   }
 }
 
-module.exports = { DeviceWidgetStore, DeviceWidgetStoreError };
+module.exports = { DeviceWidgetStore, DeviceWidgetStoreError, parseDeviceDocument: parseDocument, normalizeSettings };

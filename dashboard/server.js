@@ -5,8 +5,10 @@ const { loadConfig } = require("./lib/config");
 const { PointPoller } = require("./lib/pointPoller");
 const { WidgetStore } = require("./lib/widgetStore");
 const { DeviceWidgetStore } = require("./lib/deviceWidgetStore");
+const { initializeTransferFiles } = require("./lib/dashboardTransfer");
 
 function createRuntime(env = process.env) {
+  initializeTransferFiles(env);
   const config = loadConfig(env);
   const poller = new PointPoller({
     middlewareUrl: config.middlewareUrl,

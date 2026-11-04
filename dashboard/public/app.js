@@ -2060,6 +2060,7 @@ async function boot() {
     void refreshDeviceMetadata();
 
     const events = new EventSource("/events");
+    events.addEventListener("dashboard-imported", () => window.location.reload());
     events.addEventListener("snapshot", (event) => {
       reconcileSnapshot(JSON.parse(event.data));
     });

@@ -7,3 +7,7 @@ npm-debug.log
 /config/device-widgets.json.*.tmp
 /config/catalog-metadata.json
 /config/catalog-metadata.json.*.tmp
+/config/transfer-backups/
+/config/.dashboard-transfer.json
+/config/.dashboard-transfer.json.*.tmp
+/config/*.import

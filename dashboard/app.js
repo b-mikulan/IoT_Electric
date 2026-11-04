@@ -8,6 +8,7 @@ const { createDeviceDemo } = require("./lib/deviceDemo");
 const { DeviceCommandService } = require("./lib/deviceCommands");
 const { DeviceWidgetStore } = require("./lib/deviceWidgetStore");
 const { buildDevices } = require("./public/deviceModel");
+const { DashboardTransfer } = require("./lib/dashboardTransfer");
 
 const publicDirectory = path.join(__dirname, "public");
 const materializeDirectory = path.dirname(
@@ -103,6 +104,7 @@ function createApp({
   telemetry = new TelemetryClient(config),
   deviceMetadata = new DeviceMetadataClient(config),
   deviceCommands = new DeviceCommandService({ poller, config, deviceMetadata }),
+  dashboardTransfer = new DashboardTransfer(config),
 }) {
   if (!poller) throw new Error("A point poller is required.");
   if (!config) throw new Error("Dashboard configuration is required.");
@@ -113,7 +115,25 @@ function createApp({
   let autoDiscovery = { state: "idle" };
   let clearingWidgets = false;
   let automaticRoomNames = [];
+  let transferBusy = false;
+  let activeConfigurationRequests = 0;
   app.disable("x-powered-by");
+
+  // Hold configuration writes and reads that synchronize settings during an
+  // import. Existing HTTP operations must finish before the import can start.
+  app.use("/api", (request, response, next) => {
+    const importing = request.path === "/dashboard-transfer/import";
+    const observesConfiguration = ["/config", "/devices/settings", "/devices/metadata", "/dashboard-transfer/export", "/dashboard-transfer/preview"].includes(request.path);
+    const configurationRequest = observesConfiguration || !["GET", "HEAD", "OPTIONS"].includes(request.method);
+    if (transferBusy && configurationRequest) return response.status(409).json({ error: "Uvoz dashboarda je u tijeku. Pokušaj ponovno nakon završetka.", code: "TRANSFER_IN_PROGRESS" });
+    if (!importing && configurationRequest) {
+      activeConfigurationRequests += 1;
+      let released = false;
+      const release = () => { if (!released) { released = true; activeConfigurationRequests -= 1; } };
+      response.once("finish", release); response.once("close", release);
+    }
+    return next();
+  });
 
   function broadcast(event, payload) {
     for (const response of eventClients) {
@@ -178,6 +198,44 @@ function createApp({
     }));
   });
   poller.on("removed", (payload) => broadcast("removed", payload));
+
+  app.get("/api/dashboard-transfer/status", (request, response) => response.json({ enabled: dashboardTransfer.enabled && Boolean(widgetStore?.enabled), demoMode: config.demoMode }));
+  app.get("/api/dashboard-transfer/export", (request, response) => {
+    try {
+      response.set({ "Cache-Control": "no-store", "Content-Disposition": 'attachment; filename="dashboard-backup.json"' });
+      return response.json(dashboardTransfer.export());
+    } catch (error) { return sendOperationError(response, error, "TRANSFER_EXPORT_FAILED", "Izvoz postavki nije uspio."); }
+  });
+  app.post("/api/dashboard-transfer/preview", requireJson, express.json({ limit: "16mb" }), (request, response) => {
+    try {
+      const { summary, token } = dashboardTransfer.prepare(request.body?.document);
+      return response.json({ summary, token });
+    } catch (error) { return sendOperationError(response, error, "TRANSFER_PREVIEW_FAILED", "Datoteku nije moguće pregledati."); }
+  });
+  app.post("/api/dashboard-transfer/import", requireJson, express.json({ limit: "16mb" }), async (request, response) => {
+    if (!dashboardTransfer.enabled || !widgetStore?.enabled) return response.status(409).json({ error: "Za uvoz postavi DEMO_MODE=false i trajnu datoteku WIDGETS_FILE.", code: "TRANSFER_UNAVAILABLE" });
+    if (transferBusy) return response.status(409).json({ error: "Uvoz dashboarda je već u tijeku.", code: "TRANSFER_IN_PROGRESS" });
+    if (activeConfigurationRequests || clearingWidgets || autoDiscovery.state === "running") return response.status(409).json({ error: "Pričekaj završetak trenutačne promjene ili automatske pretrage pa ponovi uvoz.", code: "WIDGET_OPERATION_IN_PROGRESS" });
+    transferBusy = true;
+    try {
+      const result = await widgetStore.withExclusive(() => deviceWidgetStore.withExclusive(() => {
+        const imported = dashboardTransfer.apply(request.body?.document, request.body?.token);
+        // This synchronous publication follows the completed file transaction.
+        // No observer can see a mixture of the previous and imported settings.
+        config.widgets = imported.payload.widgets;
+        config.deviceMetadataFile = imported.metadataFile;
+        deviceWidgetStore.adoptDocument(imported.payload.deviceWidgets);
+        deviceMetadata.replaceCatalog(imported.payload.metadata);
+        automaticRoomNames = [...new Set(Object.values(imported.payload.metadata?.roomByZone || {}))];
+        discoveredById.clear();
+        poller.replaceWidgets(config.widgets);
+        return imported;
+      }));
+      broadcast("dashboard-imported", { summary: result.summary });
+      return response.json({ summary: result.summary, backupId: result.backupId });
+    } catch (error) { return sendOperationError(response, error, "TRANSFER_IMPORT_FAILED", "Uvoz dashboarda nije uspio."); }
+    finally { transferBusy = false; }
+  });
 
   app.get("/health", (request, response) => {
     const snapshot = poller.getSnapshot();

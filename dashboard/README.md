@@ -12,6 +12,35 @@ npm start
 
 Open `http://localhost:3001`. Demo mode is enabled by default and is visibly marked in the interface.
 
+## Move a dashboard to another server
+
+Open **Prijenos postavki** on the dashboard, or `/transfer.html`.
+
+1. On the source dashboard, click **Preuzmi postavke** to download `dashboard-backup.json`.
+2. Deploy the updated dashboard image on the destination server with its own working EWS/middleware connection and a persistent writable configuration volume.
+3. Open **Prijenos postavki** on that server, select the downloaded file and review the point, card and room counts. Confirm **Želim primijeniti ovaj prikaz na dashboard**, then click **Uvezi postavke**.
+
+The single versioned JSON bundle contains widget definitions, visibility and write flags, card names, room assignments (including empty rooms and room renames), chosen readings/units, and the saved device metadata used to recognize controls. It excludes live values, credentials, EWS addresses and polling settings. All open dashboard views reload after import. A fresh complete read runs through the existing sequential poller; the building is not crawled again. Existing in-flight reads cannot publish old results over imported configuration.
+
+The page also accepts an older `widgets.json` array. That replaces the point list while retaining destination card preferences for matching owners and any available destination metadata. It cannot transfer source room assignments or descriptions; use the full bundle for this building. Imports replace the point set rather than merging it, so deliberately removed duplicate points stay removed. Maximum upload size: 16 MB. If a reverse proxy limits request bodies, allow at least 16 MB there as well.
+
+For Docker Compose or Portainer, set these stack variables (middleware credentials remain configured separately):
+
+```dotenv
+DASHBOARD_DEMO_MODE=false
+DASHBOARD_WIDGETS_FILE=/app/config/widgets.json
+DASHBOARD_POLL_INTERVAL_MS=180000
+DASHBOARD_READ_BATCH_SIZE=128
+DASHBOARD_READ_BATCH_DELAY_MS=1000
+DASHBOARD_MIDDLEWARE_TIMEOUT_MS=30000
+```
+
+Both Compose definitions mount `/app/config` read/write. Keep that volume across redeploys. The dashboard now creates an empty `widgets.json` when the configured file does not yet exist, so a fresh live deployment can start and accept an upload. Leave `DASHBOARD_WIDGETS_JSON` unset for persistent imports. Card settings and metadata default to adjacent `device-widgets.json` and `catalog-metadata.json`; explicit file paths must point to separate writable files. The image initializes its config directory for the unprivileged application user; an existing host bind mount must also permit that user to write.
+
+Preview validates the entire document without changing files. Its confirmation token covers both the uploaded settings and destination files, so an intervening change requires another preview. Import waits for queued storage work and rejects concurrent edits/discovery. It stages all three files, saves the previous files under `/app/config/transfer-backups/<backup-id>/`, then publishes the new runtime state. Failed replacement restores the preceding files; an interrupted process is recovered from the local journal at startup before configuration is loaded. To restore a backup through the page, import its `widgets.json` for points only, or restore all three saved files while the service is stopped for the complete previous state.
+
+API: `GET /api/dashboard-transfer/status`, `GET /api/dashboard-transfer/export`, `POST /api/dashboard-transfer/preview` with `{document}`, and `POST /api/dashboard-transfer/import` with `{document, token}`.
+
 ## Trends and alarms
 
 Open **Trendovi i alarmi** on the dashboard (or `/trends.html`). The page uses locally served [DataTables](https://datatables.net/) for searchable, sortable, paginated tables and [Chart.js](https://www.chartjs.org/) for a history line chart. No CDN access is required in the browser.

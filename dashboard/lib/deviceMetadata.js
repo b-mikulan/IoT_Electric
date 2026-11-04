@@ -45,8 +45,8 @@ class DeviceMetadataClient {
     if (!this.#demoMode && config.deviceMetadataFile) {
       try {
         const saved = JSON.parse(fs.readFileSync(config.deviceMetadataFile, "utf8").replace(/^\uFEFF/, ""));
-        if (saved?.schemaVersion !== 1 || !saved.metadataById || Array.isArray(saved.metadataById) || typeof saved.metadataById !== "object"
-          || !saved.roomByZone || Array.isArray(saved.roomByZone) || typeof saved.roomByZone !== "object") throw new Error("Invalid catalog metadata format");
+        if (saved !== null && (saved?.schemaVersion !== 1 || !saved.metadataById || Array.isArray(saved.metadataById) || typeof saved.metadataById !== "object"
+          || !saved.roomByZone || Array.isArray(saved.roomByZone) || typeof saved.roomByZone !== "object")) throw new Error("Invalid catalog metadata format");
         this.#catalog = saved;
       } catch { throw new Error("Unable to load DEVICE_METADATA_FILE. Re-export the catalog descriptions or check its path."); }
     }
@@ -55,6 +55,12 @@ class DeviceMetadataClient {
     this.#middlewareUrl = String(config.middlewareUrl || "").replace(/\/+$/, "");
     this.#authorization = `Basic ${Buffer.from(`${config.username || ""}:${config.password || ""}`, "utf8").toString("base64")}`;
     this.#timeoutMs = Number.isFinite(config.timeoutMs) && config.timeoutMs > 0 ? config.timeoutMs : 10_000;
+  }
+
+  replaceCatalog(catalog) {
+    this.#catalog = catalog ? structuredClone(catalog) : null;
+    this.#cache.clear();
+    this.#inFlight.clear();
   }
 
   async read(widgets) {

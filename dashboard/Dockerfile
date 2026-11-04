@@ -13,6 +13,8 @@ COPY app.js server.js ./
 COPY lib ./lib
 COPY public ./public
 
+RUN mkdir -p /app/config && chown node:node /app/config
+
 USER node
 EXPOSE 3001
 
