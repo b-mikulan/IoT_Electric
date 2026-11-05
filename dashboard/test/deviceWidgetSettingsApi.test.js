@@ -48,7 +48,7 @@ test("public configuration saves device-local primary aliases and secondary read
   const settings = { key: buildDevices(config.widgets)[0].key, label: "Bedroom air", room: "Bedroom", primaryPointId: config.widgets[3].id, primaryUnit: "custom unit", secondaryPointIds: [config.widgets[0].id] };
   const response = await save({ ...settings, writable: true });
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { device: settings, rooms: ["Bedroom"], roomRules: [] });
+  assert.deepEqual(await response.json(), { device: settings, rooms: ["Bedroom"], roomRules: [], floors: [], roomDetails: [] });
   const update = new TextDecoder().decode((await reader.read()).value);
   assert.match(update, /event: device-settings/);
   assert.match(update, /Bedroom air/);
@@ -118,7 +118,7 @@ test("malformed settings are reported explicitly and retained while inline mode 
   assert.equal(await fs.readFile(persisted.file, "utf8"), "{malformed");
   const inline = await start(t, { inline: true });
   const disabled = await (await fetch(`${inline.baseUrl}/api/devices/settings`)).json();
-  assert.deepEqual(disabled, { enabled: false, devices: [], rooms: [], roomRules: [] });
+  assert.deepEqual(disabled, { enabled: false, devices: [], rooms: [], roomRules: [], floors: [], roomDetails: [] });
   const response = await inline.save({ key: "ES/Room/AC309", label: null, room: null, primaryPointId: null, secondaryPointIds: null });
   assert.equal(response.status, 409);
   assert.equal((await response.json()).code, "DEVICE_WIDGET_FILE_UNAVAILABLE");

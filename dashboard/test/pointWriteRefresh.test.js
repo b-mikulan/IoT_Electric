@@ -51,7 +51,7 @@ function fixture(t, { onRead, onWrite, intervalMs = 15_000 } = {}) {
   return { poller, reads, writes, syncs, updates, values };
 }
 
-test("refreshes every configured widget exactly two seconds after successful acknowledgement", async (t) => {
+test("reads back the written point two seconds after acknowledgement without refreshing unrelated points", async (t) => {
   const acknowledgement = deferred();
   const f = fixture(t, { onWrite: async (count, response) => { await acknowledgement.promise; return response; } });
   await f.poller.poll();
@@ -70,13 +70,13 @@ test("refreshes every configured widget exactly two seconds after successful ack
 
   t.mock.timers.tick(1);
   await flush();
-  assert.deepEqual(f.reads, [["setpoint", "sibling", "hidden"], ["setpoint", "sibling", "hidden"]]);
+  assert.deepEqual(f.reads, [["setpoint", "sibling", "hidden"], ["setpoint"]]);
   assert.deepEqual(f.poller.getSnapshot().widgets.map(({ id, value }) => [id, value]),
-    [["setpoint", 25], ["sibling", 24], ["hidden", 1]]);
+    [["setpoint", 25], ["sibling", 21], ["hidden", 0]]);
   assert.equal(f.syncs.length, 2);
 });
 
-test("publishes a completed refresh even when all widget values are unchanged", async (t) => {
+test("publishes fresh targeted readback for unchanged values while preserving the full-building clock", async (t) => {
   const f = fixture(t);
   await f.poller.poll();
   const before = f.poller.getSnapshot();
@@ -88,8 +88,10 @@ test("publishes a completed refresh even when all widget values are unchanged", 
   const after = f.poller.getSnapshot();
   assert.equal(f.reads.length, 2);
   assert.equal(f.syncs.length, 2);
-  assert.notEqual(after.syncedAt, before.syncedAt);
-  assert.equal(f.updates.length, 1, "unchanged values do not create false change events");
+  assert.equal(after.syncedAt, before.syncedAt);
+  assert.equal(f.updates.length, 2, "a partial update reports the point's fresh read time even when unchanged");
+  assert.equal(f.updates[1].scope, "partial");
+  assert.notEqual(after.widgets[0].readAt, before.widgets[0].readAt);
   assert.deepEqual(after.widgets.map(({ updatedAt }) => updatedAt), before.widgets.map(({ updatedAt }) => updatedAt));
 });
 
@@ -111,7 +113,7 @@ for (const [name, reply, code] of [
   });
 }
 
-test("waits for a read already in flight and then starts a fresh full read", async (t) => {
+test("waits for a read already in flight and then starts a fresh targeted read", async (t) => {
   const oldRead = deferred();
   const f = fixture(t, { onRead: (count, response) => count === 2 ? oldRead.promise : response });
   await f.poller.poll();
@@ -129,8 +131,8 @@ test("waits for a read already in flight and then starts a fresh full read", asy
   await flush();
 
   assert.equal(f.reads.length, 3, "the old request is not reused as post-command refresh");
-  assert.deepEqual(f.reads[2], ["setpoint", "sibling", "hidden"]);
-  assert.equal(f.poller.getSnapshot().widgets.find(({ id }) => id === "sibling").value, 24);
+  assert.deepEqual(f.reads[2], ["setpoint"]);
+  assert.equal(f.poller.getSnapshot().widgets.find(({ id }) => id === "sibling").value, 21);
 });
 
 test("stop cancels a refresh whose delay has not expired", async (t) => {
@@ -175,7 +177,7 @@ test("an acknowledgement received after stop does not schedule another refresh",
   assert.equal(f.reads.length, 1);
 });
 
-test("each successful acknowledgement keeps its own two second refresh deadline", async (t) => {
+test("nearby successful acknowledgements share one refresh two seconds after the last command", async (t) => {
   const f = fixture(t);
   await f.poller.poll();
   await f.poller.writeValue("setpoint", 25);
@@ -187,13 +189,13 @@ test("each successful acknowledgement keeps its own two second refresh deadline"
   assert.equal(f.reads.length, 1);
   t.mock.timers.tick(1);
   await flush();
-  assert.equal(f.reads.length, 2, "a newer command does not postpone the earlier refresh");
+  assert.equal(f.reads.length, 1, "nearby commands are coalesced rather than reading the same points twice");
   t.mock.timers.tick(999);
   await flush();
-  assert.equal(f.reads.length, 2);
+  assert.equal(f.reads.length, 1);
   t.mock.timers.tick(1);
   await flush();
-  assert.equal(f.reads.length, 3);
+  assert.equal(f.reads.length, 2);
 });
 
 test("post-command refresh preserves the normal polling interval", async (t) => {

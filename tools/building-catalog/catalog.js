@@ -4,6 +4,7 @@ const { parseArgs } = require("node:util");
 const { BuildingCatalog } = require("../../catalog/store");
 const { importTopology } = require("../../catalog/importTopology");
 const { importWidgets } = require("../../catalog/widgetExport");
+const { importHistories } = require("../../catalog/historyExport");
 
 const HELP = `Offline building catalog (Node 24+, no additional packages)
 
@@ -16,6 +17,8 @@ const HELP = `Offline building catalog (Node 24+, no additional packages)
   npm run catalog -- points [--native-only] [--parent "exact container ID"]
   npm run catalog -- point --id "exact point ID"
   npm run catalog -- snapshots
+  npm run catalog -- trends [--search AC101]
+  npm run catalog -- trends --apply [--metadata-file dashboard/config/catalog-metadata.json]
   npm run catalog -- widgets [--apply] [--widgets-file dashboard/config/widgets.json]
 
 Common options:
@@ -30,7 +33,7 @@ Common options:
   --metadata-file PATH  Saved descriptions (default: catalog-metadata.json beside widgets)
   --apply               Save widget import with a backup; omit for a dry run
 
-All commands use local files. The widgets command changes widget files only with --apply.
+All commands use local files. The widgets/trends commands change files only with --apply.
 No command contacts EWS or reads live values.
 `;
 
@@ -65,6 +68,7 @@ function main(args = process.argv.slice(2)) {
   const commands = {
     summary: (catalog) => catalog.summary(options), snapshots: (catalog) => catalog.listSnapshots(options),
     containers: (catalog) => catalog.listContainers(options), points: (catalog) => catalog.listPoints(options), devices: (catalog) => catalog.listDevices(options),
+    trends: (catalog) => values.apply ? importHistories(catalog, { ...options, metadataFile: values["metadata-file"] || path.join(path.dirname(values["widgets-file"]), "catalog-metadata.json"), apply: true }) : catalog.listHistories(options),
     container: (catalog) => catalog.getContainer(values.id, options), point: (catalog) => catalog.getPoint(values.id, options), device: (catalog) => catalog.getDevice(values.id, options),
     widgets: (catalog) => importWidgets(catalog, { ...options, widgetsFile: values["widgets-file"], metadataFile: values["metadata-file"], apply: values.apply }),
   };

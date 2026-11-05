@@ -84,14 +84,15 @@ const settingsDeleteMessage = document.querySelector("#settings-delete-message")
 const settingsDeleteConfirm = document.querySelector("#settings-delete-confirm");
 const settingsDeleteCancel = document.querySelector("#settings-delete-cancel");
 const cardSettings = Object.fromEntries([
-  "dialog", "title", "close", "form", "label", "label-hint", "room", "new-room-field", "new-room",
+  "dialog", "title", "close", "form", "label", "label-hint", "room", "new-room-field", "new-room", "new-room-floor",
   "primary", "unit-mode", "unit", "unit-field", "unit-hint", "secondary-mode", "secondary-hint", "secondary-field", "search", "secondary-list",
   "secondary-count", "functions", "reset", "cancel", "save", "status",
   "remove", "remove-confirmation", "remove-message", "remove-confirm", "remove-cancel",
 ].map((name) => [name, document.querySelector(`#device-settings-${name}`)]));
 
-const roomsUi = Object.fromEntries(["dialog", "close", "form", "name", "create", "list", "status", "count", "editor", "selected", "summary", "rename-form", "rename-name", "rename", "delete", "delete-confirmation", "delete-message", "delete-cancel", "delete-confirm"].map((name) => [name, document.querySelector(`#rooms-${name}`)]));
-const moveUi = Object.fromEntries(["dialog", "close", "form", "target", "new-field", "new", "cancel", "save", "summary", "status"].map((name) => [name, document.querySelector(`#device-room-${name}`)]));
+const roomsUi = Object.fromEntries(["dialog", "close", "form", "name", "floor", "edit-floor", "create", "list", "status", "count", "editor", "selected", "summary", "rename-form", "rename-name", "rename", "delete", "delete-confirmation", "delete-message", "delete-cancel", "delete-confirm"].map((name) => [name, document.querySelector(`#rooms-${name}`)]));
+const floorsUi = Object.fromEntries(["management", "form", "name", "create", "list", "status", "editor", "selected", "rename-form", "rename-name", "rename", "delete", "delete-confirmation", "delete-message", "delete-cancel", "delete-confirm"].map(name => [name, document.querySelector(`#floors-${name}`)]));
+const moveUi = Object.fromEntries(["dialog", "close", "form", "floor", "target", "hint", "new-field", "new", "cancel", "save", "summary", "status"].map((name) => [name, document.querySelector(`#device-room-${name}`)]));
 const elementsById = new Map();
 const configById = new Map();
 const visibilityInputsById = new Map();
@@ -122,12 +123,17 @@ let deviceSettingsRequest = 0;
 let cardSettingsContext = null;
 let cardSettingsBusy = false;
 let storedRooms = [];
+let storedFloors = [];
+let storedRoomDetails = [];
+let selectedFloorId = null;
 let storedRoomRules = [];
 let selectedRoomName = null;
 let roomsBusy = false;
 let moveBusy = false;
 let moveKeys = [];
 let deviceCardsRefreshPending = false;
+let generalSettingsView = null;
+let pollingState = { paused: false, active: false };
 let deviceCardsFullRefresh = true;
 const devicePointUpdates = new Set();
 
@@ -159,23 +165,26 @@ function renderDeviceCards() {
     ? deviceDemoWidgets
     : [...configById.values()].map((config) => {
       const point = latestValuesById.get(config.id)?.widget;
-      return { ...config, ...(point ? { value: point.value, state: point.state, error: point.error, updatedAt: point.updatedAt } : {}) };
+      return { ...config, ...(point ? { value: point.value, state: point.state, error: point.error, updatedAt: point.updatedAt, readAt: point.readAt } : {}) };
     });
   deviceCardView.update({ widgets, status: deviceConnectionStatus, readAt: deviceReadAt, demo: deviceDemoMode,
     ...deviceMetadata, settingsEnabled: widgetEditingEnabled || deviceSettingsEnabled,
     deviceSettings: [...deviceSettingsByKey.values()],
-    rooms: storedRooms, roomRules: storedRoomRules, roomEditingEnabled: deviceSettingsEnabled,
+    rooms: storedRooms, roomRules: storedRoomRules, floors: storedFloors, roomDetails: storedRoomDetails, roomEditingEnabled: deviceSettingsEnabled,
     warnings: [...(deviceMetadata.warnings || []), ...(deviceSettingsWarning ? [deviceSettingsWarning] : [])],
   });
   if (roomsUi.dialog.open) renderRoomsList();
+  if (moveUi.dialog.open && !moveBusy) renderBulkRoomOptions();
 }
 
-function applyDeviceSettings(entries, rooms, roomRules) {
+function applyDeviceSettings(entries, rooms, roomRules, floors, roomDetails) {
   if (!Array.isArray(entries)) return;
   deviceSettingsByKey.clear();
   for (const entry of entries) if (typeof entry?.key === "string") deviceSettingsByKey.set(entry.key, entry);
   if (Array.isArray(rooms)) storedRooms = [...new Set(rooms.filter((room) => typeof room === "string" && room.trim()))];
   if (Array.isArray(roomRules)) storedRoomRules = roomRules.map((rule) => ({ ...rule }));
+  if (Array.isArray(floors)) storedFloors = floors.map(floor => ({ ...floor }));
+  if (Array.isArray(roomDetails)) storedRoomDetails = roomDetails.map(room => ({ ...room }));
   deviceSettingsWarning = "";
   refreshDeviceCards();
   if (roomsUi.dialog.open) renderRoomsList();
@@ -189,7 +198,7 @@ async function refreshSavedDeviceSettings() {
     if (!response.ok || !Array.isArray(payload.devices)) throw new Error(payload.error || "Postavke kartica nisu dostupne.");
     if (request !== deviceSettingsRequest) return;
     deviceSettingsEnabled = payload.enabled === true;
-    applyDeviceSettings(payload.devices, payload.rooms, payload.roomRules);
+    applyDeviceSettings(payload.devices, payload.rooms, payload.roomRules, payload.floors, payload.roomDetails);
   } catch {
     if (request !== deviceSettingsRequest) return;
     deviceSettingsWarning = "Spremljene postavke kartica trenutačno nisu dostupne. Prethodni odabir je sačuvan.";
@@ -733,9 +742,9 @@ function showStatus(status = {}) {
   const isEmpty = state === "idle" && configById.size === 0;
 
   connectionDot.className = `connection-dot ${
-    isOnline ? "is-online" : isOffline ? "is-offline" : isEmpty ? "" : "is-connecting"
+    isOffline ? "is-offline" : pollingState.paused ? "is-paused" : isOnline ? "is-online" : isEmpty ? "" : "is-connecting"
   }`;
-  connectionLabel.textContent = isOnline
+  connectionLabel.textContent = !isOffline && pollingState.paused ? "Osvježavanje pauzirano" : isOnline
     ? "Podaci uživo"
     : isOffline
       ? "Veza prekinuta"
@@ -753,10 +762,10 @@ function showStatus(status = {}) {
 
 function applyPayload(payload = {}) {
   const widgets = payload.widgets || payload.changed || [];
-  for (const widget of widgets) updateWidget(widget, payload.syncedAt);
+  for (const widget of widgets) updateWidget(widget, payload.readAt || payload.syncedAt);
 
   const syncTime = payload.syncedAt || payload.lastSync;
-  if (syncTime) {
+  if (syncTime && payload.scope !== "partial") {
     deviceReadAt = syncTime;
     lastSync.textContent = `Zadnja uspješna provjera: ${formatTime(syncTime)}`;
   }
@@ -1299,18 +1308,66 @@ function showCardSettingsStatus(message, state = "") {
 function knownRoomNames() {
   const rooms = new Map();
   const add = (name) => { if (typeof name === "string" && name.trim()) rooms.set(name.toLocaleLowerCase("hr"), name); };
-  for (const device of cardSettingsDevices()) { add(device.room?.label); add(device.automaticRoom?.label); }
+  for (const device of cardSettingsDevices()) { add(device.room?.id || device.room?.label); add(device.automaticRoom?.id || device.automaticRoom?.label); }
   for (const entry of deviceSettingsByKey.values()) add(entry.room);
   for (const name of storedRooms) add(name);
-  return [...rooms.values()].sort((a, b) => a.localeCompare(b, "hr"));
+  for (const room of storedRoomDetails) add(room.id);
+  return [...rooms.values()].sort((a, b) => roomDisplayName(a).localeCompare(roomDisplayName(b), "hr"));
+}
+
+function roomDefinition(id) { return storedRoomDetails.find(room => room.id === id); }
+function roomNameConflict(name, floorId, exceptId) {
+  return knownRoomNames().some(id => id !== exceptId && (roomDefinition(id)?.floorId || null) === floorId
+    && (roomDefinition(id)?.name || id).toLocaleLowerCase("hr") === name.toLocaleLowerCase("hr"));
+}
+function roomDisplayName(id) {
+  const detail = roomDefinition(id);
+  if (!detail) return id;
+  const floor = storedFloors.find(floor => floor.id === detail.floorId);
+  return [detail.name, floor?.name].filter(Boolean).join(" · ");
+}
+function populateFloorSelect(select) {
+  const previous = select.value;
+  select.replaceChildren();
+  appendSettingsOption(select, "", "Kat nije određen");
+  for (const floor of storedFloors) appendSettingsOption(select, floor.id, floor.name);
+  select.value = storedFloors.some(floor => floor.id === previous) ? previous : "";
+}
+
+function renderFloors() {
+  for (const select of [roomsUi.floor, roomsUi["edit-floor"], cardSettings["new-room-floor"]]) populateFloorSelect(select);
+  floorsUi.list.replaceChildren();
+  if (!storedFloors.some(floor => floor.id === selectedFloorId)) selectedFloorId = null;
+  for (const floor of storedFloors) {
+    const count = storedRoomDetails.filter(room => room.floorId === floor.id).length;
+    const row = document.createElement("li"), button = document.createElement("button");
+    button.type = "button"; button.className = "room-registry-select"; button.disabled = roomsBusy;
+    button.setAttribute("aria-pressed", String(selectedFloorId === floor.id));
+    button.setAttribute("aria-label", `${floor.name} · ${count} prostorija`);
+    const name = document.createElement("span"), total = document.createElement("small");
+    name.textContent = floor.name; total.textContent = `${count} prostorija`; button.append(name, total);
+    button.addEventListener("click", () => {
+      if (roomsBusy) return;
+      selectedFloorId = floor.id; floorsUi["rename-name"].value = floor.name; floorsUi["delete-confirmation"].hidden = true;
+      renderFloors(); floorsUi["rename-name"].focus();
+    });
+    row.append(button); floorsUi.list.appendChild(row);
+  }
+  floorsUi.editor.hidden = !selectedFloorId;
+  if (selectedFloorId) {
+    floorsUi.selected.textContent = storedFloors.find(floor => floor.id === selectedFloorId).name;
+    const count = storedRoomDetails.filter(room => room.floorId === selectedFloorId).length;
+    floorsUi["delete-message"].textContent = `Izbrisati ovu grupu? Prostorije (${count}) ostaju spremljene i prelaze u „Kat nije određen”. Uređaji ostaju u svojim prostorijama.`;
+  }
 }
 
 function renderRoomsList() {
+  renderFloors();
   roomsUi.list.replaceChildren();
   const names = knownRoomNames();
   roomsUi.count.textContent = `Ukupno: ${names.length}`;
   const counts = new Map();
-  for (const device of cardSettingsDevices()) if (device.room?.label) counts.set(device.room.label, (counts.get(device.room.label) || 0) + 1);
+  for (const device of cardSettingsDevices()) if (device.room?.label) { const id = device.room.id || device.room.label; counts.set(id, (counts.get(id) || 0) + 1); }
   if (selectedRoomName && !names.includes(selectedRoomName)) selectedRoomName = null;
   for (const name of names) {
     const row = document.createElement("li");
@@ -1319,20 +1376,21 @@ function renderRoomsList() {
     button.className = "room-registry-select";
     button.disabled = roomsBusy;
     button.setAttribute("aria-pressed", String(selectedRoomName === name));
-    button.setAttribute("aria-label", `${name} · ${counts.get(name) || 0} uređaja`);
+    button.setAttribute("aria-label", `${roomDisplayName(name)} · ${counts.get(name) || 0} uređaja`);
     const label = document.createElement("span");
     label.className = "room-registry-name";
-    label.textContent = name;
+    label.textContent = roomDisplayName(name);
     const count = document.createElement("small");
     count.textContent = `${counts.get(name) || 0} uređaja`;
     button.append(label, count);
     button.addEventListener("click", () => {
       if (roomsBusy) return;
       selectedRoomName = name;
-      roomsUi["rename-name"].value = name;
+      roomsUi["rename-name"].value = roomDefinition(name)?.name || name;
       roomsUi["delete-confirmation"].hidden = true;
       roomsUi.status.textContent = "";
       renderRoomsList();
+      roomsUi["edit-floor"].value = roomDefinition(name)?.floorId || "";
       roomsUi["rename-name"].focus();
     });
     row.append(button);
@@ -1342,9 +1400,9 @@ function renderRoomsList() {
   roomsUi.dialog.classList.toggle("has-room-selection", Boolean(selectedRoomName));
   if (selectedRoomName) {
     const count = counts.get(selectedRoomName) || 0;
-    roomsUi.selected.textContent = selectedRoomName;
-    roomsUi.summary.textContent = `Uređaja u prostoriji: ${count}. Preimenovanje vrijedi za sve uređaje u ovoj prostoriji.`;
-    roomsUi["delete-message"].textContent = `Izbrisati prostoriju „${selectedRoomName}”? Uređaji (${count}) prijeći će u „Bez prostorije”. Kartice uređaja ostaju na dashboardu.`;
+    roomsUi.selected.textContent = roomDisplayName(selectedRoomName);
+    roomsUi.summary.textContent = `Uređaja u prostoriji: ${count}. Promjena naziva i grupe vrijedi za sve uređaje u ovoj prostoriji.`;
+    roomsUi["delete-message"].textContent = `Izbrisati prostoriju „${roomDisplayName(selectedRoomName)}”? Uređaji (${count}) prijeći će u „Bez prostorije”. Kartice uređaja ostaju na dashboardu.`;
   }
 }
 
@@ -1364,7 +1422,7 @@ async function persistRoomChange(endpoint, body) {
   const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || "Spremanje prostorije nije uspjelo.");
-  if (request === deviceSettingsRequest) applyDeviceSettings(payload.devices || [...deviceSettingsByKey.values()], payload.rooms, payload.roomRules);
+  if (request === deviceSettingsRequest) applyDeviceSettings(payload.devices || [...deviceSettingsByKey.values()], payload.rooms, payload.roomRules, payload.floors, payload.roomDetails);
   else await refreshSavedDeviceSettings();
   return payload;
 }
@@ -1374,21 +1432,22 @@ roomsUi.form.addEventListener("submit", async (event) => {
   if (roomsBusy || !deviceSettingsEnabled) return;
   const name = roomsUi.name.value.trim().normalize("NFC");
   if (!name || name.length > 160) { roomsUi.status.textContent = "Upiši naziv prostorije do 160 znakova."; return; }
-  if (knownRoomNames().some((room) => room.toLocaleLowerCase("hr") === name.toLocaleLowerCase("hr"))) { roomsUi.status.textContent = "Prostorija s tim nazivom već postoji."; return; }
+  if (roomNameConflict(name, roomsUi.floor.value || null)) { roomsUi.status.textContent = "Prostorija s tim nazivom već postoji u odabranoj grupi."; return; }
   setRoomsBusy(true);
   roomsUi.status.textContent = "Spremam prostoriju…";
   try {
-    const payload = await persistRoomChange("/api/rooms", { name });
+    const payload = await persistRoomChange("/api/rooms", { name, floorId: roomsUi.floor.value || null });
     roomsUi.name.value = "";
     renderRoomsList();
-    roomsUi.status.textContent = `Prostorija „${payload.room}” je stvorena. Odaberi uređaje za premještanje.`;
+    roomsUi.status.textContent = `Prostorija „${roomDisplayName(payload.room)}” je stvorena. Odaberi uređaje za premještanje.`;
   } catch (error) { roomsUi.status.textContent = error.message; }
   finally { setRoomsBusy(false); }
 });
 
 function setRoomsBusy(busy) {
   roomsBusy = busy;
-  for (const name of ["create", "close", "name", "rename-name", "rename", "delete", "delete-cancel", "delete-confirm"]) roomsUi[name].disabled = busy;
+  for (const name of ["create", "close", "name", "floor", "edit-floor", "rename-name", "rename", "delete", "delete-cancel", "delete-confirm"]) roomsUi[name].disabled = busy;
+  for (const name of ["name", "create", "rename-name", "rename", "delete", "delete-cancel", "delete-confirm"]) floorsUi[name].disabled = busy;
   renderRoomsList();
 }
 
@@ -1398,15 +1457,16 @@ roomsUi["rename-form"].addEventListener("submit", async (event) => {
   const name = selectedRoomName;
   const newName = roomsUi["rename-name"].value.trim().normalize("NFC");
   if (!newName || newName.length > 160) { roomsUi.status.textContent = "Upiši naziv prostorije do 160 znakova."; return; }
-  if (knownRoomNames().some((room) => room !== name && room.toLocaleLowerCase("hr") === newName.toLocaleLowerCase("hr"))) { roomsUi.status.textContent = "Prostorija s tim nazivom već postoji."; return; }
+  if (roomNameConflict(newName, roomsUi["edit-floor"].value || null, name)) { roomsUi.status.textContent = "Prostorija s tim nazivom već postoji u odabranoj grupi."; return; }
   setRoomsBusy(true);
   roomsUi["delete-confirmation"].hidden = true;
   roomsUi.status.textContent = "Spremam novi naziv…";
   try {
-    const payload = await persistRoomChange("/api/rooms/rename", { name, newName });
+    const structured = Boolean(roomDefinition(name));
+    const payload = await persistRoomChange(structured ? "/api/rooms/update" : "/api/rooms/rename", structured ? { id: name, name: newName, floorId: roomsUi["edit-floor"].value || null } : { name, newName });
     selectedRoomName = payload.room;
-    roomsUi["rename-name"].value = payload.room;
-    roomsUi.status.textContent = `Prostorija „${name}” preimenovana je u „${payload.room}”.`;
+    roomsUi["rename-name"].value = roomDefinition(payload.room)?.name || payload.room;
+    roomsUi.status.textContent = `Prostorija „${roomDisplayName(payload.room)}” je spremljena.`;
   } catch (error) { roomsUi.status.textContent = error.message; }
   finally { setRoomsBusy(false); }
 });
@@ -1430,6 +1490,39 @@ roomsUi["delete-confirm"].addEventListener("click", async () => {
   } catch (error) { roomsUi.status.textContent = error.message; }
   finally { setRoomsBusy(false); }
 });
+floorsUi.form.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (roomsBusy || !deviceSettingsEnabled) return;
+  setRoomsBusy(true); floorsUi.status.textContent = "Spremam novu grupu…";
+  try {
+    const payload = await persistRoomChange("/api/floors/create", { name: floorsUi.name.value.trim() });
+    selectedFloorId = payload.floor.id; floorsUi.name.value = ""; floorsUi["rename-name"].value = payload.floor.name;
+    renderFloors(); roomsUi.floor.value = payload.floor.id; floorsUi.status.textContent = "Grupa je stvorena. Možeš joj dodati prostorije.";
+  } catch (error) { floorsUi.status.textContent = error.message; }
+  finally { setRoomsBusy(false); }
+});
+floorsUi["rename-form"].addEventListener("submit", async event => {
+  event.preventDefault(); if (roomsBusy || !selectedFloorId) return;
+  setRoomsBusy(true); floorsUi.status.textContent = "Spremam grupu…";
+  try {
+    await persistRoomChange("/api/floors/rename", { id: selectedFloorId, name: floorsUi["rename-name"].value.trim() });
+    floorsUi.status.textContent = "Naziv grupe je spremljen. Prostorije i uređaji ostaju povezani.";
+  } catch (error) { floorsUi.status.textContent = error.message; }
+  finally { setRoomsBusy(false); }
+});
+floorsUi.delete.addEventListener("click", () => { if (!roomsBusy && selectedFloorId) floorsUi["delete-confirmation"].hidden = false; });
+floorsUi["delete-cancel"].addEventListener("click", () => { floorsUi["delete-confirmation"].hidden = true; });
+floorsUi["delete-confirm"].addEventListener("click", async () => {
+  if (roomsBusy || !selectedFloorId) return;
+  setRoomsBusy(true); floorsUi.status.textContent = "Brišem grupu…";
+  try {
+    await persistRoomChange("/api/floors/delete", { id: selectedFloorId });
+    selectedFloorId = null; floorsUi["delete-confirmation"].hidden = true;
+    floorsUi.status.textContent = "Grupa je izbrisana. Prostorije i uređaji su zadržani.";
+  } catch (error) { floorsUi.status.textContent = error.message; }
+  finally { setRoomsBusy(false); }
+});
+
 roomsUi.close.addEventListener("click", () => { if (!roomsBusy) roomsUi.dialog.close(); });
 roomsUi.dialog.addEventListener("cancel", (event) => { if (roomsBusy) event.preventDefault(); });
 
@@ -1437,32 +1530,70 @@ function updateBulkRoomMode() {
   const custom = moveUi.target.value === "new";
   moveUi["new-field"].hidden = !custom;
   moveUi.new.required = custom;
+  moveUi.floor.setCustomValidity("");
+  const floor = storedFloors.find(floor => `floor:${floor.id}` === moveUi.floor.value);
+  if (moveUi.target.value === "unassigned") moveUi.hint.textContent = "Uređaji će ostati bez prostorije i bez dodijeljenog kata.";
+  else if (moveUi.target.value === "auto") moveUi.hint.textContent = "Vraća se prostorija prema serveru. Kat/grupa preuzima se iz te prostorije.";
+  else if (custom) moveUi.hint.textContent = floor ? `Nova prostorija bit će spremljena u grupu „${floor.name}”.`
+    : moveUi.floor.value === "unknown" ? "Nova prostorija neće imati dodijeljen kat/grupu."
+      : "Za novu prostoriju odaberi kat/grupu ili „Kat nije određen”.";
+  else if (moveUi.target.value.startsWith("room:")) moveUi.hint.textContent = `Odredište: ${roomDisplayName(moveUi.target.value.slice(5))}. Uređaji preuzimaju kat te prostorije.`;
+  else moveUi.hint.textContent = "Odaberi kat/grupu pa prostoriju. Kat uređaja određuje njegova prostorija.";
+}
+
+function bulkRoomNames() {
+  const filter = moveUi.floor.value;
+  return knownRoomNames().filter(id => filter === "all" || (filter === "unknown"
+    ? !roomDefinition(id)?.floorId : `floor:${roomDefinition(id)?.floorId}` === filter));
+}
+
+function renderBulkRoomOptions(preferredFloor = moveUi.floor.value) {
+  const previousFloor = preferredFloor;
+  moveUi.floor.replaceChildren();
+  appendSettingsOption(moveUi.floor, "all", "Svi katovi / grupe");
+  for (const floor of storedFloors) appendSettingsOption(moveUi.floor, `floor:${floor.id}`, floor.name);
+  appendSettingsOption(moveUi.floor, "unknown", "Kat nije određen");
+  moveUi.floor.value = previousFloor === "unknown" || storedFloors.some(floor => `floor:${floor.id}` === previousFloor) ? previousFloor : "all";
+  const previousRoom = moveUi.target.value;
+  const rooms = bulkRoomNames();
+  moveUi.target.replaceChildren();
+  appendSettingsOption(moveUi.target, "", "Odaberi prostoriju");
+  appendSettingsOption(moveUi.target, "unassigned", "Bez prostorije");
+  appendSettingsOption(moveUi.target, "auto", "Automatski prema serveru");
+  for (const id of rooms) appendSettingsOption(moveUi.target, `room:${id}`, moveUi.floor.value === "all" ? roomDisplayName(id) : roomDefinition(id)?.name || id);
+  appendSettingsOption(moveUi.target, "new", "Nova prostorija…");
+  moveUi.target.value = ["unassigned", "auto", "new"].includes(previousRoom) || rooms.some(id => `room:${id}` === previousRoom) ? previousRoom : "";
+  updateBulkRoomMode();
 }
 
 function openBulkRoomDialog(devices) {
   if (!deviceSettingsEnabled || moveBusy || !Array.isArray(devices) || !devices.length) return;
   moveKeys = devices.map((device) => device.key);
   moveUi.summary.textContent = `Odabrano uređaja: ${devices.length}. ${devices.slice(0, 8).map((device) => device.label).join(", ")}${devices.length > 8 ? "…" : ""}`;
-  moveUi.target.replaceChildren();
-  appendSettingsOption(moveUi.target, "", "Odaberi prostoriju");
-  appendSettingsOption(moveUi.target, "unassigned", "Bez prostorije");
-  appendSettingsOption(moveUi.target, "auto", "Automatski prema serveru");
-  for (const name of knownRoomNames()) appendSettingsOption(moveUi.target, `room:${name}`, name);
-  appendSettingsOption(moveUi.target, "new", "Nova prostorija…");
+  const sharedFloor = devices[0].room?.floorId;
+  const preferredFloor = sharedFloor && devices.every(device => device.room?.floorId === sharedFloor) ? `floor:${sharedFloor}` : "all";
   moveUi.target.value = "";
   moveUi.new.value = "";
   moveUi.status.textContent = "";
-  updateBulkRoomMode();
+  renderBulkRoomOptions(preferredFloor);
   moveUi.dialog.showModal();
 }
 
 moveUi.target.addEventListener("change", updateBulkRoomMode);
+moveUi.floor.addEventListener("change", () => { moveUi.status.textContent = ""; renderBulkRoomOptions(); });
 moveUi.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (moveBusy || !deviceSettingsEnabled || !moveKeys.length) return;
   const selected = moveUi.target.value;
   const name = moveUi.new.value.trim().normalize("NFC");
   if (!selected || selected === "new" && (!name || name.length > 160)) { moveUi.status.textContent = "Odaberi prostoriju ili upiši naziv nove prostorije."; return; }
+  if (selected === "new" && moveUi.floor.value !== "unknown" && !storedFloors.some(floor => `floor:${floor.id}` === moveUi.floor.value)) {
+    moveUi.status.textContent = "Za novu prostoriju odaberi kat/grupu ili „Kat nije određen”.";
+    moveUi.floor.setCustomValidity(moveUi.status.textContent); moveUi.floor.reportValidity(); return;
+  }
+  if (selected.startsWith("room:") && !bulkRoomNames().includes(selected.slice(5))) {
+    moveUi.status.textContent = "Odaberi prostoriju na odabranom katu/grupi."; return;
+  }
   let room = selected === "auto" ? null : selected === "unassigned" ? "" : selected === "new" ? name : selected.slice(5);
   if (room) room = knownRoomNames().find((known) => known.toLocaleLowerCase("hr") === room.toLocaleLowerCase("hr")) || room;
   moveBusy = true;
@@ -1470,7 +1601,8 @@ moveUi.form.addEventListener("submit", async (event) => {
   moveUi.close.disabled = true;
   moveUi.status.textContent = "Premještam odabrane uređaje…";
   try {
-    const payload = await persistRoomChange("/api/devices/rooms", { keys: moveKeys, room });
+    const payload = await persistRoomChange("/api/devices/rooms", { keys: moveKeys, room: selected === "new" ? "" : room,
+      ...(selected === "new" ? { newRoom: { name, floorId: moveUi.floor.value === "unknown" ? null : moveUi.floor.value.slice(6) } } : {}) });
     deviceCardView?.clearSelection?.(`Premješteno uređaja: ${payload.moved}.`);
     moveUi.dialog.close();
   } catch (error) { moveUi.status.textContent = error.message; }
@@ -1625,20 +1757,22 @@ function populateCardSettings(entry) {
   cardSettings.label.placeholder = automaticLabel;
   cardSettings["label-hint"].textContent = `Prazno polje koristi automatski naziv: ${automaticLabel}.`;
   cardSettings.room.replaceChildren();
-  appendSettingsOption(cardSettings.room, "auto", `Automatski · ${device.automaticRoom?.label || "Bez prostorije"}`);
+  appendSettingsOption(cardSettings.room, "auto", `Automatski · ${device.automaticRoom ? roomDisplayName(device.automaticRoom.id || device.automaticRoom.label) : "Bez prostorije"}`);
   appendSettingsOption(cardSettings.room, "unassigned", "Bez prostorije");
   const rooms = new Set();
   for (const candidate of cardSettingsDevices()) {
-    if (candidate.room?.label) rooms.add(candidate.room.label);
-    if (candidate.automaticRoom?.label) rooms.add(candidate.automaticRoom.label);
+    if (candidate.room?.label) rooms.add(candidate.room.id || candidate.room.label);
+    if (candidate.automaticRoom?.label) rooms.add(candidate.automaticRoom.id || candidate.automaticRoom.label);
   }
   for (const saved of deviceSettingsByKey.values()) if (saved.room) rooms.add(saved.room);
   for (const room of storedRooms) rooms.add(room);
+  for (const room of storedRoomDetails) rooms.add(room.id);
   if (entry?.room) rooms.add(entry.room);
-  for (const room of [...rooms].sort((a, b) => a.localeCompare(b, "hr"))) appendSettingsOption(cardSettings.room, `room:${room}`, room);
+  for (const room of [...rooms].sort((a, b) => roomDisplayName(a).localeCompare(roomDisplayName(b), "hr"))) appendSettingsOption(cardSettings.room, `room:${room}`, roomDisplayName(room));
   appendSettingsOption(cardSettings.room, "new", "Nova prostorija…");
   cardSettings.room.value = entry?.room === "" ? "unassigned" : entry?.room ? `room:${entry.room}` : "auto";
   cardSettings["new-room"].value = "";
+  populateFloorSelect(cardSettings["new-room-floor"]);
   updateCardRoomMode();
 
   const choices = metricChoicesForDevice(device);
@@ -1749,6 +1883,7 @@ cardSettings.form.addEventListener("submit", async (event) => {
       && globalThis.IoTWidgetGrouping.deriveWidgetGrouping(id).key === cardSettingsContext.key);
   const primaryUnit = cardSettings["unit-mode"].value === "auto" ? null : customUnit ? unit : "";
   const settings = { key: cardSettingsContext.key, label: cardSettings.label.value.trim() || null, room, primaryPointId, primaryUnit, secondaryPointIds };
+  if (needsRoom) { settings.room = ""; settings.newRoom = { name: newRoom, floorId: cardSettings["new-room-floor"].value || null }; }
   // Older reconnect reads must not replace the result of this user save.
   const saveRequest = ++deviceSettingsRequest;
   setCardSettingsBusy(true);
@@ -1762,6 +1897,8 @@ cardSettings.form.addEventListener("submit", async (event) => {
       deviceSettingsByKey.set(payload.device.key, payload.device);
       if (Array.isArray(payload.rooms)) storedRooms = payload.rooms;
       if (Array.isArray(payload.roomRules)) storedRoomRules = payload.roomRules;
+      if (Array.isArray(payload.floors)) storedFloors = payload.floors;
+      if (Array.isArray(payload.roomDetails)) storedRoomDetails = payload.roomDetails;
       deviceSettingsWarning = "";
       refreshDeviceCards();
     } else {
@@ -2046,7 +2183,7 @@ async function boot() {
     demoBadge.hidden = !config.demoMode;
     widgetEditingEnabled = config.widgetEditingEnabled === true;
     deviceSettingsEnabled = config.deviceSettingsEnabled === true;
-    applyDeviceSettings(config.deviceSettings || [], config.rooms, config.roomRules);
+    applyDeviceSettings(config.deviceSettings || [], config.rooms, config.roomRules, config.floors, config.roomDetails);
     discoveryOpen.hidden = config.discoveryEnabled !== true;
     visibilityOpen.hidden = !widgetEditingEnabled;
     automaticDiscovery.hidden = !widgetEditingEnabled;
@@ -2057,9 +2194,29 @@ async function boot() {
     configureWriteValueInput();
     setupVisibilityControls(config.widgets);
     updateEmptyState();
+    generalSettingsView = globalThis.IoTDashboardSettings?.create({
+      onAction(action) {
+        if (action === "rooms") openRoomsDialog();
+        else if (action === "visibility") visibilityOpen.click();
+        else if (action === "discovery") discoveryOpen.click();
+      },
+      onPolling(state) { pollingState = state; showStatus({ state: deviceConnectionStatus }); },
+    });
+    generalSettingsView?.setSettings({ settings: config.dashboardSettings, persisted: config.settingsPersisted });
+    generalSettingsView?.setPolling(config.polling);
+    generalSettingsView?.setCapabilities(config);
+    const requestedAction = globalThis.location?.hash?.slice(1);
+    if (["rooms", "visibility", "discovery"].includes(requestedAction)) {
+      if (requestedAction === "rooms" && deviceSettingsEnabled) openRoomsDialog();
+      else if (requestedAction === "visibility" && widgetEditingEnabled) visibilityOpen.click();
+      else if (requestedAction === "discovery" && config.discoveryEnabled) discoveryOpen.click();
+    }
     void refreshDeviceMetadata();
 
     const events = new EventSource("/events");
+    events.addEventListener("dashboard-settings", event => generalSettingsView?.setSettings(JSON.parse(event.data)));
+    events.addEventListener("polling", event => generalSettingsView?.setPolling(JSON.parse(event.data)));
+    events.addEventListener("refresh-error", event => { generalSettingsView?.showError(`Provjera nakon naredbe nije uspjela: ${JSON.parse(event.data).error}`); });
     events.addEventListener("dashboard-imported", () => window.location.reload());
     events.addEventListener("snapshot", (event) => {
       reconcileSnapshot(JSON.parse(event.data));
@@ -2080,7 +2237,7 @@ async function boot() {
     events.addEventListener("device-settings", (event) => {
       ++deviceSettingsRequest;
       const payload = JSON.parse(event.data);
-      applyDeviceSettings(payload.devices, payload.rooms, payload.roomRules);
+      applyDeviceSettings(payload.devices, payload.rooms, payload.roomRules, payload.floors, payload.roomDetails);
     });
     events.addEventListener("device-settings-error", () => {
       deviceSettingsWarning = "Postavke kartica nije moguće spremiti. Provjeri datoteku konfiguracije.";

@@ -1,0 +1,45 @@
+/* Shared Materialize tokens for the device dashboard and telemetry pages. */
+.app-theme {
+  --md-sys-color-primary: var(--brand);
+  --md-sys-color-on-primary: #fff;
+  --md-sys-color-primary-container: #e1f2ed;
+  --md-sys-color-on-primary-container: var(--brand-dark);
+  --md-sys-color-secondary: var(--brand-dark);
+  --md-sys-color-secondary-container: #e7f3ef;
+  --md-sys-color-on-secondary-container: var(--brand-dark);
+  --md-sys-color-surface: #fff;
+  --md-sys-color-surface-variant: #f5f9f7;
+  --md-sys-color-on-surface: var(--ink);
+  --md-sys-color-on-surface-variant: #536c65;
+  --md-sys-color-outline: #a7bbb4;
+  --md-sys-color-outline-variant: var(--border);
+  --btn-height: 44px;
+  --btn-border-radius: 10px;
+  --btn-font-size: 14px;
+  --btn-padding: 18px;
+  --mw-input-height: 52px;
+  --mw-font-size: 15px;
+  --mw-border-radius: 10px;
+  --mw-idle-color: #6a8179;
+  --mw-hover-color: var(--brand-dark);
+  --mw-focus-color: var(--brand);
+}
+.app-theme :is(.btn, .btn-small, .btn-flat) { justify-content: center; gap: 8px; font-family: inherit; font-weight: 650; }
+.app-theme :is(.btn.outlined, .btn-small.outlined) { border-color: #bfd6ce; }
+.app-theme :is(.btn, .btn-small, .btn-flat):focus-visible { outline: 3px solid #00968866; outline-offset: 3px; }
+.app-theme select option { color: var(--ink); background: #fff; }
+
+/* Native details provide keyboard support without adding a JS accordion. */
+.app-disclosure.collapsible { margin: 0 0 12px; padding: 0; border: 1px solid var(--border); border-radius: 11px; box-shadow: none; }
+.app-disclosure > .collapsible-header { align-items: center; justify-content: space-between; gap: 11px; min-height: 54px; padding: 14px 16px; border: 0; border-radius: 11px; background: #f6faf8; color: var(--brand-dark); font-size: .88rem; font-weight: 650; list-style: none; }
+.app-disclosure > .collapsible-header::-webkit-details-marker { display: none; }
+.app-disclosure > .collapsible-header::after { content: ""; width: 8px; height: 8px; flex: 0 0 8px; margin: 0 3px 3px 10px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); }
+.app-disclosure[open] > .collapsible-header { border-bottom: 1px solid var(--border); border-radius: 11px 11px 0 0; }
+.app-disclosure[open] > .collapsible-header::after { transform: rotate(225deg); margin-bottom: -3px; }
+.app-disclosure > .collapsible-header:hover { background: #edf6f1; }
+.app-disclosure > .collapsible-header:focus-visible { outline: 3px solid #00968866; outline-offset: 2px; }
+.app-disclosure > .collapsible-body { max-height: none; padding: 18px; overflow: visible; border: 0; }
+@media (max-width: 600px) {
+  .app-disclosure > .collapsible-header { padding: 13px; gap: 9px; font-size: .82rem; }
+  .app-disclosure > .collapsible-body { padding: 14px; }
+}

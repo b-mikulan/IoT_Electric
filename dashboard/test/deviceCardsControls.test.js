@@ -52,7 +52,7 @@ function setup(t, initialDevices, onWrite, demo = false, initialReadAt, options 
   globalThis.IoTDeviceModel = options.model || { buildDevices: () => devices };
   const container = new Element("section");
   const view = create({ container, onWrite, onSettings: options.onSettings, onRooms: options.onRooms, onMove: options.onMove });
-  const update = (next = devices, nextReadAt = readAt, overrides = {}) => { devices = next; readAt = nextReadAt; view.update({ status: "connected", demo, readAt, settingsEnabled: options.settingsEnabled, ...overrides }); };
+  const update = (next = devices, nextReadAt = readAt, overrides = {}) => { devices = next; readAt = nextReadAt; view.update({ status: "connected", demo, readAt, settingsEnabled: options.settingsEnabled, floors: options.floors, roomDetails: options.roomDetails, ...overrides }); };
   update();
   t.after(() => { view.destroy(); globalThis.document = previousDocument; globalThis.IoTDeviceModel = previousModel; });
   return { container, update, view };
@@ -313,6 +313,7 @@ test("persisted card title, room and device-local metrics update without changin
   assert.equal(byClass(main, "dc-metric-value")[0].textContent, "24,1 °C");
   assert.equal(byClass(main, "dc-metric-label")[0].textContent, "Temperatura");
   assert.equal(byClass(container, "dc-metric-value")[1].textContent, "11");
+  byClass(container, "dc-floor-filter").find(button => button.dataset.floor === "unknown").dispatch("click");
   const filters = byClass(container, "dc-room-filter");
   const dining = filters.find((entry) => entry.textContent === "Dining room");
   dining.dispatch("click");
@@ -333,7 +334,7 @@ test("persisted card title, room and device-local metrics update without changin
   assert.equal(byClass(container, "dc-metric-value")[0].textContent, "11");
   assert.equal(byClass(container, "dc-room-filter").some((entry) => entry.textContent === "Dining room"), false);
   assert.equal(byClass(container, "dc-room-filter").some((entry) => entry.textContent === "Bedroom"), true);
-  assert.equal(byClass(container, "dc-room-filter")[0].attributes["aria-pressed"], "true");
+  assert.equal(byClass(container, "dc-floor-filter").find(button => button.dataset.floor === "unknown").attributes["aria-pressed"], "true");
 });
 
 test("a missing chosen metric displays an unavailable placeholder instead of owner feedback", (t) => {
@@ -418,6 +419,7 @@ test("device search and type filters combine with room selection and survive rea
   search.dispatch("input");
   type.value = "all";
   type.dispatch("change");
+  byClass(container, "dc-floor-filter").find(button => button.dataset.floor === "unknown").dispatch("click");
   byClass(container, "dc-room-filter").find((button) => button.textContent === "Kitchen").dispatch("click");
   assert.equal(visible().length, 2);
 });
@@ -449,6 +451,7 @@ test("bulk selection follows shown cards, survives refreshes and filters, and pa
   assert.equal(byClass(container, "dc-selection-count")[0].textContent, "Odabrano: 2");
   byClass(container, "dc-move-selection")[0].dispatch("click");
   assert.deepEqual(moves, [[climate.key, light.key]]);
+  byClass(container, "dc-floor-filter").find(button => button.dataset.floor === "unknown").dispatch("click");
   byClass(container, "dc-room-filter").find((button) => button.textContent === "Empty room").dispatch("click");
   assert.equal(byClass(container, "dc-card").filter((card) => !card.hidden).length, 0);
   assert.equal(byClass(container, "dc-selection-count")[0].textContent, "Odabrano: 2");
@@ -552,6 +555,119 @@ function sensorWidgets(count = 30) {
   return Array.from({ length: count }, (_, index) => ({ id: `01/ES/Application/Items/Sensor${index}/Values/RmTmp`, value: 20, state: 0, unit: "°C", updatedAt: "initial" }));
 }
 
+function selectFloor(container, key) {
+  const button = byClass(container, "dc-floor-filter").find(entry => entry.dataset.floor === key);
+  assert(button, `Missing floor ${key}`);
+  button.dispatch("click");
+  return button;
+}
+
+test("many rooms stay behind compact floor buttons and selecting a floor shows only its rooms", t => {
+  const devices = Array.from({ length: 52 }, (_, index) => ({
+    ...device("sensor", {}), key: `ES/S${index}`, label: `S${index}`,
+    room: { id: `r${index}`, label: index < 39 ? `Room ${index % 13}` : `Room · ZX${index}`, floorId: index < 39 ? `floor:${Math.floor(index / 13) + 1}` : null },
+  }));
+  const { container, update } = setup(t, devices, undefined, false, undefined, { floors: [1, 2, 3].map(n => ({ id: `floor:${n}`, name: `${n}. kat` })) });
+  const roomList = byClass(container, "dc-room-filters")[0];
+  assert.equal(roomList.hidden, true);
+  assert.equal(byClass(container, "dc-room-filter").length, 1);
+  assert.deepEqual(byClass(container, "dc-floor-filter").map(button => button.dataset.floor), ["floor:1", "floor:2", "floor:3", "unknown"]);
+  const firstFloor = selectFloor(container, "floor:1");
+  assert.equal(firstFloor.attributes["aria-pressed"], "true");
+  assert.equal(roomList.hidden, false);
+  assert.equal(roomList.children.length, 14);
+  assert.equal(roomList.children.some(button => /kat|ZX/.test(button.textContent)), false, "the selected floor is already shown above the room list");
+  assert.equal(byClass(container, "dc-card").length, 13);
+  assert.match(byClass(container, "dc-summary")[0].textContent, /13 od 52/);
+  byClass(container, "dc-room-filter").find(button => button.dataset.room === "room:r1").dispatch("click");
+  assert.equal(byClass(container, "dc-card").length, 1);
+  assert.equal(byClass(container, "dc-card-title")[0].textContent, "S1");
+  update(devices);
+  assert.equal(byClass(container, "dc-floor-filter").find(button => button.dataset.floor === "floor:1"), firstFloor);
+  assert.equal(byClass(container, "dc-card").length, 1);
+  selectFloor(container, "floor:2");
+  assert.equal(byClass(container, "dc-card").length, 13);
+  assert.equal(roomList.children.every(button => !button.dataset.room.startsWith("room:") || devices.slice(13, 26).some(device => button.dataset.room === `room:${device.room.id}`)), true);
+  byClass(container, "dc-room-filter").find(button => button.dataset.room === "all").dispatch("click");
+  assert.equal(roomList.hidden, true);
+  assert.equal(byClass(container, "dc-card").length, 24);
+});
+
+test("unknown floors, level zero, numbered room names and empty registered rooms remain separately accessible", t => {
+  const devices = [
+    { ...device("sensor", {}), key: "ES/Level0", room: { label: "Guard room", floorId: "floor:0" } },
+    { ...device("sensor", {}), key: "ES/Floor3", room: { label: "Kitchen", floorId: "floor:3" } },
+    { ...device("sensor", {}), key: "ES/Unknown", room: { label: "Office 301 · ZX11" } },
+    { ...device("sensor", {}), key: "ES/Unassigned" },
+  ];
+  const { container, update } = setup(t, devices);
+  update(devices, undefined, { rooms: ["empty"], floors: [0, 2, 3].map(n => ({ id: `floor:${n}`, name: `${n}. kat` })), roomDetails: [{ id: "empty", name: "Empty room", floorId: "floor:2" }] });
+  assert.deepEqual(byClass(container, "dc-floor-filter").map(button => button.dataset.floor), ["floor:0", "floor:2", "floor:3", "unknown"]);
+  selectFloor(container, "floor:0");
+  assert.equal(byClass(container, "dc-card")[0].dataset.deviceKey, "ES/Level0");
+  selectFloor(container, "unknown");
+  assert.equal(byClass(container, "dc-card")[0].dataset.deviceKey, "ES/Unknown");
+  assert(byClass(container, "dc-room-filter").some(button => button.textContent === "Office 301 · ZX11"));
+  selectFloor(container, "floor:2");
+  assert.equal(byClass(container, "dc-card").length, 0);
+  assert(byClass(container, "dc-room-filter").some(button => button.textContent === "Empty room"));
+  byClass(container, "dc-room-filter").find(button => button.dataset.room === "unassigned").dispatch("click");
+  assert.equal(byClass(container, "dc-card")[0].dataset.deviceKey, "ES/Unassigned");
+  assert.equal(byClass(container, "dc-room-filters")[0].hidden, true);
+  assert(byClass(container, "dc-floor-filter").every(button => button.attributes["aria-pressed"] === "false"));
+});
+
+test("floor filtering combines with search, type, paging and selection across unloaded devices", t => {
+  const devices = Array.from({ length: 90 }, (_, index) => ({
+    ...device(index % 2 ? "light" : "sensor", {}), key: `ES/Sensor${index}`, label: `Sensor ${index}`,
+    room: { id: `kitchen-${index < 60 ? 1 : 2}`, label: "Kitchen", floorId: `floor:${index < 60 ? 1 : 2}` },
+  }));
+  const moves = [];
+  const { container, update } = setup(t, devices, undefined, false, undefined, { onMove: selected => moves.push(selected.map(d => d.key)), floors: [1, 2].map(n => ({ id: `floor:${n}`, name: `${n}. kat` })) });
+  update(devices, undefined, { roomEditingEnabled: true });
+  selectFloor(container, "floor:1");
+  assert.equal(byClass(container, "dc-card").length, 24);
+  byClass(container, "dc-load-button")[0].dispatch("click");
+  assert.equal(byClass(container, "dc-card").length, 48);
+  byClass(container, "dc-select-devices")[0].dispatch("click");
+  byClass(container, "dc-select-shown")[0].dispatch("click");
+  assert.equal(byClass(container, "dc-selection-count")[0].textContent, "Odabrano: 60");
+  selectFloor(container, "floor:2");
+  assert.equal(byClass(container, "dc-card").length, 24, "floor changes reset progressive rendering");
+  const type = byClass(container, "dc-type-filter")[0];
+  type.value = "sensor"; type.dispatch("change");
+  assert.equal(byClass(container, "dc-card").length, 15);
+  const search = byClass(container, "dc-search")[0];
+  search.value = "sensor 82"; search.dispatch("input");
+  assert.equal(byClass(container, "dc-card").length, 1);
+  assert.equal(byClass(container, "dc-card-title")[0].textContent, "Sensor 82");
+  update(devices, undefined, { roomEditingEnabled: true });
+  assert.equal(byClass(container, "dc-card").length, 1);
+  byClass(container, "dc-move-selection")[0].dispatch("click");
+  assert.deepEqual(moves, [devices.slice(0, 60).map(d => d.key)]);
+});
+
+test("incremental readings retain floor selection and button identity, and removed floors reset safely", t => {
+  const model = require("../public/deviceModel");
+  const first = { id: "01/ES/Zones/Z101/S1/Values/RmTmp", value: 20, state: 0, unit: "°C" };
+  const second = { id: "01/ES/Zones/Z201/S2/Values/RmTmp", value: 21, state: 0, unit: "°C" };
+  const { container, update, view } = setup(t, [], undefined, false, "first", { model });
+  const options = { widgets: [first, second], roomByZone: { "ES/Zones/Z101": "Kitchen1", "ES/Zones/Z201": "Kitchen2" }, floors: [1, 2].map(n => ({ id: `floor:${n}`, name: `${n}. kat` })), roomDetails: [1, 2].map(n => ({ id: `Kitchen${n}`, name: "Kitchen", floorId: `floor:${n}` })) };
+  update([], "first", options);
+  const button = selectFloor(container, "floor:2");
+  const room = byClass(container, "dc-room-filters")[0].children[1];
+  room.dispatch("click");
+  assert.deepEqual(view.updateValues({ widgets: [{ id: second.id, value: 24 }], readAt: "second" }), { changedDevices: 1, updatedCards: 1 });
+  assert.equal(byClass(container, "dc-floor-filter").find(entry => entry.dataset.floor === "floor:2"), button);
+  assert.equal(byClass(container, "dc-room-filters")[0].children[1], room);
+  assert.equal(byClass(container, "dc-metric-value")[0].textContent, "24 °C");
+  update([], "third", { ...options, widgets: [first], floors: options.floors.slice(0, 1), roomDetails: options.roomDetails.slice(0, 1) });
+  assert.equal(byClass(container, "dc-room-filters")[0].hidden, true);
+  assert.equal(byClass(container, "dc-room-filter")[0].attributes["aria-pressed"], "true");
+  assert.equal(byClass(container, "dc-card").length, 1);
+  assert.equal(byClass(container, "dc-card")[0].dataset.deviceKey, "ES/Zones/Z101/S1");
+});
+
 test("incremental values touch only the changed visible card and skip filtering and unchanged syncs", (t) => {
   const widgets = sensorWidgets();
   const { container, view, update } = setup(t, [], undefined, false, "initial", { model: require("../public/deviceModel") });
@@ -642,5 +758,17 @@ test("a changed read that contradicts a no-op target cannot confirm that command
   view.updateValues({ readAt: "second" });
   assert.match(byClass(container, "dc-command-status")[0].textContent, /Čekam novo očitanje/);
   view.updateValues({ widgets: [{ id: set.id, value: 40, updatedAt: "third" }], readAt: "third" });
+  assert.match(byClass(container, "dc-command-status")[0].textContent, /potvrđena je novim očitanjem/);
+});
+
+test("only the command's own fresh point can confirm a partial read, including a no-op command", async t => {
+  const a = { id: "01/ES/Application/Items/LightA/Values/LtPct", value: 40, state: 0, writable: true, updatedAt: "initial", readAt: "first" };
+  const b = { ...a, id: "01/ES/Application/Items/LightB/Values/LtPct" };
+  const { container, view, update } = setup(t, [], async () => {}, false, "full-first", { model: require("../public/deviceModel") });
+  update([], "full-first", { widgets: [a, b], metadataById: { [a.id]: { writeable: 1 }, [b.id]: { writeable: 1 } } });
+  const input = byClass(container, "dc-range")[0]; input.value = "40"; input.dispatch("change"); await flush();
+  view.updateValues({ widgets: [{ id: b.id, readAt: "other-room" }] });
+  assert.match(byClass(container, "dc-command-status")[0].textContent, /Čekam novo očitanje/);
+  view.updateValues({ widgets: [{ id: a.id, readAt: "own-room" }] });
   assert.match(byClass(container, "dc-command-status")[0].textContent, /potvrđena je novim očitanjem/);
 });

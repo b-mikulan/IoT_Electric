@@ -25,7 +25,7 @@ async function selectFile() {
     if (current !== selection) return;
     selectedDocument = document; previewToken = payload.token;
     transferUi.counts.replaceChildren();
-    for (const [label, count] of [["Pointova", payload.summary.points], ["Kartica uređaja", payload.summary.devices], ["Prostorija", payload.summary.rooms], ["Točaka s upisom", payload.summary.writablePoints]]) {
+    for (const [label, count] of [["Pointova", payload.summary.points], ["Kartica uređaja", payload.summary.devices], ["Prostorija", payload.summary.rooms], ...(payload.summary.floors !== undefined ? [["Katova / grupa", payload.summary.floors]] : []), ["Točaka s upisom", payload.summary.writablePoints]]) {
       const row = window.document.createElement("div"), name = window.document.createElement("dt"), value = window.document.createElement("dd");
       name.textContent = label; value.textContent = count.toLocaleString("hr-HR"); row.append(name, value); transferUi.counts.append(row);
     }

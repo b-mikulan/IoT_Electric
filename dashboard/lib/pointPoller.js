@@ -39,6 +39,7 @@ function normalizeWidget(widget, index) {
   delete normalized.state;
   delete normalized.error;
   delete normalized.updatedAt;
+  delete normalized.readAt;
   normalized.writable = normalized.writable === true;
   normalized.visible = normalized.visible !== false;
   normalized.group = widgetGroup(normalized);
@@ -133,6 +134,14 @@ class PointPoller extends EventEmitter {
   #writeRefreshTimers = new Set();
 
   #writeRefreshGeneration = 0;
+  #paused = false;
+  #readingKind = null;
+  #readingManual = false;
+  #activeReadGeneration = null;
+  #priorityIds = new Set();
+  #priorityPromise = null;
+  #resolveWriteRefreshIds = null;
+  #pendingWriteIds = new Set();
 
   constructor({
     middlewareUrl,
@@ -232,16 +241,72 @@ class PointPoller extends EventEmitter {
     for (const timer of this.#writeRefreshTimers) clearTimeout(timer);
     this.#writeRefreshTimers.clear();
     this.#writeRefreshGeneration += 1;
+    this.#pendingWriteIds.clear();
+    this.#priorityIds.clear();
 
     return this;
   }
 
-  async poll() {
+  getPollingState() {
+    return { paused: this.#paused, active: this.#readingKind !== null, scope: this.#readingKind, manual: this.#readingManual };
+  }
+
+  configurePolling({ intervalMs, timeoutMs, readBatchSize, readBatchDelayMs }) {
+    this.#intervalMs = intervalMs;
+    this.#timeoutMs = timeoutMs;
+    this.#readBatchSize = readBatchSize;
+    this.#readBatchDelayMs = readBatchDelayMs;
+    if (this.#timer !== null) {
+      clearInterval(this.#timer);
+      this.#timer = setInterval(() => void this.poll(), this.#intervalMs);
+      this.#timer.unref?.();
+    }
+    this.emit("polling", this.getPollingState());
+  }
+
+  setPaused(paused) {
+    if (paused === this.#paused) return this.getPollingState();
+    this.#paused = paused;
+    if (paused && this.#readingKind === "all" && !this.#readingManual) this.#readGeneration += 1;
+    this.emit("polling", this.getPollingState());
+    if (!paused) void this.#resumePolling();
+    return this.getPollingState();
+  }
+
+  setWriteRefreshResolver(resolver) {
+    this.#resolveWriteRefreshIds = resolver;
+  }
+
+  async #resumePolling() {
+    const generation = this.#writeRefreshGeneration;
+    if (this.#priorityPromise) await this.#priorityPromise;
+    if (this.#pollPromise) await this.#pollPromise;
+    if (!this.#paused && generation === this.#writeRefreshGeneration) await this.poll();
+  }
+
+  async poll({ manual = false } = {}) {
+    if (this.#paused && !manual) return this.getSnapshot();
+    if (this.#priorityPromise) {
+      await this.#priorityPromise;
+      return manual ? this.poll({ manual: true }) : this.getSnapshot();
+    }
     if (this.#pollPromise) {
-      return this.#pollPromise;
+      const operation = this.#pollPromise;
+      const needsRead = manual && (this.#readingKind === "partial" || this.#activeReadGeneration !== this.#readGeneration);
+      await operation;
+      if (needsRead) return this.poll({ manual: true });
+      return this.getSnapshot();
     }
 
-    const operation = this.#performPoll();
+    return this.#runRead(null, manual);
+  }
+
+  async #runRead(ids = null, manual = false) {
+    this.#readingKind = ids ? "partial" : "all";
+    this.#readingManual = manual;
+    this.#activeReadGeneration = this.#readGeneration;
+    this.emit("polling", this.getPollingState());
+    const operation = this.#performPoll(ids);
     this.#pollPromise = operation;
 
     try {
@@ -249,12 +314,37 @@ class PointPoller extends EventEmitter {
     } finally {
       if (this.#pollPromise === operation) {
         this.#pollPromise = null;
+        this.#readingKind = null;
+        this.#readingManual = false;
+        this.#activeReadGeneration = null;
+        this.emit("polling", this.getPollingState());
       }
     }
   }
 
   getSnapshot() {
     return clone(this.snapshot);
+  }
+
+  async refreshPoints(ids) {
+    const configured = new Set(this.#widgets.map(widget => widget.id));
+    for (const id of ids) if (configured.has(id)) this.#priorityIds.add(id);
+    if (!this.#priorityIds.size) return this.getSnapshot();
+    if (this.#readingKind === "all") this.#readGeneration += 1;
+    if (this.#priorityPromise) return this.#priorityPromise;
+    const generation = this.#writeRefreshGeneration;
+    const operation = (async () => {
+      if (this.#pollPromise) await this.#pollPromise;
+      while (this.#priorityIds.size && generation === this.#writeRefreshGeneration) {
+        const pending = [...this.#priorityIds];
+        this.#priorityIds.clear();
+        await this.#runRead(pending);
+      }
+      return this.getSnapshot();
+    })();
+    this.#priorityPromise = operation;
+    try { return await operation; }
+    finally { if (this.#priorityPromise === operation) this.#priorityPromise = null; }
   }
 
   replaceWidgets(widgets) {
@@ -264,6 +354,8 @@ class PointPoller extends EventEmitter {
     this.#writeRefreshGeneration += 1;
     for (const timer of this.#writeRefreshTimers) clearTimeout(timer);
     this.#writeRefreshTimers.clear();
+    this.#pendingWriteIds.clear();
+    this.#priorityIds.clear();
     this.#widgets = next;
     this.snapshot = { status: "idle", syncedAt: null, error: null, widgets: next.map((widget) => ({
       ...clone(widget), value: previous.get(widget.id)?.value ?? null,
@@ -621,12 +713,17 @@ class PointPoller extends EventEmitter {
       }
 
       if (refreshGeneration === this.#writeRefreshGeneration) {
-        const refresh = setTimeout(() => {
-          this.#writeRefreshTimers.delete(refresh);
-          void this.#refreshAfterWrite(refreshGeneration);
-        }, 2_000);
-        this.#writeRefreshTimers.add(refresh);
-        refresh.unref?.();
+        this.#pendingWriteIds.add(pointId);
+        for (const timer of this.#writeRefreshTimers) clearTimeout(timer);
+        this.#writeRefreshTimers.clear();
+        {
+          const refresh = setTimeout(() => {
+            this.#writeRefreshTimers.delete(refresh);
+            void this.#refreshAfterWrite(refreshGeneration);
+          }, 2_000);
+          this.#writeRefreshTimers.add(refresh);
+          refresh.unref?.();
+        }
       }
 
       return {
@@ -662,10 +759,17 @@ class PointPoller extends EventEmitter {
   }
 
   async #refreshAfterWrite(generation) {
-    // A read already in flight can predate the command. Finish it, then read
-    // every configured point again so related feedback is refreshed as well.
-    if (this.#pollPromise) await this.#pollPromise;
-    if (generation === this.#writeRefreshGeneration) await this.poll();
+    if (generation !== this.#writeRefreshGeneration) return;
+    const writtenIds = [...this.#pendingWriteIds];
+    this.#pendingWriteIds.clear();
+    const ids = new Set(writtenIds);
+    for (const id of writtenIds) {
+      try {
+        const related = await this.#resolveWriteRefreshIds?.(id);
+        for (const relatedId of related || []) ids.add(relatedId);
+      } catch { /* The written point is always read back, even if room lookup fails. */ }
+    }
+    if (generation === this.#writeRefreshGeneration) await this.refreshPoints([...ids]);
   }
 
   #discoveryResponse(containerId, items, payload, exactMatch = false) {
@@ -793,21 +897,28 @@ class PointPoller extends EventEmitter {
     return this.getSnapshot();
   }
 
-  async #performPoll() {
+  async #performPoll(ids = null) {
     const generation = this.#readGeneration;
+    const selectedIds = ids ? new Set(ids) : null;
+    const selectedWidgets = selectedIds ? this.#widgets.filter(widget => selectedIds.has(widget.id)) : this.#widgets;
+    if (selectedIds && !selectedWidgets.length) return this.getSnapshot();
     if (this.#widgets.length === 0) return this.#emptySnapshot();
     try {
       const points = this.#demoMode
         ? this.#createDemoPoints()
-        : await this.#fetchPoints();
+        : await this.#fetchPoints(selectedWidgets);
       if (generation !== this.#readGeneration) return this.getSnapshot();
       if (this.#widgets.length === 0) return this.#emptySnapshot();
       const syncedAt = timestampFrom(this.#now);
+      const eventClock = selectedIds
+        ? { scope: "partial", readAt: syncedAt, pointIds: selectedWidgets.map(widget => widget.id) }
+        : { syncedAt };
       const previousById = new Map(
         this.snapshot.widgets.map((widget) => [widget.id, widget])
       );
       const evaluatedWidgets = this.#widgets.map((widget) => {
         const previous = previousById.get(widget.id);
+        if (selectedIds && !selectedIds.has(widget.id)) return { changed: false, widget: previous };
         const nextPoint = {
           ...clone(widget),
           ...(points.get(widget.id) || {
@@ -823,19 +934,20 @@ class PointPoller extends EventEmitter {
           widget: {
             ...nextPoint,
             updatedAt: changed ? syncedAt : previous.updatedAt,
+            readAt: syncedAt,
           },
         };
       });
       const nextWidgets = evaluatedWidgets.map(({ widget }) => widget);
       const changedWidgets = evaluatedWidgets
-        .filter(({ changed }) => changed)
+        .filter(({ changed, widget }) => changed || selectedIds?.has(widget.id))
         .map(({ widget }) => widget);
       const previousStatus = this.snapshot.status;
 
       this.snapshot = {
-        status: "connected",
-        syncedAt,
-        error: null,
+        status: selectedIds ? this.snapshot.status : "connected",
+        syncedAt: selectedIds ? this.snapshot.syncedAt : syncedAt,
+        error: selectedIds ? this.snapshot.error : null,
         widgets: nextWidgets,
       };
 
@@ -844,23 +956,23 @@ class PointPoller extends EventEmitter {
       // readback must never use a new read timestamp with older point values.
       if (changedWidgets.length > 0) {
         this.emit("update", {
-          syncedAt,
+          ...eventClock,
           widgets: clone(changedWidgets),
         });
       }
 
-      if (previousStatus !== "connected") {
+      if (previousStatus !== this.snapshot.status) {
         this.emit("status", {
           status: "connected",
-          syncedAt,
+          ...(selectedIds ? { syncedAt: this.snapshot.syncedAt, ...eventClock } : eventClock),
           error: null,
         });
       }
 
       this.emit("sync", {
-        status: "connected",
-        syncedAt,
-        error: null,
+        status: this.snapshot.status,
+        ...eventClock,
+        error: this.snapshot.error,
       });
 
       return this.getSnapshot();
@@ -868,6 +980,10 @@ class PointPoller extends EventEmitter {
       if (generation !== this.#readGeneration) return this.getSnapshot();
       if (this.#widgets.length === 0) return this.#emptySnapshot();
       const message = error instanceof Error ? error.message : String(error);
+      if (selectedIds) {
+        this.emit("refresh-error", { scope: "partial", pointIds: [...selectedIds], error: message });
+        return this.getSnapshot();
+      }
       const previousStatus = this.snapshot.status;
       const previousError = this.snapshot.error;
 
@@ -889,12 +1005,12 @@ class PointPoller extends EventEmitter {
     }
   }
 
-  async #fetchPoints() {
+  async #fetchPoints(widgets = this.#widgets) {
     const generation = this.#readGeneration;
     const batches = [];
     let batch = [];
     let bytes = 12;
-    for (const { id } of this.#widgets) {
+    for (const { id } of widgets) {
       const size = Buffer.byteLength(JSON.stringify(id), "utf8") + 1;
       if (batch.length > 0 && (batch.length >= this.#readBatchSize || bytes + size > 60_000)) {
         batches.push(batch);

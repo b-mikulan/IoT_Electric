@@ -11,6 +11,31 @@ IoT Electric contains two small services: a REST middleware for Schneider EcoStr
 
 The middleware exposes public health and Swagger pages at `/health` and `/api-docs`. All `/api/*` endpoints require HTTP Basic authentication. Open Swagger and use **Authorize** before trying an API endpoint.
 
+## Architecture
+
+The dashboard backend holds the middleware credentials and shares one live-value poller across connected browsers. Browser actions use HTTP requests; readings and configuration changes arrive through Server-Sent Events (SSE).
+
+```mermaid
+flowchart TD
+    Browser["Browser dashboard"]
+    Dashboard["Dashboard backend"]
+    Middleware["REST middleware"]
+    Controller["EWS controller"]
+    Settings["Point and card configuration"]
+    Metadata["Saved catalog metadata"]
+
+    Browser -->|HTTP requests and commands| Dashboard
+    Dashboard -->|SSE readings and updates| Browser
+    Dashboard -->|Authenticated REST requests| Middleware
+    Middleware <-->|SOAP over HTTPS| Controller
+    Dashboard <-->|Load and save JSON| Settings
+    Metadata -->|Descriptions and room labels| Dashboard
+```
+
+Live values are cached in dashboard memory. Point definitions and card preferences persist as JSON files in the mounted configuration directory. The separate SQLite building catalog supports offline inventory and export; the dashboard uses exported metadata without opening the catalog database. History and alarms are requested from the controller through the middleware.
+
+See the dashboard diagrams for [live refresh](dashboard/README.md#live-refresh), [device-card grouping](dashboard/README.md#experimental-device-cards), [command validation](dashboard/README.md#device-command-flow), and [automatic discovery](dashboard/README.md#automatic-discovery-flow).
+
 ## EWS container discovery
 
 `GET /api/containers?id=...` reads a container and automatically follows EWS continuation pages. Repeated container headers are combined; child containers, values, histories and alarms are merged by their exact, case-sensitive IDs. The existing `containers` and `errors` arrays remain available. History/alarm items retain their original `Id`/`Name` field names.

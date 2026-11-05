@@ -8,8 +8,10 @@
       content="Live pregled vrijednosti s IoT Electric PLC kontrolera"
     />
     <title>IoT Electric · Tehnički prikaz vrijednosti</title>
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg" />
     <link rel="stylesheet" href="/vendor/materialize/materialize.min.css" />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/dashboardSettings.css" />
     <link rel="stylesheet" href="/deviceCards.css" />
   </head>
   <body>
@@ -42,10 +44,17 @@
         </div>
         <div class="intro-actions">
           <a class="btn" href="/">Natrag na uređaje</a>
+          <button id="refresh-pause" class="refresh-pause" type="button" aria-label="Pauziraj osvježavanje" aria-pressed="false" disabled>
+            <svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14" stroke-width="3" stroke-linecap="round" /></svg>
+            <svg class="resume-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 10 7-10 7Z" fill="currentColor" stroke-linejoin="round" /></svg><span>Pauziraj</span>
+          </button>
+          <button id="general-settings-open" class="general-settings-open" type="button" aria-haspopup="dialog" aria-label="Postavke stranice" title="Postavke stranice">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 3-.7 2.3-2 .9L5 5.7 3 9l1.8 1.7v2.6L3 15l2 3.3 2.3-.5 2 .9L10 21h4l.7-2.3 2-.9 2.3.5 2-3.3-1.8-1.7v-2.6L21 9l-2-3.3-2.3.5-2-.9L14 3Z" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" /></svg><span>Postavke</span>
+          </button>
           <div id="demo-badge" class="demo-badge" hidden>Demo podaci</div>
           <button
             id="visibility-open"
-            class="dashboard-menu-open"
+            class="dashboard-menu-open general-settings-shortcut"
             type="button"
             title="Uredi prikaz dashboarda"
             aria-label="Uredi prikaz dashboarda"
@@ -57,7 +66,7 @@
           </button>
           <button
             id="discovery-open"
-            class="discovery-open"
+            class="discovery-open general-settings-shortcut"
             type="button"
             title="Pronađi nove objekte"
             aria-label="Pronađi nove objekte"
@@ -281,7 +290,7 @@
           </div>
           <div id="device-settings-new-room-field" class="settings-field settings-field-wide" hidden>
             <label for="device-settings-new-room">Naziv nove prostorije</label>
-            <input id="device-settings-new-room" type="text" maxlength="160" placeholder="npr. Dnevni boravak" />
+            <input id="device-settings-new-room" type="text" maxlength="160" placeholder="npr. Dnevni boravak" /><label for="device-settings-new-room-floor">Kat / grupa</label><select id="device-settings-new-room-floor" class="browser-default"></select>
           </div>
           <div class="device-settings-section settings-field-wide">
             <h3>Očitanja na kartici</h3>
@@ -349,10 +358,23 @@
           <button id="rooms-close" class="dialog-close" type="button" aria-label="Zatvori prostorije">×</button>
         </header>
         <p class="settings-context">Stvori prostoriju, zatim odaberi uređaje i premjesti ih zajedno. Prostorije ostaju spremljene i dok su prazne.</p>
+        <details class="floor-management" id="floors-management">
+          <summary>Uredi katove i grupe</summary>
+          <p class="settings-context">Dodaj kat ili vlastitu grupu, primjerice 1. kat A. Prostorije grupiraš zasebnim odabirom.</p>
+          <form id="floors-form" class="room-input-row"><div><label class="room-field-label" for="floors-name">Naziv novog kata / grupe</label><input id="floors-name" type="text" maxlength="160" required placeholder="npr. 1. kat A" /></div><button id="floors-create" class="btn" type="submit">Dodaj grupu</button></form>
+          <ul id="floors-list" class="room-registry-list floor-registry-list" aria-label="Katovi i grupe"></ul>
+          <section id="floors-editor" class="room-editor" hidden>
+            <h3 id="floors-selected"></h3>
+            <form id="floors-rename-form" class="room-input-row"><div><label class="room-field-label" for="floors-rename-name">Naziv kata / grupe</label><input id="floors-rename-name" type="text" maxlength="160" required /></div><button id="floors-rename" class="btn" type="submit">Spremi grupu</button></form>
+            <button id="floors-delete" class="btn-flat danger-action" type="button">Izbriši grupu</button>
+            <div id="floors-delete-confirmation" class="room-delete-confirmation" hidden><p id="floors-delete-message"></p><div class="room-delete-actions"><button id="floors-delete-cancel" class="btn-flat" type="button">Odustani</button><button id="floors-delete-confirm" class="btn" type="button">Da, izbriši grupu</button></div></div>
+          </section>
+          <p id="floors-status" class="discovery-status" role="status" aria-live="polite"></p>
+        </details>
         <form id="rooms-form" class="room-create-form">
-          <label class="room-field-label" for="rooms-name">Naziv nove prostorije</label>
-          <div class="room-input-row">
-            <input id="rooms-name" type="text" maxlength="160" required placeholder="npr. Ured 101" />
+          <div class="room-create-grid">
+            <div><label class="room-field-label" for="rooms-name">Naziv nove prostorije</label><input id="rooms-name" type="text" maxlength="160" required placeholder="npr. Ured 101" /></div>
+            <div><label class="room-field-label" for="rooms-floor">Kat / grupa</label><select id="rooms-floor" class="browser-default"></select></div>
             <button id="rooms-create" class="btn" type="submit">Stvori prostoriju</button>
           </div>
         </form>
@@ -363,10 +385,10 @@
           <h3 id="rooms-selected"></h3>
           <p id="rooms-summary" class="settings-context"></p>
           <form id="rooms-rename-form" class="room-edit-form">
-            <label class="room-field-label" for="rooms-rename-name">Naziv odabrane prostorije</label>
-            <div class="room-input-row">
-              <input id="rooms-rename-name" type="text" maxlength="160" required />
-              <button id="rooms-rename" class="btn" type="submit">Spremi naziv</button>
+            <div class="room-create-grid">
+              <div><label class="room-field-label" for="rooms-rename-name">Naziv prostorije</label><input id="rooms-rename-name" type="text" maxlength="160" required /></div>
+              <div><label class="room-field-label" for="rooms-edit-floor">Kat / grupa</label><select id="rooms-edit-floor" class="browser-default"></select></div>
+              <button id="rooms-rename" class="btn" type="submit">Spremi prostoriju</button>
             </div>
           </form>
           <button id="rooms-delete" class="btn-flat danger-action" type="button">Izbriši prostoriju</button>
@@ -389,7 +411,9 @@
         </header>
         <p id="device-room-summary" class="settings-context"></p>
         <form id="device-room-form" class="settings-form">
-          <div class="settings-field settings-field-wide"><label for="device-room-target">Prostorija</label><select id="device-room-target" class="browser-default" required></select></div>
+          <div class="settings-field"><label for="device-room-floor">Kat / grupa</label><select id="device-room-floor" class="browser-default"></select></div>
+          <div class="settings-field"><label for="device-room-target">Prostorija</label><select id="device-room-target" class="browser-default" required></select></div>
+          <p id="device-room-hint" class="settings-context settings-field-wide"></p>
           <div id="device-room-new-field" class="settings-field settings-field-wide" hidden><label for="device-room-new">Naziv nove prostorije</label><input id="device-room-new" type="text" maxlength="160" /></div>
           <div class="settings-actions settings-field-wide">
             <button id="device-room-cancel" class="btn-flat" type="button">Odustani</button>
@@ -550,6 +574,7 @@
     </noscript>
     <script src="/widgetGrouping.js" defer></script>
     <script src="/deviceModel.js" defer></script>
+    <script src="/dashboardSettings.js" defer></script>
     <script src="/app.js" defer></script>
   </body>
 </html>

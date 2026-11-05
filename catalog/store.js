@@ -166,6 +166,26 @@ class BuildingCatalog {
     };
   }
 
+  listHistories({ search = "", parentId, ...options } = {}) {
+    const snapshot = this.snapshot(options);
+    const { limit, offset } = pagination(options);
+    const conditions = ["o.snapshot_id = ?", "o.kind = 'history'"];
+    const params = [snapshot.id];
+    if (search) { conditions.push("catalog_contains(o.id || ' ' || o.name || ' ' || o.description, ?)"); params.push(search); }
+    if (parentId !== undefined) {
+      conditions.push("EXISTS (SELECT 1 FROM relations r WHERE r.snapshot_id = o.snapshot_id AND r.kind = 'history' AND r.item_id = o.id AND r.parent_id = ?)");
+      params.push(parentId);
+    }
+    const page = this.page("objects o", conditions.join(" AND "), params, "o.id, o.name, o.description, o.raw_json", "o.id", limit, offset);
+    const parents = this.db.prepare("SELECT parent_id FROM relations WHERE snapshot_id = ? AND kind = 'history' AND item_id = ? ORDER BY parent_id");
+    page.items = page.items.map(row => {
+      const metadata = JSON.parse(row.raw_json);
+      return { id: row.id, name: row.name, description: row.description, unit: String(metadata.Unit || ""), valueItemId: String(metadata.ValueItemId || ""),
+        parentIds: parents.all(snapshot.id, row.id).map(row => row.parent_id) };
+    });
+    return page;
+  }
+
   listDevices({ type, search = "", ...options } = {}) {
     const snapshot = this.snapshot(options);
     const { limit, offset } = pagination(options);

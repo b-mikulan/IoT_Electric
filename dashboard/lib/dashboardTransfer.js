@@ -5,12 +5,15 @@ const { parseWidgets } = require("./config");
 const { parseDeviceDocument, normalizeSettings } = require("./deviceWidgetStore");
 const { buildDevices } = require("../public/deviceModel");
 const { deriveWidgetGrouping } = require("../public/widgetGrouping");
+const { migrateOrganization } = require("./roomOrganization");
+const { validateSettings, settingsFromConfig, settingsFile } = require("./dashboardSettings");
+const { normalizeHistoryItems } = require("./historyCatalog");
 
 const FORMAT = "iot-electric-dashboard";
 const MAX_POINTS = 50_000;
 const MAX_BYTES = 16 * 1024 * 1024;
 const journalName = ".dashboard-transfer.json";
-const names = ["widgets.json", "device-widgets.json", "catalog-metadata.json"];
+const names = ["widgets.json", "device-widgets.json", "catalog-metadata.json", "dashboard-settings.json"];
 const json = value => `${JSON.stringify(value, null, 2)}\n`;
 const digest = value => createHash("sha256").update(value).digest("hex");
 const readJson = file => JSON.parse(fs.readFileSync(file, "utf8").replace(/^\uFEFF/, ""));
@@ -30,8 +33,8 @@ function text(value, maximum, label, empty = true) {
 function targets(config) {
   if (!config.widgetsFile) return null;
   const root = path.dirname(path.resolve(config.widgetsFile));
-  const files = [path.resolve(config.widgetsFile), path.resolve(config.deviceWidgetsFile || path.join(root, names[1])), path.resolve(config.deviceMetadataFile || path.join(root, names[2]))];
-  if (new Set(files.map(file => file.toLowerCase())).size !== 3) throw new TransferError("Datoteke pointova, kartica i opisa moraju biti odvojene.", 409, "TRANSFER_UNAVAILABLE");
+  const files = [path.resolve(config.widgetsFile), path.resolve(config.deviceWidgetsFile || path.join(root, names[1])), path.resolve(config.deviceMetadataFile || path.join(root, names[2])), path.resolve(settingsFile(config))];
+  if (new Set(files.map(file => file.toLowerCase())).size !== files.length) throw new TransferError("Datoteke pointova, kartica, opisa i općih postavki moraju biti odvojene.", 409, "TRANSFER_UNAVAILABLE");
   return { root, files, journal: path.join(root, journalName) };
 }
 function atomicWrite(file, data, fsImpl = fs) {
@@ -49,10 +52,10 @@ function initializeTransferFiles(env) {
   const location = targets({ widgetsFile: env.WIDGETS_FILE, deviceWidgetsFile: env.DEVICE_WIDGETS_FILE, deviceMetadataFile: env.DEVICE_METADATA_FILE });
   if (exists(location.journal)) {
     const record = readJson(location.journal);
-    if (!/^[\dTZ.-]+-[a-f0-9-]{36}$/.test(record.id) || !Array.isArray(record.existed) || record.existed.length !== 3) throw new Error("Invalid dashboard transfer recovery journal.");
+    if (!/^[\dTZ.-]+-[a-f0-9-]{36}$/.test(record.id) || !Array.isArray(record.existed) || ![3, 4].includes(record.existed.length)) throw new Error("Invalid dashboard transfer recovery journal.");
     const backup = path.join(location.root, "transfer-backups", record.id);
     if (record.phase !== "committed") {
-      for (let i = 0; i < names.length; i++) {
+      for (let i = 0; i < record.existed.length; i++) {
         if (record.existed[i]) atomicWrite(location.files[i], fs.readFileSync(path.join(backup, names[i])));
         else if (exists(location.files[i])) fs.unlinkSync(location.files[i]);
       }
@@ -92,7 +95,8 @@ function normalizeDevices(document, widgets) {
     if (deriveWidgetGrouping(id).key !== device.key) invalid("Odabrano očitanje mora pripadati istom uređaju.");
     text(id, 4096, "ID očitanja", false);
   }
-  return { version: 1, devices, rooms: parsed.rooms || [], roomRules: parsed.roomRules || [] };
+  return { version: 1, devices, rooms: parsed.rooms || [], roomRules: parsed.roomRules || [],
+    ...(parsed.organizationVersion === 1 ? { organizationVersion: 1, floors: parsed.floors, roomDetails: parsed.roomDetails } : {}) };
 }
 
 function normalizeMetadata(document, widgets) {
@@ -129,6 +133,15 @@ function normalizeMetadata(document, widgets) {
     text(zone, 4096, "putanja zone", false); roomByZone[zone] = text(room, 160, "naziv prostorije", false);
   }
   const result = { schemaVersion: 1, metadataById, roomByZone };
+  if (document.historyItems !== undefined) {
+    try { result.historyItems = normalizeHistoryItems(document.historyItems); }
+    catch { invalid("Popis trendova u opisima nije valjan."); }
+  }
+  if (object(document.historyCatalog)) {
+    result.historyCatalog = {};
+    for (const field of ["buildingKey", "capturedAt"]) if (typeof document.historyCatalog[field] === "string") result.historyCatalog[field] = text(document.historyCatalog[field], 500, field);
+    if (Number.isSafeInteger(document.historyCatalog.snapshotId)) result.historyCatalog.snapshotId = document.historyCatalog.snapshotId;
+  }
   if (object(document.catalog)) {
     result.catalog = {};
     for (const field of ["buildingKey", "capturedAt"]) if (typeof document.catalog[field] === "string") result.catalog[field] = text(document.catalog[field], 500, field);
@@ -144,33 +157,41 @@ class DashboardTransfer {
     return digest(JSON.stringify(this.location?.files.map(file => this.fs.existsSync(file) ? digest(this.fs.readFileSync(file)) : null) || []));
   }
   current() {
-    if (!this.location) return { widgets: this.config.widgets, deviceWidgets: { version: 1, devices: [] }, metadata: null };
-    const [widgetsFile, devicesFile, metadataFile] = this.location.files;
-    return { widgets: normalizeWidgets(readJson(widgetsFile)), deviceWidgets: exists(devicesFile) ? readJson(devicesFile) : { version: 1, devices: [] }, metadata: exists(metadataFile) ? readJson(metadataFile) : null };
+    if (!this.location) return { widgets: this.config.widgets, deviceWidgets: { version: 1, devices: [] }, metadata: null, dashboardSettings: settingsFromConfig(this.config) };
+    const [widgetsFile, devicesFile, metadataFile, settingsPath] = this.location.files;
+    return { widgets: normalizeWidgets(readJson(widgetsFile)), deviceWidgets: exists(devicesFile) ? readJson(devicesFile) : { version: 1, devices: [] }, metadata: exists(metadataFile) ? readJson(metadataFile) : null,
+      dashboardSettings: exists(settingsPath) ? readJson(settingsPath).settings : settingsFromConfig(this.config) };
   }
   prepare(document) {
     if (Buffer.byteLength(JSON.stringify(document) || "") > MAX_BYTES) invalid("Datoteka je prevelika (najviše 16 MB).");
     const legacy = Array.isArray(document), current = this.current();
-    if (!legacy && (!object(document) || document.format !== FORMAT || document.version !== 1 || !Object.hasOwn(document, "metadata"))) invalid("Odaberi dashboard-backup.json ili izvorni widgets.json.");
+    if (!legacy && (!object(document) || document.format !== FORMAT || ![1, 2].includes(document.version) || !Object.hasOwn(document, "metadata"))) invalid("Odaberi dashboard-backup.json ili izvorni widgets.json.");
     const widgets = normalizeWidgets(legacy ? document : document.widgets);
-    const deviceWidgets = normalizeDevices(legacy ? current.deviceWidgets : document.deviceWidgets, widgets);
     const metadata = normalizeMetadata(legacy ? current.metadata : document.metadata, widgets);
-    const payload = { widgets, deviceWidgets, metadata };
-    const models = buildDevices(widgets, { ...(metadata || {}), deviceSettings: deviceWidgets.devices, roomRules: deviceWidgets.roomRules });
+    const suppliedSettings = structuredClone(legacy ? current.deviceWidgets : document.deviceWidgets);
+    try { migrateOrganization(suppliedSettings, Object.values(metadata?.roomByZone || {})); }
+    catch { invalid("Katovi ili prostorije nisu valjani."); }
+    const deviceWidgets = normalizeDevices(suppliedSettings, widgets);
+    let dashboardSettings;
+    try { dashboardSettings = validateSettings(!legacy && Object.hasOwn(document, "dashboardSettings") ? document.dashboardSettings : current.dashboardSettings); }
+    catch { invalid("Opće postavke dashboarda nisu valjane."); }
+    const payload = { widgets, deviceWidgets, metadata, dashboardSettings };
+    const models = buildDevices(widgets, { ...(metadata || {}), deviceSettings: deviceWidgets.devices, roomRules: deviceWidgets.roomRules, floors: deviceWidgets.floors, roomDetails: deviceWidgets.roomDetails });
     const currentIds = new Set(current.widgets.map(w => w.id)), ids = new Set(widgets.map(w => w.id));
-    const roomNames = new Set([...deviceWidgets.rooms, ...models.map(d => d.room?.label).filter(Boolean)]);
+    const roomNames = new Set([...deviceWidgets.rooms, ...(deviceWidgets.roomDetails || []).map(room => room.id), ...models.map(d => d.room?.id || d.room?.label).filter(Boolean)]);
     const warnings = [];
     if (legacy) warnings.push("widgets.json prenosi samo pointove. Zadržavaju se postojeće postavke kartica i dostupni opisi; za cijeli prikaz koristi dashboard-backup.json.");
     const missingMetadata = widgets.length - Object.keys(metadata?.metadataById || {}).length;
     if (missingMetadata) warnings.push(`Za ${missingMetadata} pointova nisu preneseni opisi uređaja.`);
     const summary = { points: widgets.length, devices: models.length, rooms: roomNames.size, writablePoints: widgets.filter(w => w.writable).length,
       added: widgets.filter(w => !currentIds.has(w.id)).length, removed: current.widgets.filter(w => !ids.has(w.id)).length, metadataPoints: widgets.length - missingMetadata, legacy, warnings };
+    if (deviceWidgets.organizationVersion === 1) summary.floors = deviceWidgets.floors.length;
     return { payload, summary, token: digest(JSON.stringify(payload) + this.fingerprint()) };
   }
   export() {
     const current = this.current();
     const normalized = this.prepare({ format: FORMAT, version: 1, ...current }).payload;
-    return { format: FORMAT, version: 1, exportedAt: new Date().toISOString(), ...normalized };
+    return { format: FORMAT, version: 2, exportedAt: new Date().toISOString(), ...normalized };
   }
   apply(document, token) {
     if (!this.enabled) throw new TransferError("Za uvoz uključi stvarni način rada i trajnu datoteku WIDGETS_FILE.", 409, "TRANSFER_UNAVAILABLE");
@@ -181,7 +202,7 @@ class DashboardTransfer {
     const backup = path.join(root, "transfer-backups", id), existed = files.map(file => this.fs.existsSync(file));
     const originals = files.map((file, i) => existed[i] ? this.fs.readFileSync(file) : null);
     const stage = files.map(file => `${file}.${id}.import`);
-    const documents = [prepared.payload.widgets, prepared.payload.deviceWidgets, prepared.payload.metadata];
+    const documents = [prepared.payload.widgets, prepared.payload.deviceWidgets, prepared.payload.metadata, { version: 1, settings: prepared.payload.dashboardSettings }];
     let journalCreated = false;
     try {
       this.fs.mkdirSync(backup, { recursive: true });

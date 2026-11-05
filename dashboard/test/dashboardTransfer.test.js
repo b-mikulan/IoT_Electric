@@ -59,7 +59,7 @@ test("portable export/import retains room assignments, empty rooms, units, write
 test("invalid and duplicate points, foreign readings, invalid rooms and invalid metadata cannot change existing files", t => {
   const { config, transfer } = fixture(t);
   const before = fs.readFileSync(config.widgetsFile, "utf8");
-  const invalid = [null, {}, { ...bundle(), version: 2 }, { ...bundle(), widgets: [{ id: point }, { id: point }] }, { ...bundle(), widgets: [{ id: "bad\npoint" }] }];
+  const invalid = [null, {}, { ...bundle(), version: 3 }, { ...bundle(), widgets: [{ id: point }, { id: point }] }, { ...bundle(), widgets: [{ id: "bad\npoint" }] }];
   const foreign = bundle(); foreign.deviceWidgets.devices[0].primaryPointId = "01/ES/Zones/Z2/Other/Values/RmTmp"; invalid.push(foreign);
   const room = bundle(); room.deviceWidgets.rooms = ["Kitchen", "kitchen"]; invalid.push(room);
   const metadata = bundle(); metadata.metadata.metadataById[point].id = "foreign"; invalid.push(metadata);

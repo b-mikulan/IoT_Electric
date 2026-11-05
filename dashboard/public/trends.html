@@ -4,51 +4,72 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Trendovi i alarmi · IoT Electric</title>
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg" />
     <link rel="stylesheet" href="/vendor/materialize/materialize.min.css" />
     <link rel="stylesheet" href="/vendor/datatables.css" />
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/dashboardSettings.css" />
+    <link rel="stylesheet" href="/dashboardTheme.css" />
     <link rel="stylesheet" href="/trends.css" />
     <script src="/vendor/datatables.js" defer></script>
     <script src="/vendor/chart.js" defer></script>
     <script src="/trends.js" defer></script>
+    <script src="/dashboardSettings.js" data-standalone defer></script>
   </head>
-  <body>
+  <body class="app-theme telemetry-page">
     <header class="app-header"><div class="container header-content">
-      <span class="brand-name">IoT Electric</span><a class="telemetry-back" href="/">← Vrijednosti uživo</a>
+      <a class="brand" href="/" aria-label="IoT Electric · Uređaji"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span class="brand-name">IoT Electric</span></a>
+      <div class="header-page-actions"><a class="btn outlined telemetry-back" href="/" aria-label="Vrijednosti uživo" title="Vrijednosti uživo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6" /></svg><span>Vrijednosti uživo</span></a><button id="refresh-pause" class="btn outlined refresh-pause" type="button" aria-label="Pauziraj osvježavanje" aria-pressed="false" disabled>
+            <svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14" stroke-width="3" stroke-linecap="round" /></svg>
+            <svg class="resume-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 10 7-10 7Z" fill="currentColor" stroke-linejoin="round" /></svg><span>Pauziraj</span>
+          </button>
+          <button id="general-settings-open" class="btn outlined general-settings-open" type="button" aria-haspopup="dialog" aria-label="Postavke stranice" title="Postavke stranice">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 3-.7 2.3-2 .9L5 5.7 3 9l1.8 1.7v2.6L3 15l2 3.3 2.3-.5 2 .9L10 21h4l.7-2.3 2-.9 2.3.5 2-3.3-1.8-1.7v-2.6L21 9l-2-3.3-2.3.5-2-.9L14 3Z" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" /></svg><span>Postavke</span>
+          </button></div>
     </div></header>
     <main class="container dashboard-shell telemetry-shell">
       <div class="intro"><div><p class="eyebrow">Pregled podataka</p><h1>Trendovi i alarmi</h1></div>
-        <span id="telemetry-mode" role="status">Provjeravam izvor…</span>
+        <span id="telemetry-mode" class="chip telemetry-source" role="status">Provjeravam izvor…</span>
       </div>
-      <section class="telemetry-panel" aria-labelledby="history-title">
-        <h2 id="history-title">Povijesne vrijednosti</h2>
-        <details>
-          <summary>Pronađi trend kroz mape kontrolera</summary>
+      <section class="card-panel telemetry-panel" aria-labelledby="history-title">
+        <div class="telemetry-heading"><h2 id="history-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v14h16M8 14l4-4 3 2 5-6" /></svg>Povijesne vrijednosti</h2></div>
+        <details id="trend-catalog" class="collapsible app-disclosure telemetry-disclosure trend-catalog" open>
+          <summary class="collapsible-header"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5" /></svg><span class="collapsible-header-content">Odaberi trend iz popisa</span></summary>
+          <div class="collapsible-body">
+            <div class="trend-catalog-heading"><p id="trend-catalog-status" class="telemetry-note" role="status">Učitavam spremljeni popis trendova…</p><button id="trend-catalog-reload" class="btn-small outlined trend-catalog-reload" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1" /></svg>Ponovno učitaj popis</button></div>
+            <div class="telemetry-table"><table id="trend-catalog-table" class="striped highlight"><thead><tr><th>Trend</th><th>Opis</th><th>Lokacija / putanja</th><th>Odabir</th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </details>
+        <p id="history-selected" class="history-selected" hidden></p>
+        <details id="trend-browser" class="collapsible app-disclosure telemetry-disclosure">
+          <summary class="collapsible-header"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h7l2 2h9v11H3z" /></svg><span class="collapsible-header-content">Pronađi trend kroz mape kontrolera</span></summary>
+          <div class="collapsible-body">
           <form id="browse-form" class="telemetry-form">
-            <div class="telemetry-field"><label for="container-id">ID mape (prazno za početnu mapu)</label><input id="container-id" maxlength="4096" /></div>
-            <button class="btn" type="submit">Otvori mapu</button>
-            <button class="btn-flat" id="browse-root" type="button">Početna mapa</button>
+            <fieldset class="form-field telemetry-field"><legend>ID mape</legend><input id="container-id" type="text" maxlength="4096" placeholder="Prazno za početnu mapu" /><label for="container-id">ID mape</label></fieldset>
+            <button class="btn filled" type="submit">Otvori mapu</button>
+            <button class="btn outlined" id="browse-root" type="button">Početna mapa</button>
           </form>
-          <p id="browse-status" role="status"></p><ul id="browse-items" class="browse-items"></ul>
+          <p id="browse-status" class="telemetry-status" role="status"></p><ul id="browse-items" class="collection browse-items"></ul>
+          </div>
         </details>
         <form id="history-form" class="telemetry-form">
-          <div class="telemetry-field telemetry-wide"><label for="history-id">ID trenda</label><input id="history-id" required maxlength="4096" placeholder="Odaberi trend iz mape ili zalijepi njegov ID" /></div>
-          <div class="telemetry-field"><label for="time-from">Od</label><input id="time-from" type="datetime-local" required /></div>
-          <div class="telemetry-field"><label for="time-to">Do</label><input id="time-to" type="datetime-local" required /></div>
-          <button class="btn" type="submit">Dohvati trend</button>
+          <fieldset class="form-field telemetry-field telemetry-wide"><legend>ID odabranog trenda</legend><input id="history-id" type="text" required maxlength="4096" placeholder="Odaberi trend iz popisa ili zalijepi njegov ID" /><label for="history-id">ID odabranog trenda</label></fieldset>
+          <fieldset class="form-field telemetry-field"><legend>Od</legend><input id="time-from" type="datetime-local" required /><label for="time-from">Od</label></fieldset>
+          <fieldset class="form-field telemetry-field"><legend>Do</legend><input id="time-to" type="datetime-local" required /><label for="time-to">Do</label></fieldset>
+          <button class="btn filled" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v14h16M8 14l4-4 3 2 5-6" /></svg>Dohvati trend</button>
         </form>
         <p id="timezone-note" class="telemetry-note"></p>
-        <p id="history-status" role="status">Odaberi trend i razdoblje za dohvat.</p>
+        <p id="history-status" class="telemetry-status" role="status">Odaberi trend i razdoblje za dohvat.</p>
         <div id="chart-wrap" class="chart-wrap" hidden><canvas id="history-chart" role="img" aria-label="Graf povijesnih vrijednosti; isti podaci dostupni su u tablici ispod."></canvas></div>
         <p id="chart-note" class="telemetry-note"></p>
-        <div class="telemetry-table"><table id="history-table" class="display"><thead><tr><th>Vrijeme</th><th>Vrijednost</th><th>Stanje (EWS)</th></tr></thead><tbody></tbody></table></div>
-        <button id="history-more" class="btn" type="button" hidden>Učitaj još vrijednosti</button>
+        <div class="telemetry-table"><table id="history-table" class="striped highlight"><thead><tr><th>Vrijeme</th><th>Vrijednost</th><th>Stanje (EWS)</th></tr></thead><tbody></tbody></table></div>
+        <button id="history-more" class="btn outlined" type="button" hidden>Učitaj još vrijednosti</button>
       </section>
-      <section class="telemetry-panel" aria-labelledby="alarms-title">
-        <div class="telemetry-heading"><h2 id="alarms-title">Lista alarma</h2><button id="alarms-refresh" class="btn" type="button">Dohvati alarme</button></div>
-        <p id="alarms-status" role="status">Pokreni dohvat za pregled liste alarma.</p>
-        <div class="telemetry-table"><table id="alarms-table" class="display"><thead><tr><th>Zadnja promjena</th><th>Nastanak</th><th>Izvor</th><th>Poruka</th><th>Prioritet</th><th>Stanje (EWS)</th><th>Tip</th><th>ID alarma</th><th>ID izvora</th></tr></thead><tbody></tbody></table></div>
-        <button id="alarms-more" class="btn" type="button" hidden>Učitaj još alarma</button>
+      <section class="card-panel telemetry-panel" aria-labelledby="alarms-title">
+        <div class="telemetry-heading"><h2 id="alarms-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0v6l2 3H4l2-3zM10 21h4" /></svg>Lista alarma</h2><button id="alarms-refresh" class="btn filled" type="button">Dohvati alarme</button></div>
+        <p id="alarms-status" class="telemetry-status" role="status">Pokreni dohvat za pregled liste alarma.</p>
+        <div class="telemetry-table"><table id="alarms-table" class="striped highlight"><thead><tr><th>Zadnja promjena</th><th>Nastanak</th><th>Izvor</th><th>Poruka</th><th>Prioritet</th><th>Stanje (EWS)</th><th>Tip</th><th>ID alarma</th><th>ID izvora</th></tr></thead><tbody></tbody></table></div>
+        <button id="alarms-more" class="btn outlined" type="button" hidden>Učitaj još alarma</button>
       </section>
       <noscript>Za pregled trendova i alarma uključi JavaScript.</noscript>
     </main>

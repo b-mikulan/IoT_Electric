@@ -9,6 +9,7 @@ const { DatabaseSync } = require("node:sqlite");
 const { BuildingCatalog } = require("../catalog/store");
 const { importTopology } = require("../catalog/importTopology");
 const { prepareWidgetImport, importWidgets } = require("../catalog/widgetExport");
+const { historyDefinitions, importHistories } = require("../catalog/historyExport");
 
 const owner = "AS/Zones/Z1/AC01";
 const pointsFolder = `00/${owner}/Points`;
@@ -322,4 +323,36 @@ test("a failed widget publication restores the existing descriptor file and leav
   assert.equal(fs.readFileSync(widgetsFile, "utf8"), previous);
   assert.equal(fs.readFileSync(metadataFile, "utf8"), "previous metadata");
   assert.equal(fs.readdirSync(f.directory).some((name) => name.endsWith(".tmp")), false);
+});
+
+test("saved histories are searchable and retain exact IDs, explicit point references and observed parents", t => {
+  const f = fixture(t); f.run(); const catalog = f.open();
+  const histories = catalog.listHistories({ limit: 1 });
+  assert.equal(histories.total, 2); assert.equal(histories.items.length, 1);
+  const item = catalog.listHistories({ search: "TEMPERATURE" }).items[0];
+  assert.equal(item.id, "03/history-ok"); assert.equal(item.valueItemId, pointId("RmTmp"));
+  assert.deepEqual(item.parentIds, [pointsFolder]);
+  assert.equal(catalog.listHistories({ parentId: "opaque alias " }).total, 0, "only actual history parent links count");
+  const definitions = historyDefinitions(catalog);
+  assert.equal(definitions.historyItems.length, 2);
+  assert.equal(definitions.historyItems.find(item => item.id === "03/history-missing").valueItemId, "01/not-in-snapshot ");
+  assert.equal(prepareWidgetImport(catalog).metadata.historyItems.length, 2);
+});
+
+test("adding a trend list preserves curated widgets, device preferences and room metadata and backs up the descriptor file", t => {
+  const f = fixture(t); f.run(); const catalog = f.open();
+  const widgetsFile = path.join(f.directory, "widgets.json"), metadataFile = path.join(f.directory, "catalog-metadata.json");
+  const before = { schemaVersion: 1, catalog: { buildingKey: "default" }, metadataById: { [pointId("RmTmp")]: { id: pointId("RmTmp"), description: "custom" } }, roomByZone: { "AS/Zones/Z1": "Kitchen · 3. kat" } };
+  fs.writeFileSync(widgetsFile, JSON.stringify([{ id: pointId("RmTmp"), label: "Keep curated list" }]));
+  fs.writeFileSync(metadataFile, JSON.stringify(before));
+  const original = fs.readFileSync(metadataFile), widgetsHash = hash(widgetsFile);
+  const options = { metadataFile, backupDirectory: path.join(f.directory, "backups") };
+  assert.equal(importHistories(catalog, options).applied, false);
+  assert.deepEqual(fs.readFileSync(metadataFile), original);
+  const saved = importHistories(catalog, { ...options, apply: true });
+  const after = JSON.parse(fs.readFileSync(metadataFile));
+  assert.equal(after.historyItems.length, 2);
+  assert.deepEqual(after.metadataById, before.metadataById); assert.deepEqual(after.roomByZone, before.roomByZone);
+  assert.equal(hash(widgetsFile), widgetsHash);
+  assert.deepEqual(fs.readFileSync(path.join(saved.backup, "catalog-metadata.json")), original);
 });

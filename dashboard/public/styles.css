@@ -206,6 +206,31 @@ h1 {
   gap: 10px;
 }
 
+.trends-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 15px;
+  color: #fff;
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: 12px;
+  box-shadow: 0 3px 9px rgba(0, 121, 107, 0.14);
+  font: inherit;
+  font-size: .83rem;
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 150ms ease, box-shadow 150ms ease;
+}
+.trends-open:visited { color: #fff; }
+.trends-open:hover { color: #fff; background: var(--brand-dark); border-color: var(--brand-dark); box-shadow: 0 4px 12px rgba(0, 121, 107, 0.22); }
+.trends-open:focus-visible { outline: 3px solid #00968866; outline-offset: 3px; }
+.trends-open svg { width: 19px; height: 19px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+@media (prefers-reduced-motion: reduce) { .trends-open { transition: none; } }
+
 .discovery-open,
 .dashboard-menu-open,
 .dialog-close {
@@ -763,6 +788,20 @@ h1 {
   font-size: 0.83rem;
   line-height: 1.5;
 }
+
+#device-room-form .settings-field { min-width: 0; }
+#device-room-form select, #device-room-new {
+  box-sizing: border-box; width: 100%; height: 44px; margin: 0; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: 10px; background: #f9fbfa;
+  color: var(--ink); font: inherit; font-size: .88rem; box-shadow: none;
+}
+#device-room-form select {
+  appearance: none; padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2347615f' stroke-width='1.6'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+}
+#device-room-form :is(input, select):focus-visible { outline: 3px solid #00968844; outline-offset: 2px; }
+#device-room-form .settings-actions .btn { color: #fff; border-radius: 9px; }
 
 #settings-point {
   width: 100%;

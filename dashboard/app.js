@@ -9,6 +9,9 @@ const { DeviceCommandService } = require("./lib/deviceCommands");
 const { DeviceWidgetStore } = require("./lib/deviceWidgetStore");
 const { buildDevices } = require("./public/deviceModel");
 const { DashboardTransfer } = require("./lib/dashboardTransfer");
+const { DashboardSettingsStore } = require("./lib/dashboardSettings");
+const { resolveRefreshScope } = require("./lib/refreshScope");
+const { buildHistoryCatalog } = require("./lib/historyCatalog");
 
 const publicDirectory = path.join(__dirname, "public");
 const materializeDirectory = path.dirname(
@@ -105,25 +108,36 @@ function createApp({
   deviceMetadata = new DeviceMetadataClient(config),
   deviceCommands = new DeviceCommandService({ poller, config, deviceMetadata }),
   dashboardTransfer = new DashboardTransfer(config),
+  dashboardSettings = new DashboardSettingsStore(config),
 }) {
   if (!poller) throw new Error("A point poller is required.");
   if (!config) throw new Error("Dashboard configuration is required.");
 
   const app = express();
   const eventClients = new Set();
+  const settingsClients = new Set();
   const discoveredById = new Map();
   let autoDiscovery = { state: "idle" };
   let clearingWidgets = false;
-  let automaticRoomNames = [];
+  let automaticRoomNames = deviceMetadata.roomNames?.() || [];
   let transferBusy = false;
   let activeConfigurationRequests = 0;
+  Object.assign(config, dashboardSettings.values);
+  poller.configurePolling?.(dashboardSettings.values);
+  poller.setWriteRefreshResolver?.(id => resolveRefreshScope(config.widgets, {
+    ...(deviceMetadata.groupingMetadata?.() || {}),
+    deviceSettings: deviceWidgetStore.devices,
+    roomRules: deviceWidgetStore.roomRules,
+    floors: deviceWidgetStore.floors,
+    roomDetails: deviceWidgetStore.roomDetails,
+  }, id, config.afterWriteScope));
   app.disable("x-powered-by");
 
   // Hold configuration writes and reads that synchronize settings during an
   // import. Existing HTTP operations must finish before the import can start.
   app.use("/api", (request, response, next) => {
     const importing = request.path === "/dashboard-transfer/import";
-    const observesConfiguration = ["/config", "/devices/settings", "/devices/metadata", "/dashboard-transfer/export", "/dashboard-transfer/preview"].includes(request.path);
+    const observesConfiguration = ["/config", "/devices/settings", "/devices/metadata", "/history/catalog", "/dashboard-transfer/export", "/dashboard-transfer/preview"].includes(request.path);
     const configurationRequest = observesConfiguration || !["GET", "HEAD", "OPTIONS"].includes(request.method);
     if (transferBusy && configurationRequest) return response.status(409).json({ error: "Uvoz dashboarda je u tijeku. Pokušaj ponovno nakon završetka.", code: "TRANSFER_IN_PROGRESS" });
     if (!importing && configurationRequest) {
@@ -136,6 +150,11 @@ function createApp({
   });
 
   function broadcast(event, payload) {
+    if (["dashboard-settings", "polling", "refresh-error", "dashboard-imported"].includes(event)) for (const response of settingsClients) {
+      try {
+        if (!sendEvent(response, event, payload)) { settingsClients.delete(response); response.end(); }
+      } catch { settingsClients.delete(response); response.end(); }
+    }
     for (const response of eventClients) {
       try {
         if (!sendEvent(response, event, payload)) {
@@ -157,10 +176,14 @@ function createApp({
     };
   }
 
+  function organizationState() {
+    return { floors: deviceWidgetStore.floors, roomDetails: deviceWidgetStore.roomDetails };
+  }
+
   async function synchronizeDeviceSettings() {
-    const previous = JSON.stringify([deviceWidgetStore.devices, deviceWidgetStore.rooms, deviceWidgetStore.roomRules]);
-    const devices = await deviceWidgetStore.synchronize(deviceSettingsContext().deviceKeys);
-    if (JSON.stringify([devices, deviceWidgetStore.rooms, deviceWidgetStore.roomRules]) !== previous) broadcast("device-settings", { devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
+    const previous = JSON.stringify([deviceWidgetStore.devices, deviceWidgetStore.rooms, deviceWidgetStore.roomRules, organizationState()]);
+    const devices = await deviceWidgetStore.synchronize(deviceSettingsContext().deviceKeys, deviceSettingsContext());
+    if (JSON.stringify([devices, deviceWidgetStore.rooms, deviceWidgetStore.roomRules, organizationState()]) !== previous) broadcast("device-settings", { devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
     return devices;
   }
 
@@ -189,6 +212,8 @@ function createApp({
   }
   poller.on("status", (payload) => broadcast("status", payload));
   poller.on("sync", (payload) => broadcast("sync", payload));
+  poller.on("polling", payload => broadcast("polling", payload));
+  poller.on("refresh-error", payload => broadcast("refresh-error", payload));
   poller.on("config", (payload) => {
     broadcast("config", payload);
     // The route updates config.widgets immediately after the poller event.
@@ -226,6 +251,10 @@ function createApp({
         config.deviceMetadataFile = imported.metadataFile;
         deviceWidgetStore.adoptDocument(imported.payload.deviceWidgets);
         deviceMetadata.replaceCatalog(imported.payload.metadata);
+        dashboardSettings.values = imported.payload.dashboardSettings;
+        Object.assign(config, imported.payload.dashboardSettings);
+        poller.configurePolling?.(dashboardSettings.values);
+        deviceMetadata.setTimeoutMs?.(dashboardSettings.values.timeoutMs);
         automaticRoomNames = [...new Set(Object.values(imported.payload.metadata?.roomByZone || {}))];
         discoveredById.clear();
         poller.replaceWidgets(config.widgets);
@@ -265,11 +294,15 @@ function createApp({
         title: "IoT Electric · PLC pregled",
         demoMode: config.demoMode,
         intervalMs: config.intervalMs,
+        dashboardSettings: dashboardSettings.values,
+        settingsPersisted: Boolean(dashboardSettings.filePath),
+        polling: poller.getPollingState?.() || { paused: false, active: false, scope: null },
         discoveryEnabled: !config.demoMode,
         widgetEditingEnabled:
           !config.demoMode && Boolean(widgetStore?.enabled),
         deviceSettingsEnabled: Boolean(deviceWidgetStore.enabled),
         deviceSettings,
+        ...organizationState(),
         rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules,
         autoDiscovery,
         widgets: config.widgets.map(publicWidget),
@@ -279,10 +312,45 @@ function createApp({
     }
   });
 
+  app.get("/api/dashboard/settings", (request, response) => {
+    response.set("Cache-Control", "no-store");
+    return response.json({ settings: dashboardSettings.values, persisted: Boolean(dashboardSettings.filePath), polling: poller.getPollingState?.(), capabilities: {
+      deviceSettingsEnabled: Boolean(deviceWidgetStore.enabled), widgetEditingEnabled: !config.demoMode && Boolean(widgetStore?.enabled), discoveryEnabled: !config.demoMode,
+    } });
+  });
+  app.get("/api/dashboard/events", (request, response) => {
+    response.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
+    response.flushHeaders?.();
+    sendEvent(response, "dashboard-settings", { settings: dashboardSettings.values, persisted: Boolean(dashboardSettings.filePath) });
+    sendEvent(response, "polling", poller.getPollingState?.());
+    settingsClients.add(response);
+    const heartbeat = setInterval(() => response.write(": heartbeat\n\n"), 25_000);
+    request.on("close", () => { clearInterval(heartbeat); settingsClients.delete(response); });
+  });
+  app.post("/api/dashboard/settings", requireJson, express.json({ limit: "4kb" }), (request, response) => {
+    try {
+      const settings = dashboardSettings.save(request.body);
+      Object.assign(config, settings);
+      poller.configurePolling?.(settings);
+      deviceMetadata.setTimeoutMs?.(settings.timeoutMs);
+      broadcast("dashboard-settings", { settings, persisted: Boolean(dashboardSettings.filePath) });
+      return response.json({ settings, persisted: Boolean(dashboardSettings.filePath) });
+    } catch (error) { return sendOperationError(response, error, "DASHBOARD_SETTINGS_SAVE_FAILED", "Spremanje općih postavki nije uspjelo."); }
+  });
+  app.post("/api/dashboard/pause", requireJson, express.json({ limit: "1kb" }), (request, response) => {
+    if (typeof request.body?.paused !== "boolean") return response.status(400).json({ error: "Odaberi pauziranje ili nastavak osvježavanja.", code: "INVALID_POLLING_STATE" });
+    return response.json({ polling: poller.setPaused(request.body.paused) });
+  });
+  app.post("/api/dashboard/refresh", (request, response) => {
+    if (poller.getPollingState?.().active) return response.status(409).json({ error: "Osvježavanje je već u tijeku.", code: "REFRESH_IN_PROGRESS" });
+    void poller.poll({ manual: true });
+    return response.status(202).json({ polling: poller.getPollingState?.() });
+  });
+
   app.get("/api/devices/settings", async (request, response) => {
     response.set("Cache-Control", "no-store");
     try {
-      return response.json({ enabled: Boolean(deviceWidgetStore.enabled), devices: await synchronizeDeviceSettings(), rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
+      return response.json({ enabled: Boolean(deviceWidgetStore.enabled), devices: await synchronizeDeviceSettings(), rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
     } catch (error) {
       return sendOperationError(response, error, "DEVICE_SETTINGS_FAILED", "Device card settings could not be loaded.");
     }
@@ -292,8 +360,8 @@ function createApp({
     response.set("Cache-Control", "no-store");
     try {
       const device = await deviceWidgetStore.save(request.body, deviceSettingsContext());
-      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
-      return response.json({ device, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
+      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
+      return response.json({ device, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
     } catch (error) {
       return sendOperationError(response, error, "DEVICE_SETTINGS_UPDATE_FAILED", "Device card settings could not be saved.");
     }
@@ -301,9 +369,9 @@ function createApp({
 
   app.post("/api/rooms", requireJson, express.json({ limit: "4kb" }), async (request, response) => {
     try {
-      const room = await deviceWidgetStore.createRoom(request.body?.name);
-      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
-      return response.status(201).json({ room, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
+      const room = await deviceWidgetStore.createRoom(request.body?.name, Object.hasOwn(request.body || {}, "floorId") ? { floorId: request.body.floorId, roomNames: automaticRoomNames } : {});
+      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
+      return response.status(201).json({ room, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
     } catch (error) { return sendOperationError(response, error, "ROOM_CREATE_FAILED", "Prostoriju nije moguće stvoriti."); }
   });
 
@@ -313,18 +381,36 @@ function createApp({
         const result = action === "rename"
           ? await deviceWidgetStore.renameRoom(request.body?.name, request.body?.newName, deviceSettingsContext())
           : await deviceWidgetStore.deleteRoom(request.body?.name, deviceSettingsContext());
-        const state = { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules };
+        const state = { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() };
         broadcast("device-settings", state);
         return response.json({ ...result, ...state });
       } catch (error) { return sendOperationError(response, error, "ROOM_UPDATE_FAILED", "Prostoriju nije moguće promijeniti."); }
     });
   }
 
+  app.post("/api/rooms/update", requireJson, express.json({ limit: "4kb" }), async (request, response) => {
+    try {
+      const result = await deviceWidgetStore.updateRoom(request.body?.id, request.body?.name, request.body?.floorId ?? null, deviceSettingsContext());
+      const state = { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() };
+      broadcast("device-settings", state);
+      return response.json({ ...result, ...state });
+    } catch (error) { return sendOperationError(response, error, "ROOM_UPDATE_FAILED", "Prostoriju nije moguće promijeniti."); }
+  });
+
+  for (const action of ["create", "rename", "delete"]) app.post(`/api/floors/${action}`, requireJson, express.json({ limit: "4kb" }), async (request, response) => {
+    try {
+      const result = await deviceWidgetStore.changeFloor(action, request.body, deviceSettingsContext());
+      const state = { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() };
+      broadcast("device-settings", state);
+      return response.json({ ...result, ...state });
+    } catch (error) { return sendOperationError(response, error, "FLOOR_UPDATE_FAILED", "Kat ili grupu nije moguće promijeniti."); }
+  });
+
   app.post("/api/devices/rooms", requireJson, express.json({ limit: "1mb" }), async (request, response) => {
     try {
-      const result = await deviceWidgetStore.assignRoom(request.body?.keys, request.body?.room, deviceSettingsContext());
-      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
-      return response.json({ ...result, devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
+      const result = await deviceWidgetStore.assignRoom(request.body?.keys, request.body?.room, deviceSettingsContext(), request.body?.newRoom);
+      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
+      return response.json({ ...result, devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
     } catch (error) { return sendOperationError(response, error, "DEVICE_ROOM_MOVE_FAILED", "Uređaje nije moguće premjestiti."); }
   });
 
@@ -377,6 +463,17 @@ function createApp({
     } catch (error) {
       return sendOperationError(response, error, "DEVICE_COMMAND_WRITE_FAILED", "Slanje naredbe nije uspjelo.");
     }
+  });
+
+  app.get("/api/history/catalog", async (request, response) => {
+    response.set("Cache-Control", "no-store");
+    try {
+      await synchronizeDeviceSettings();
+      return response.json({ demoMode: config.demoMode, ...buildHistoryCatalog(deviceMetadata.historyCatalog?.() || { available: false, items: [] }, config.widgets, {
+        ...(deviceMetadata.groupingMetadata?.() || {}), deviceSettings: deviceWidgetStore.devices,
+        roomRules: deviceWidgetStore.roomRules, ...organizationState(),
+      }) });
+    } catch (error) { return sendOperationError(response, error, "HISTORY_CATALOG_FAILED", "Popis trendova nije dostupan."); }
   });
 
   for (const kind of ["history", "alarms"]) {
@@ -767,8 +864,10 @@ function createApp({
     response.flushHeaders?.();
 
     sendEvent(response, "snapshot", poller.getSnapshot());
+    sendEvent(response, "dashboard-settings", { settings: dashboardSettings.values, persisted: Boolean(dashboardSettings.filePath) });
+    sendEvent(response, "polling", poller.getPollingState?.() || { paused: false, active: false, scope: null });
     sendEvent(response, "discovery", autoDiscovery);
-    sendEvent(response, "device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules });
+    sendEvent(response, "device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
     eventClients.add(response);
     const heartbeat = setInterval(() => response.write(": heartbeat\n\n"), 25_000);
 

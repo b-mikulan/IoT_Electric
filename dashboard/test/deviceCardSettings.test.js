@@ -64,6 +64,16 @@ const json = (value) => JSON.parse(JSON.stringify(value));
 const response = (payload, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => json(payload) });
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
+test("partial live events retain the full-building freshness and pass fresh point timestamps to device cards", () => {
+  const fixture = setup();
+  fixture.run(`applyPayload({ syncedAt: "2026-11-05T10:00:00.000Z", widgets: fixtureWidgets });`);
+  const before = fixture.node("#last-sync").textContent;
+  fixture.run(`applyPayload({ scope: "partial", readAt: "2026-11-05T10:01:00.000Z", widgets: [{ ...fixtureWidgets[0], readAt: "2026-11-05T10:01:00.000Z", value: 25 }] });`);
+  assert.equal(fixture.node("#last-sync").textContent, before);
+  assert.equal(fixture.run("deviceReadAt"), "2026-11-05T10:00:00.000Z");
+  assert.equal(fixture.models().find(device => device.key === owner).roles.temperature.readAt, "2026-11-05T10:01:00.000Z");
+});
+
 function setup({ saved = [], enabled = true, editable = true, technical = true } = {}) {
   const nodes = new Map();
   const node = (selector) => {
@@ -127,6 +137,11 @@ function setup({ saved = [], enabled = true, editable = true, technical = true }
 
 test("card settings save custom identity and device-local secondary readings through the settings endpoint only", async () => {
   const fixture = setup();
+  fixture.setHandler((_url, options) => {
+    const { newRoom, ...device } = JSON.parse(options.body);
+    device.room = "room-living";
+    return response({ device, floors: [], roomDetails: [{ id: device.room, name: newRoom.name, floorId: null }] });
+  });
   fixture.open();
   assert.equal(fixture.cardNode("dialog").open, true);
   assert.equal(fixture.cardNode("label").placeholder, "Climate");
@@ -147,13 +162,14 @@ test("card settings save custom identity and device-local secondary readings thr
   fixture.checkbox(temperature.id).checked = true;
   fixture.checkbox(temperature.id).dispatch("change");
   await fixture.cardNode("form").dispatch("submit");
-  const expected = { key: owner, label: "Living room climate", room: "Living room", primaryPointId: humidity.id, primaryUnit: null, secondaryPointIds: [temperature.id] };
+  const expected = { key: owner, label: "Living room climate", room: "room-living", primaryPointId: humidity.id, primaryUnit: null, secondaryPointIds: [temperature.id] };
   assert.deepEqual(fixture.posts().map((request) => request.url), ["/api/devices/settings"]);
-  assert.deepEqual(JSON.parse(fixture.posts()[0].options.body), expected);
+  assert.deepEqual(JSON.parse(fixture.posts()[0].options.body), { ...expected, room: "", newRoom: { name: "Living room", floorId: null } });
   assert.deepEqual(fixture.saved(), [expected]);
   const climate = fixture.models().find((device) => device.key === owner);
   assert.equal(climate.label, expected.label);
-  assert.equal(climate.room.label, expected.room);
+  assert.equal(climate.room.label, "Living room");
+  assert.equal(climate.room.id, expected.room);
   assert.equal(climate.metrics.primary.id, humidity.id);
   assert.equal(climate.metrics.secondary[0].id, temperature.id);
   assert.equal(climate.roles.setpoint.id, setpoint.id);
@@ -517,7 +533,7 @@ test("creates a persistent empty room and offers it in individual card settings"
   fixture.node("#rooms-name").value = " New office ";
   await fixture.node("#rooms-form").dispatch("submit");
   assert.deepEqual(fixture.posts().map((request) => request.url), ["/api/rooms"]);
-  assert.deepEqual(JSON.parse(fixture.posts()[0].options.body), { name: "New office" });
+  assert.deepEqual(JSON.parse(fixture.posts()[0].options.body), { name: "New office", floorId: null });
   assert.deepEqual(json(fixture.run("storedRooms")), ["New office"]);
   fixture.open();
   assert.ok(fixture.cardNode("room").options.some((option) => option.value === "room:New office"));
@@ -528,6 +544,64 @@ function selectRoom(fixture, name) {
   assert.ok(row, `Room ${name} is available`);
   row.children[0].dispatch("click");
 }
+
+test("users can create arbitrary floor groups and choose one independently when creating an empty room", async () => {
+  const f = setup();
+  let floors = [], roomDetails = [];
+  f.setHandler((url, options) => {
+    const body = JSON.parse(options.body);
+    if (url === "/api/floors/create") { floors = [{ id: "floor-a", name: body.name }]; return response({ floor: floors[0], floors, roomDetails }); }
+    if (url === "/api/rooms") { roomDetails = [{ id: "room-studio", name: body.name, floorId: body.floorId }]; return response({ room: "room-studio", rooms: ["room-studio"], floors, roomDetails }); }
+    if (url === "/api/floors/rename") { floors[0].name = body.name; return response({ floor: floors[0], floors, roomDetails }); }
+    throw new Error("Unexpected request");
+  });
+  f.run("openRoomsDialog()");
+  f.node("#floors-name").value = "1. kat A";
+  await f.node("#floors-form").dispatch("submit");
+  assert.equal(f.node("#rooms-floor").value, "floor-a");
+  assert(f.node("#rooms-floor").options.some(option => option.value === "floor-a" && option.textContent === "1. kat A"));
+  f.node("#rooms-name").value = "Studio";
+  await f.node("#rooms-form").dispatch("submit");
+  assert.deepEqual(JSON.parse(f.posts()[1].options.body), { name: "Studio", floorId: "floor-a" });
+  assert.equal(f.run('roomDisplayName("room-studio")'), "Studio · 1. kat A");
+  f.node("#floors-rename-name").value = "1. kat B";
+  await f.node("#floors-rename-form").dispatch("submit");
+  assert.equal(f.run('roomDisplayName("room-studio")'), "Studio · 1. kat B");
+  assert.equal(f.run('roomDefinition("room-studio").floorId'), "floor-a");
+});
+
+test("editing a room changes its explicit group without renaming its identity or touching the points", async () => {
+  const f = setup();
+  const floors = [{ id: "a", name: "1. kat A" }, { id: "b", name: "1. kat B" }];
+  const details = [{ id: "Office", name: "Office", floorId: "a" }];
+  f.run(`applyDeviceSettings([], [], [], ${JSON.stringify(floors)}, ${JSON.stringify(details)})`);
+  f.setHandler((_url, options) => { const body = JSON.parse(options.body); return response({ room: body.id, floors, roomDetails: [{ id: body.id, name: body.name, floorId: body.floorId }] }); });
+  f.run("openRoomsDialog()"); selectRoom(f, "Office · 1. kat A");
+  f.node("#rooms-edit-floor").value = "b";
+  await f.node("#rooms-rename-form").dispatch("submit");
+  assert.equal(f.posts()[0].url, "/api/rooms/update");
+  assert.deepEqual(JSON.parse(f.posts()[0].options.body), { id: "Office", name: "Office", floorId: "b" });
+  const climate = f.models().find(device => device.key === owner);
+  assert.equal(climate.room.id, "Office"); assert.equal(climate.room.floorId, "b");
+  assert.equal(climate.roles.setpoint.id, setpoint.id);
+});
+
+test("deleting a floor requires confirmation and keeps its rooms and devices", async () => {
+  const f = setup();
+  const floor = { id: "a", name: "North wing" };
+  f.run(`applyDeviceSettings([], [], [], [${JSON.stringify(floor)}], [{id:"Office",name:"Office",floorId:"a"}])`);
+  f.setHandler(() => response({ floors: [], roomDetails: [{ id: "Office", name: "Office", floorId: null }] }));
+  f.run("openRoomsDialog()");
+  f.node("#floors-list").children[0].children[0].dispatch("click");
+  f.node("#floors-delete").dispatch("click");
+  assert.equal(f.posts().length, 0);
+  assert.equal(f.node("#floors-delete-confirmation").hidden, false);
+  await f.node("#floors-delete-confirm").dispatch("click");
+  assert.equal(f.posts()[0].url, "/api/floors/delete");
+  const climate = f.models().find(device => device.key === owner);
+  assert.equal(climate.room.id, "Office"); assert.equal(climate.room.floorId, null);
+  assert.equal(f.models().length, 2);
+});
 
 test("selecting and renaming an automatic room updates its cards, choices and selected editor", async () => {
   const f = setup();
@@ -605,16 +679,19 @@ test("bulk room form sends selected device keys in one update and preserves thei
   const fixture = setup({ saved });
   fixture.setHandler((_url, options) => {
     const body = JSON.parse(options.body);
-    const devices = [saved[0], { ...automaticEntry, key: foreignOwner }].map((entry) => ({ ...entry, room: body.room }));
-    return response({ moved: body.keys.length, devices, rooms: [body.room] });
+    const room = body.newRoom ? "room-conference" : body.room;
+    const devices = [saved[0], { ...automaticEntry, key: foreignOwner }].map((entry) => ({ ...entry, room }));
+    return response({ moved: body.keys.length, devices, rooms: [room], floors: [], roomDetails: [{ id: room, name: body.newRoom?.name || room, floorId: null }] });
   });
   fixture.run("openBulkRoomDialog(cardSettingsDevices())");
+  fixture.node("#device-room-floor").value = "unknown";
+  fixture.node("#device-room-floor").dispatch("change");
   fixture.node("#device-room-target").value = "new";
   fixture.node("#device-room-target").dispatch("change");
   fixture.node("#device-room-new").value = "Conference room";
   await fixture.node("#device-room-form").dispatch("submit");
   assert.deepEqual(fixture.posts().map((request) => request.url), ["/api/devices/rooms"]);
-  assert.deepEqual(JSON.parse(fixture.posts()[0].options.body), { keys: [owner, foreignOwner], room: "Conference room" });
+  assert.deepEqual(JSON.parse(fixture.posts()[0].options.body), { keys: [owner, foreignOwner], room: "", newRoom: { name: "Conference room", floorId: null } });
   assert.ok(fixture.models().every((device) => device.room.label === "Conference room"));
   assert.equal(fixture.models()[0].label, "My climate");
   assert.equal(fixture.models()[0].metrics.primary.id, humidity.id);
@@ -625,12 +702,96 @@ test("failed bulk room save leaves cards unchanged and keeps the room dialog ava
   const fixture = setup({ saved: [{ ...automaticEntry, room: "Existing room" }] });
   fixture.setHandler(() => response({ error: "Disk unavailable" }, 500));
   fixture.run("openBulkRoomDialog(cardSettingsDevices())");
+  fixture.node("#device-room-floor").value = "unknown";
+  fixture.node("#device-room-floor").dispatch("change");
   fixture.node("#device-room-target").value = "new";
   fixture.node("#device-room-new").value = "Unwritten room";
   await fixture.node("#device-room-form").dispatch("submit");
   assert.equal(fixture.models()[0].room.label, "Existing room");
   assert.equal(fixture.node("#device-room-dialog").open, true);
   assert.match(fixture.node("#device-room-status").textContent, /Disk unavailable/);
+});
+
+function bulkFloorFixture(sameFloor = false) {
+  const fixture = setup({ saved: [{ ...automaticEntry, room: "kitchen-1" }, { ...automaticEntry, key: foreignOwner, room: sameFloor ? "kitchen-1" : "kitchen-2" }] });
+  const floors = [{ id: "floor:1", name: "1. kat A" }, { id: "floor:2", name: "1. kat B" }];
+  const rooms = [{ id: "kitchen-1", name: "Kitchen", floorId: "floor:1" }, { id: "kitchen-2", name: "Kitchen", floorId: "floor:2" }, { id: "empty-2", name: "Storage", floorId: "floor:2" }, { id: "unknown-room", name: "Hall", floorId: null }];
+  fixture.run(`applyDeviceSettings(fixtureSaved, ${JSON.stringify(rooms.map(room => room.id))}, [], ${JSON.stringify(floors)}, ${JSON.stringify(rooms)}); openBulkRoomDialog(cardSettingsDevices());`);
+  return fixture;
+}
+
+test("bulk move filters identical room names by stored floor ID and clears an incompatible previous target", async () => {
+  const fixture = bulkFloorFixture();
+  assert.equal(fixture.node("#device-room-floor").value, "all");
+  fixture.node("#device-room-target").value = "room:kitchen-1";
+  fixture.node("#device-room-floor").value = "floor:floor:2";
+  fixture.node("#device-room-floor").dispatch("change");
+  assert.equal(fixture.node("#device-room-target").value, "");
+  const choices = fixture.node("#device-room-target").options.map(option => option.value);
+  assert(choices.includes("room:kitchen-2")); assert(choices.includes("room:empty-2"));
+  assert(!choices.includes("room:kitchen-1")); assert(!choices.includes("room:unknown-room"));
+  assert.equal(fixture.node("#device-room-target").options.find(option => option.value === "room:kitchen-2").textContent, "Kitchen");
+  fixture.node("#device-room-target").value = "room:kitchen-2";
+  fixture.setHandler((_url, options) => response({ moved: 2, devices: fixture.saved().map(device => ({ ...device, room: JSON.parse(options.body).room })) }));
+  await fixture.node("#device-room-form").dispatch("submit");
+  assert.deepEqual(JSON.parse(fixture.posts()[0].options.body), { keys: [owner, foreignOwner], room: "kitchen-2" });
+  assert(fixture.models().every(device => device.room.floorId === "floor:2"));
+});
+
+test("bulk move preselects the common source floor and can atomically create its destination room on another group", async () => {
+  const fixture = bulkFloorFixture(true);
+  assert.equal(fixture.node("#device-room-floor").value, "floor:floor:1");
+  fixture.node("#device-room-floor").value = "floor:floor:2";
+  fixture.node("#device-room-floor").dispatch("change");
+  fixture.node("#device-room-target").value = "new";
+  fixture.node("#device-room-target").dispatch("change");
+  fixture.node("#device-room-new").value = "Studio";
+  assert.match(fixture.node("#device-room-hint").textContent, /1\. kat B/);
+  await fixture.node("#device-room-form").dispatch("submit");
+  assert.equal(fixture.posts().length, 1);
+  assert.deepEqual(JSON.parse(fixture.posts()[0].options.body), { keys: [owner, foreignOwner], room: "", newRoom: { name: "Studio", floorId: "floor:2" } });
+});
+
+test("bulk new-room creation requires an explicit group or the unknown-floor option and preserves the draft", async () => {
+  const fixture = bulkFloorFixture();
+  fixture.node("#device-room-target").value = "new";
+  fixture.node("#device-room-target").dispatch("change");
+  fixture.node("#device-room-new").value = "New room";
+  await fixture.node("#device-room-form").dispatch("submit");
+  assert.equal(fixture.posts().length, 0);
+  assert.match(fixture.node("#device-room-status").textContent, /odaberi kat/);
+  fixture.node("#device-room-floor").value = "unknown";
+  fixture.node("#device-room-floor").dispatch("change");
+  assert.equal(fixture.node("#device-room-new").value, "New room");
+  assert.equal(fixture.node("#device-room-target").value, "new");
+  assert.equal(fixture.node("#device-room-floor").validationMessage, "");
+  await fixture.node("#device-room-form").dispatch("submit");
+  assert.equal(JSON.parse(fixture.posts()[0].options.body).newRoom.floorId, null);
+});
+
+test("bulk unknown-floor filter keeps unknown and legacy rooms, and unassigning clears both room and inherited floor", async () => {
+  const fixture = bulkFloorFixture();
+  fixture.node("#device-room-floor").value = "unknown";
+  fixture.node("#device-room-floor").dispatch("change");
+  const choices = fixture.node("#device-room-target").options.map(option => option.value);
+  assert(choices.includes("room:unknown-room")); assert(choices.includes("room:Office"));
+  assert(!choices.includes("room:kitchen-1")); assert(choices.includes("auto"));
+  fixture.node("#device-room-target").value = "unassigned";
+  fixture.node("#device-room-target").dispatch("change");
+  assert.match(fixture.node("#device-room-hint").textContent, /bez dodijeljenog kata/);
+  await fixture.node("#device-room-form").dispatch("submit");
+  assert.equal(JSON.parse(fixture.posts()[0].options.body).room, "");
+});
+
+test("a live room move to a different floor invalidates an open bulk destination without losing the selected devices", async () => {
+  const fixture = bulkFloorFixture(true);
+  fixture.node("#device-room-target").value = "room:kitchen-1";
+  fixture.run(`applyDeviceSettings([...deviceSettingsByKey.values()], storedRooms, storedRoomRules, storedFloors, storedRoomDetails.map(room => room.id === 'kitchen-1' ? { ...room, floorId: 'floor:2' } : room));`);
+  assert.equal(fixture.node("#device-room-target").value, "");
+  assert.equal(fixture.node("#device-room-dialog").open, true);
+  assert.deepEqual(json(fixture.run("moveKeys")), [owner, foreignOwner]);
+  await fixture.node("#device-room-form").dispatch("submit");
+  assert.equal(fixture.posts().length, 0);
 });
 
 test("device removal requires confirmation and removes only the confirmed card's point configuration", async () => {

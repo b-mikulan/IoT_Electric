@@ -121,17 +121,100 @@ Widgets appear in collapsible groups based on their owning device's EWS path. Fo
 
 The optional `group` setting overrides automatic grouping and remains unchanged. Unknown path formats keep parent-folder grouping; IDs without a parent folder appear under **PLC vrijednosti**. Grouping does not hide or remove points, combine aliases, classify controls, or enable writing. Hidden widgets do not appear in a group, and a group with no visible widgets is hidden. Group headers show the visible/total count when some widgets are hidden.
 
+### Automatic discovery flow
+
+Discovery runs on the backend independently of the browser connection. It collects readable values before saving new point definitions; existing IDs and their settings are preserved.
+
+```mermaid
+flowchart TD
+    Start["Start at root or selected container"]
+    Browse["Read next queued container"]
+    Result{"Container readable?"}
+    Collect["Collect values and queue unseen children"]
+    Failure{"Starting container failed?"}
+    Warning["Record branch warning"]
+    Stop["Stop scan without adding points"]
+    More{"More containers?"}
+    Save["Save new IDs to widgets.json"]
+    Runtime["Add points to running poller"]
+    Browser["Broadcast configuration and scan result"]
+
+    Start --> Browse
+    Browse --> Result
+    Result -->|Yes, possibly with warnings| Collect
+    Result -->|No| Failure
+    Failure -->|Yes| Stop
+    Failure -->|No| Warning
+    Collect --> More
+    Warning --> More
+    More -->|Yes| Browse
+    More -->|No| Save
+    Save -->|Save succeeds| Runtime
+    Runtime --> Browser
+```
+
+Progress is streamed over SSE throughout the scan. Exceeding scan limits stops discovery before saving; a save failure prevents the collected points from being added to the running poller. New points are read-only until writing is explicitly enabled.
+
 ### Live refresh
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant App as Backend app.js
+    participant Poller as PointPoller
+    participant Middleware
+
+    Browser->>App: GET /api/config
+    App-->>Browser: Point definitions and card preferences
+    Browser->>App: Open /events
+    App-->>Browser: Cached snapshot
+
+    loop Shared polling cycle
+        Poller->>Middleware: POST /api/values/read in sequential batches
+        Middleware-->>Poller: Values, states, and point errors
+        Poller->>Poller: Compare with previous snapshot
+        opt Points changed
+            Poller-->>App: update with changed points
+            App-->>Browser: SSE update
+        end
+        Poller-->>App: sync with successful read timestamp
+        App-->>Browser: SSE sync
+    end
+```
+
+The sequence shows a successful cycle. A failed batch retains the preceding snapshot and sends an error status instead of a successful sync.
 
 The dashboard service starts one shared PointPoller immediately and schedules later polls with `POLL_INTERVAL_MS`. Overlapping ticks reuse the in-flight poll. It reads every configured point in sequential requests to middleware `POST /api/values/read`, bounded by `READ_BATCH_SIZE` and 60 KB request bodies, with `READ_BATCH_DELAY_MS` between batches. Middleware calls SOAP `GetValues` once for each batch. A successful complete cycle compares value, state and error against the previous snapshot. A point retains its `updatedAt` when those fields are unchanged, while the overall `syncedAt` advances after every successful cycle. A failed batch retains the preceding successful snapshot and publishes a connection error.
 
 The browser receives a full cached snapshot when connecting to `/events`, then changed-point `update` messages and successful-cycle `sync` messages over SSE. Changed values are emitted before successful read/status timestamps, so command readback cannot confirm an old value against a newer cycle timestamp. The 25-second stream heartbeat does not read the controller. Multiple browser tabs share the service poller.
+
+Page settings can pause automatic polling and adjust its interval and batching. Command readback defaults to the device's room, or just the device when it has no room; it does not schedule a full-building refresh. See [settings and targeted refresh](SETTINGS.md) for persistence, scheduling and partial-read behavior, and [floors and rooms](ORGANIZATION.md) for the saved organization model.
 
 Device cards keep an in-memory point-to-owner index and the resolved models. Ordinary reads merge only value/state/error/updatedAt and rebuild only affected owners, including linked legacy aliases and auxiliary property owners. Unaffected models retain object identity. Only already mounted, unfiltered cards for those owners update their DOM; unloaded cards retain the latest model until scrolling or search mounts them. Values alone do not rebuild room/search filters. Connection transitions refresh mounted controls and warnings without regrouping points. A successful unchanged sync only advances the read clock and checks outstanding command confirmations.
 
 The browser collects the latest changed point IDs until its next animation frame, then calls `updateValues` once. Structure is rebuilt through `update` after a full snapshot/reconnect, added/removed/hidden points, metadata changes or saved room/card preferences. This initializes ownership and dependency indexes again while retaining control drafts where their source remains valid. This optimization reduces browser work, not EWS read volume or frequency.
 
 ### Experimental device cards
+
+```mermaid
+flowchart TD
+    Points["Configured points and live readings"]
+    Grouping["widgetGrouping.js: full owner paths"]
+    Model["deviceModel.js: roles and device types"]
+    Metadata["Descriptions, units, permissions, enums"]
+    Preferences["Saved card preferences and room rules"]
+    Cards["deviceCards.js: readings and controls"]
+    Details["Diagnostics and unrecognized functions"]
+
+    Points --> Grouping
+    Grouping --> Model
+    Metadata --> Model
+    Preferences --> Model
+    Model --> Cards
+    Model --> Details
+```
+
+Full owner paths keep identically named devices on different controllers separate. Function roles distinguish commands from feedback and diagnostics; controller write permission alone does not establish a user control. Display preferences are saved separately from point definitions and do not grant command permissions.
 
 **Uređaji** is the main dashboard view, combining functions into cards for lights, lighting groups, climate units, blinds, sensors and zone summaries. It uses locally served JavaScript and styles, with no additional framework or build step. The former technical value view is preserved as a separate page at `/technical.html`, with a link back to the dashboard. Only that page creates individual point widgets and the manual write form. The main dashboard keeps point configuration and readings in memory without building their technical DOM. The visibility list is created only while its dialog is open and released on close. Polling and saved configuration are unchanged.
 
@@ -168,6 +251,44 @@ Two seconds after each successful controller write acknowledgement, the backend 
 The read-only `/api/devices/metadata` endpoint retrieves configured point descriptions with `GetItems`, their enums, and exact zone descriptions through the middleware. Credentials remain on the backend. Results are cached for 60 seconds, fetched in bounded groups, and partial failures return safe warnings. Room keys use the complete zone path; equal zone codes on different controllers are not merged. Kitchen comes from the Z312 description; AC309 and B301 remain without a room when no matching zone path is available. Metadata is loaded when the page opens and when widget configuration changes.
 
 The saved 9 October installation snapshot produces 10 owner cards, 30 main functions, 17 native diagnostic functions, 63 auxiliary properties, 8 other points and 34 merged Value references. These cards are not a verified count of physical devices: the two S3201 paths and the zone aggregate remain distinct.
+
+#### Device command flow
+
+The backend repeats command checks using a fresh controller read, even when display metadata comes from a saved catalog. The browser keeps command acceptance separate from confirmation by a subsequent reading.
+
+```mermaid
+sequenceDiagram
+    participant Browser as Browser card
+    participant Commands as DeviceCommandService
+    participant Metadata as DeviceMetadataClient
+    participant Poller as PointPoller
+    participant Middleware
+
+    Browser->>Commands: POST /api/devices/write through backend app.js
+    Commands->>Commands: Check visible, writable, native, unambiguous command
+    Commands->>Metadata: readFreshPoint
+    Metadata->>Middleware: Read current point and enum options
+    Middleware-->>Metadata: Value, state, permissions, options
+    Metadata-->>Commands: Fresh point information
+    Commands->>Commands: Recheck configuration and validate requested value
+
+    alt Validation passes
+        Commands->>Poller: writeValue
+        Poller->>Middleware: POST /api/values/write
+        Middleware-->>Poller: Successful write result
+        Poller-->>Commands: Acknowledgement
+        Commands-->>Browser: Command accepted
+        Note over Poller,Middleware: After two seconds, finish the current batch and read the device's room or device
+        Poller->>Middleware: POST /api/values/read in batches
+        Middleware-->>Poller: Reported values
+        Poller-->>Browser: Updates and sync through backend SSE
+        Browser->>Browser: Check matching command value in a fresh read
+    else Validation fails
+        Commands-->>Browser: Rejection with reason
+    end
+```
+
+The successful path is shown after validation; middleware or controller write failures return an error and do not schedule an extra read. Readback confirms the reported command value. Physical completion must be assessed using the device's feedback points.
 
 ### Offline grouping preview
 

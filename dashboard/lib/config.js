@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { readSavedSettings, settingsFile } = require("./dashboardSettings");
 const { deriveWidgetGroup, widgetGroup } = require("../public/widgetGrouping");
 
 const DEFAULT_DEMO_WIDGETS = [
@@ -203,7 +204,7 @@ function loadConfig(env = process.env) {
     );
   }
 
-  return {
+  const config = {
     port,
     demoMode,
     intervalMs: parseInterval(env.POLL_INTERVAL_MS),
@@ -220,6 +221,12 @@ function loadConfig(env = process.env) {
     deviceWidgetsFile,
     deviceMetadataFile,
   };
+  config.dashboardSettingsFile = settingsFile(config);
+  if (config.dashboardSettingsFile && [widgetsFile, deviceWidgetsFile, deviceMetadataFile].some(file => file && path.resolve(file).toLowerCase() === path.resolve(config.dashboardSettingsFile).toLowerCase())) {
+    throw new Error("dashboard-settings.json must be separate from point, device and metadata files.");
+  }
+  Object.assign(config, readSavedSettings(config));
+  return config;
 }
 
 module.exports = {

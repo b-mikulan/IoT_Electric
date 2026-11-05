@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
 const { parseWidgets } = require("../dashboard/lib/config");
+const { historyDefinitions } = require("./historyExport");
 
 function prepareWidgetImport(catalog, { building = "default", snapshotId, existingWidgets = [] } = {}) {
   // Validate the existing configuration before reusing any personal settings.
@@ -43,7 +44,8 @@ function prepareWidgetImport(catalog, { building = "default", snapshotId, existi
   const removedIds = existingWidgets.filter((widget) => !ids.has(widget.id)).map((widget) => widget.id);
   return {
     widgets,
-    metadata: { schemaVersion: 1, catalog: { buildingKey: building, snapshotId: snapshot.id, capturedAt: snapshot.captured_at }, metadataById, roomByZone },
+    metadata: { schemaVersion: 1, catalog: { buildingKey: building, snapshotId: snapshot.id, capturedAt: snapshot.captured_at }, metadataById, roomByZone,
+      ...historyDefinitions(catalog, { building, snapshotId: snapshot.id }) },
     summary: {
       building, snapshotId: snapshot.id, capturedAt: snapshot.captured_at, points: widgets.length,
       added: widgets.length - retained, retained, removed: removedIds.length, removedIds,

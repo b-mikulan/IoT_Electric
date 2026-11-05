@@ -8,6 +8,7 @@ const CACHE_TTL_MS = 60_000;
 const asArray = (value) => value == null || value === "" ? [] : Array.isArray(value) ? value : [value];
 const scalar = (value) => ["string", "number", "boolean"].includes(typeof value) ? String(value) : "";
 const flag = (value) => value === true || value === 1 || value === "1" || value === "true";
+const { normalizeHistoryItems } = require("./historyCatalog");
 
 function zonePath(id) {
   if (!/^(?:01|11)\//.test(id)) return "";
@@ -47,6 +48,7 @@ class DeviceMetadataClient {
         const saved = JSON.parse(fs.readFileSync(config.deviceMetadataFile, "utf8").replace(/^\uFEFF/, ""));
         if (saved !== null && (saved?.schemaVersion !== 1 || !saved.metadataById || Array.isArray(saved.metadataById) || typeof saved.metadataById !== "object"
           || !saved.roomByZone || Array.isArray(saved.roomByZone) || typeof saved.roomByZone !== "object")) throw new Error("Invalid catalog metadata format");
+        if (saved?.historyItems !== undefined) saved.historyItems = normalizeHistoryItems(saved.historyItems);
         this.#catalog = saved;
       } catch { throw new Error("Unable to load DEVICE_METADATA_FILE. Re-export the catalog descriptions or check its path."); }
     }
@@ -61,6 +63,21 @@ class DeviceMetadataClient {
     this.#catalog = catalog ? structuredClone(catalog) : null;
     this.#cache.clear();
     this.#inFlight.clear();
+  }
+
+  roomNames() {
+    return [...new Set(Object.values(this.#catalog?.roomByZone || {}).filter(value => typeof value === "string" && value.trim()))];
+  }
+
+  groupingMetadata() {
+    return this.#catalog || [...this.#cache.values()].at(-1)?.result || { metadataById: {}, roomByZone: {} };
+  }
+
+  setTimeoutMs(timeoutMs) { this.#timeoutMs = timeoutMs; }
+
+  historyCatalog() {
+    if (this.#demoMode) return { available: true, capturedAt: null, items: [{ id: "demo-history", name: "Demo temperatura", description: "Simulirani temperaturni trend", unit: "°C", valueItemId: "demo-room-temperature", parentIds: [] }] };
+    return { available: Array.isArray(this.#catalog?.historyItems), capturedAt: this.#catalog?.historyCatalog?.capturedAt || this.#catalog?.catalog?.capturedAt || null, items: this.#catalog?.historyItems || [] };
   }
 
   async read(widgets) {

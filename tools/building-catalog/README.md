@@ -35,6 +35,7 @@ npm run catalog -- container --id "00/03AS001/[Modbus Serial Client A]/ACX01/Poi
 npm run catalog -- points --native-only --search RmTmp
 npm run catalog -- point --id "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/EffSpt"
 npm run catalog -- snapshots
+npm run catalog -- trends --search AC101
 ```
 
 Lists return `total`, `limit`, `offset` and `items`. Default page size is 50, maximum 1000; use `--limit 100 --offset 100` to continue. Search matches labels, paths, descriptions or room names, ignoring case and accents. A parent filter uses actual saved links, including additional parents, rather than assuming that IDs form filesystem paths. `--id` for `device` is the exact owner key shown by `devices`; for `point` and `container` it is the exact EWS ID. IDs retain case and whitespace.
@@ -110,6 +111,33 @@ try {
 ```
 
 The dashboard integration currently uses the explicit widget/descriptor export described above; it does not open the catalog database directly. Discovery and live polling retain their existing behavior. Always pin a `snapshotId` when several catalog queries must use the same view while imports run. Data access is synchronous, so bulk imports belong in this CLI or a dedicated worker rather than an HTTP request handler.
+
+## Searchable trend list
+
+The catalog retains EWS HistoryItem definitions independently of live point
+widgets. `trends` lists these with their exact history IDs, descriptions, units,
+explicit `ValueItemId` links and all observed parent containers. Ordinary
+`widgets --apply` exports also include them in `catalog-metadata.json`.
+
+To add the complete saved trend list to an existing dashboard **without
+replacing its curated widgets, room assignments or descriptions**:
+
+```powershell
+npm run catalog -- trends --apply
+docker compose up -d --build --no-deps dashboard
+```
+
+This changes only the descriptor file and saves its original under
+`output/building-catalog/history-backups/`. It exports the full pinned snapshot,
+independently of list pagination/search options. The dashboard's **Trendovi i
+alarmi** page reads this local list and offers search, pagination and direct
+selection. Device/room labels are added only from explicit point references;
+similar names do not establish bindings. The original folder browser remains
+available for newly created trends absent from the snapshot. Selecting/searching
+a definition does not fetch samples; the chosen history and time range are
+queried only when the user presses **Dohvati trend**. Version-2 dashboard backups
+retain the list and its capture time, including trends whose source point is not
+configured as a widget.
 
 The catalog uses SQLite WAL transactions for atomic imports and concurrent readers, with a five-second busy timeout. For a plain-file backup, close catalog processes first and then copy the database; an active WAL file may contain committed changes and must not be omitted from a backup. Keep the original mapper checkpoint for raw pages and scan resumption. Generated catalog data is covered by the ignored `output/` directory.
 

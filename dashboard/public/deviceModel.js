@@ -154,7 +154,7 @@
             : !flag(widget.writable) ? "Upis nije uključen u postavkama ove točke." : null);
     return {
       id: String(widget.id || ""), label: classification.label, configuredLabel: widget.label || metadata.name || null,
-      value: widget.value, state, error: widget.error || null, unit: displayUnit, updatedAt: widget.updatedAt || null,
+      value: widget.value, state, error: widget.error || null, unit: displayUnit, updatedAt: widget.updatedAt || null, readAt: widget.readAt || null,
       role: classification.role, importance: classification.importance, reason: classification.reason,
       metadata: normalizedMetadata, command: classification.command, control, controlAvailable,
       writeAllowed: controlAvailable && flag(widget.writable), disabledReason,
@@ -251,7 +251,13 @@
     return buildDeviceModels(prepareDeviceContext(widgets, options.metadataById || {}), options);
   }
 
-  function buildDeviceModels({ known, byPath, owners }, { metadataById = {}, roomByZone = {}, deviceSettings = [], roomRules = [] } = {}, widgets = known.values()) {
+  function buildDeviceModels({ known, byPath, owners }, { metadataById = {}, roomByZone = {}, deviceSettings = [], roomRules = [], floors = [], roomDetails = [] } = {}, widgets = known.values()) {
+    const floorNames = new Map(floors.map(floor => [floor.id, floor.name]));
+    const roomDefinitions = new Map(roomDetails.map(room => [room.id, room]));
+    const decoratedRoom = room => {
+      const detail = room && roomDefinitions.get(room.label);
+      return detail ? { ...room, id: detail.id, label: detail.name, floorId: detail.floorId, floorLabel: floorNames.get(detail.floorId) || null } : room;
+    };
     const roomRulesByName = new Map(roomRules.map((rule) => [rule.from.normalize("NFC").toLocaleLowerCase("hr"), rule.to]));
     const resolvedRoom = (owner) => {
       const room = roomForOwner(owner, roomByZone);
@@ -332,11 +338,12 @@
       }
       device.type = deviceType(device);
       device.automaticLabel = device.label;
-      device.automaticRoom = device.room;
+      device.automaticRoom = decoratedRoom(device.room);
       device.defaultMetrics = defaultMetricIds(device);
       const settings = settingsByKey.get(device.key) || {};
       if (typeof settings.label === "string" && settings.label.trim()) device.label = settings.label.trim();
       if (typeof settings.room === "string") device.room = settings.room.trim() ? { label: settings.room.trim(), source: "Ručno dodijeljena prostorija" } : null;
+      device.room = decoratedRoom(device.room);
       const foreignPrimary = typeof settings.primaryPointId === "string" && grouping.deriveWidgetGrouping(settings.primaryPointId).key !== device.key;
       const primaryId = typeof settings.primaryPointId === "string" && !foreignPrimary ? settings.primaryPointId : device.defaultMetrics.primaryPointId;
       const secondaryIds = Array.isArray(settings.secondaryPointIds) ? [...new Set(settings.secondaryPointIds)] : device.defaultMetrics.secondaryPointIds;
@@ -394,7 +401,7 @@
           if (!previous) continue;
           const next = { ...previous };
           let changed = false;
-          for (const field of ["value", "state", "error", "updatedAt"]) {
+          for (const field of ["value", "state", "error", "updatedAt", "readAt"]) {
             if (!Object.hasOwn(point, field)) continue;
             if (!Object.is(previous[field], point[field])) changed = true;
             next[field] = point[field];

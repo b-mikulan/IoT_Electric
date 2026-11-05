@@ -2,6 +2,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
 const { deriveWidgetGrouping } = require("../public/widgetGrouping");
+const organization = require("./roomOrganization");
 
 const fields = ["label", "room", "primaryPointId", "secondaryPointIds"];
 
@@ -80,6 +81,7 @@ function parseDocument(raw) {
     if (document.roomRules !== undefined && (!Array.isArray(document.roomRules)
       || document.roomRules.some((rule) => !rule || roomName(rule.from) !== rule.from || rule.to !== "" && roomName(rule.to) !== rule.to)
       || new Set(document.roomRules.map((rule) => roomKey(rule.from))).size !== document.roomRules.length)) throw new Error("Invalid room rules.");
+    organization.validateOrganization(document);
     const keys = new Set();
     for (const device of document.devices) {
       const { key } = normalizeSettings(device);
@@ -99,6 +101,8 @@ class DeviceWidgetStore {
   #devices = [];
   #rooms = [];
   #roomRules = [];
+  #floors = [];
+  #roomDetails = [];
 
   constructor(filePath, { fsImpl = fs, protectedFilePath = "" } = {}) {
     this.#filePath = String(filePath || "").trim();
@@ -113,6 +117,8 @@ class DeviceWidgetStore {
   get devices() { return structuredClone(this.#devices); }
   get rooms() { return this.#rooms.slice(); }
   get roomRules() { return structuredClone(this.#roomRules); }
+  get floors() { return structuredClone(this.#floors); }
+  get roomDetails() { return structuredClone(this.#roomDetails); }
 
   withExclusive(operation) { return this.#enqueue(operation); }
 
@@ -122,14 +128,17 @@ class DeviceWidgetStore {
     this.#devices = document.devices.map((device) => normalizeSettings(device));
     this.#rooms = [...(document.rooms || [])];
     this.#roomRules = structuredClone(document.roomRules || []);
+    this.#floors = structuredClone(document.floors || []);
+    this.#roomDetails = structuredClone(document.roomDetails || []);
   }
 
-  synchronize(keys) {
+  synchronize(keys, { roomNames = [] } = {}) {
     return this.#enqueue(async () => {
       if (!this.enabled) return [];
       const { document, missing } = await this.#read();
       const known = new Set(document.devices.map((device) => normalizeSettings(device).key));
       let changed = missing;
+      if (organization.migrateOrganization(document, roomNames)) changed = true;
       for (const key of keys) {
         const entry = normalizeSettings({ key });
         if (known.has(entry.key)) continue;
@@ -143,7 +152,7 @@ class DeviceWidgetStore {
     });
   }
 
-  save(settings, { deviceKeys, pointIds }) {
+  save(settings, { deviceKeys, pointIds, roomNames = [] }) {
     return this.#enqueue(async () => {
       if (!this.enabled) throw new DeviceWidgetStoreError("Device card settings require a writable DEVICE_WIDGETS_FILE or WIDGETS_FILE directory.", 409, "DEVICE_WIDGET_FILE_UNAVAILABLE");
       const entry = normalizeSettings(settings, { requireFields: true });
@@ -156,6 +165,10 @@ class DeviceWidgetStore {
         throw invalidSettings("All readings must belong to this device.");
       }
       const { document } = await this.#read();
+      if (settings.newRoom) {
+        this.#ensureOrganization(document, roomNames);
+        entry.room = this.#organization(() => organization.addRoom(document, settings.newRoom.name, settings.newRoom.floorId ?? null)).id;
+      }
       if (entry.room) entry.room = registerRoom(document, entry.room);
       const known = new Set(document.devices.map((device) => normalizeSettings(device).key));
       for (const key of deviceKeys) {
@@ -173,11 +186,16 @@ class DeviceWidgetStore {
     });
   }
 
-  createRoom(name) {
+  createRoom(name, options = {}) {
     return this.#enqueue(async () => {
       this.#assertEnabled();
       const normalized = roomName(name);
       const { document } = await this.#read();
+      if (Object.hasOwn(options, "floorId")) {
+        this.#ensureOrganization(document, options.roomNames);
+        const room = this.#organization(() => organization.addRoom(document, normalized, options.floorId));
+        await this.#write(document); this.#publish(document); return room.id;
+      }
       if ((document.rooms || []).some((room) => room.toLocaleLowerCase("hr") === normalized.toLocaleLowerCase("hr"))) {
         throw new DeviceWidgetStoreError("A room with this name already exists.", 409, "ROOM_ALREADY_EXISTS");
       }
@@ -188,7 +206,7 @@ class DeviceWidgetStore {
     });
   }
 
-  assignRoom(keys, room, { deviceKeys }) {
+  assignRoom(keys, room, { deviceKeys, roomNames = [] }, newRoom) {
     return this.#enqueue(async () => {
       this.#assertEnabled();
       if (!Array.isArray(keys) || keys.length < 1 || keys.length > 1000 || keys.some((key) => typeof key !== "string" || !key.trim() || key.length > 4096)
@@ -197,6 +215,10 @@ class DeviceWidgetStore {
       const current = new Set(deviceKeys);
       if (keys.some((key) => !current.has(key))) throw new DeviceWidgetStoreError("A selected device is no longer present on the dashboard.", 404, "DEVICE_NOT_FOUND");
       const { document } = await this.#read();
+      if (newRoom) {
+        this.#ensureOrganization(document, roomNames);
+        room = this.#organization(() => organization.addRoom(document, newRoom.name, newRoom.floorId ?? null)).id;
+      }
       const target = room ? registerRoom(document, room) : room;
       const entries = new Map(document.devices.map((device) => [normalizeSettings(device).key, device]));
       for (const key of keys) {
@@ -221,12 +243,60 @@ class DeviceWidgetStore {
     return this.#changeRoom(name, "", context, true);
   }
 
+  updateRoom(id, name, floorId, { roomNames = [] } = {}) {
+    return this.#enqueue(async () => {
+      this.#assertEnabled();
+      const { document } = await this.#read();
+      this.#ensureOrganization(document, roomNames);
+      const room = document.roomDetails.find(entry => entry.id === id);
+      if (!room) throw new DeviceWidgetStoreError("Prostorija više ne postoji.", 404, "ROOM_NOT_FOUND");
+      this.#organization(() => { organization.checkFloor(document, floorId); room.name = organization.checkRoomName(document, name, floorId, id); });
+      room.floorId = floorId;
+      await this.#write(document); this.#publish(document);
+      return { room: id, name: room.name, floorId };
+    });
+  }
+
+  changeFloor(action, { id, name } = {}, context = {}) {
+    return this.#enqueue(async () => {
+      this.#assertEnabled();
+      const { document } = await this.#read();
+      this.#ensureOrganization(document, context.roomNames);
+      let floor = document.floors.find(entry => entry.id === id);
+      if (action !== "create" && !floor) throw new DeviceWidgetStoreError("Kat ili grupa više ne postoji.", 404, "FLOOR_NOT_FOUND");
+      if (action === "delete") {
+        document.floors = document.floors.filter(entry => entry.id !== id);
+        for (const room of document.roomDetails) if (room.floorId === id) room.floorId = null;
+      } else {
+        const normalized = this.#organization(() => organization.organizationName(name));
+        if (document.floors.some(entry => entry.id !== id && organization.organizationKey(entry.name) === organization.organizationKey(normalized))) throw new DeviceWidgetStoreError("Kat ili grupa s tim nazivom već postoji.", 409, "FLOOR_ALREADY_EXISTS");
+        if (action === "create") { floor = { id: `floor-${randomUUID()}`, name: normalized }; document.floors.push(floor); }
+        else floor.name = normalized;
+      }
+      await this.#write(document); this.#publish(document);
+      return { floor: structuredClone(floor) };
+    });
+  }
+
+  #organization(callback) {
+    try { return callback(); } catch (error) { throw invalidSettings(error.message); }
+  }
+
+  #ensureOrganization(document, names = []) {
+    this.#organization(() => organization.migrateOrganization(document, names, { force: true }));
+  }
+
   #changeRoom(name, target, { roomNames = [] }, deleting = false) {
     return this.#enqueue(async () => {
       this.#assertEnabled();
       const requested = roomName(name);
       if (!deleting) target = roomName(target);
       const { document } = await this.#read();
+      const detail = document.roomDetails?.find(room => room.id === name);
+      if (detail && !deleting) {
+        detail.name = this.#organization(() => organization.checkRoomName(document, target, detail.floorId, detail.id));
+        await this.#write(document); this.#publish(document); return { previousName: name, room: name, name: detail.name };
+      }
       const rules = document.roomRules ||= [];
       const ruleMap = new Map(rules.map((rule) => [roomKey(rule.from), rule.to]));
       const automaticRooms = roomNames.map((room) => ruleMap.has(roomKey(room)) ? ruleMap.get(roomKey(room)) : room);
@@ -241,6 +311,7 @@ class DeviceWidgetStore {
       // temporarily absent from the dashboard.
       for (const device of document.devices) if (device.room && roomKey(device.room) === previousKey) device.room = target;
       document.rooms = (document.rooms || []).filter((room) => roomKey(room) !== previousKey);
+      if (document.roomDetails) document.roomDetails = document.roomDetails.filter(room => roomKey(room.id) !== previousKey);
       for (const rule of rules) if (rule.to && roomKey(rule.to) === previousKey) rule.to = target;
       const sourceRule = rules.find((rule) => roomKey(rule.from) === previousKey);
       if (sourceRule) sourceRule.to = target;
@@ -276,6 +347,8 @@ class DeviceWidgetStore {
   async #write(document) {
     const temporaryPath = `${this.#filePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
+      organization.migrateOrganization(document);
+      organization.validateOrganization(document);
       await this.#fs.writeFile(temporaryPath, `${JSON.stringify(document, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
       await this.#fs.rename(temporaryPath, this.#filePath);
     } catch {
