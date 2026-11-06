@@ -136,6 +136,46 @@ let generalSettingsView = null;
 let pollingState = { paused: false, active: false };
 let deviceCardsFullRefresh = true;
 const devicePointUpdates = new Set();
+const consoleIssues = new Map();
+const failedReadbackIds = new Set();
+const consoleIssueLabels = {
+  read: "Osvježavanje očitanja nije uspjelo.",
+  events: "Veza preglednika s dashboard servisom je prekinuta; pokušavam ponovno.",
+  readback: "Provjera odabranih očitanja nije uspjela.",
+  "manual-refresh": "Ručno osvježavanje nije uspjelo.",
+  startup: "Pokretanje dashboarda nije uspjelo.",
+};
+
+function reportConsoleIssue(kind, reason, details = {}) {
+  const message = String(reason || "Nepoznata greška.");
+  const signature = JSON.stringify([message, details]);
+  if (consoleIssues.get(kind) === signature) return;
+  consoleIssues.set(kind, signature);
+  console[kind === "events" ? "warn" : "error"](`[IoT Electric] ${consoleIssueLabels[kind]}`, {
+    timestamp: new Date().toISOString(), source: kind, reason: message,
+    lastSuccessfulFullRead: deviceReadAt, configuredPointCount: configById.size,
+    pollingPaused: pollingState.paused, ...details,
+  });
+}
+
+function recoverConsoleIssue(kind, message) {
+  if (!consoleIssues.delete(kind)) return;
+  console.info(`[IoT Electric] ${message}`, {
+    timestamp: new Date().toISOString(), source: kind, lastSuccessfulFullRead: deviceReadAt,
+  });
+}
+
+function recordReadbackSuccess(payload) {
+  if (payload.scope === "partial") {
+    if (!failedReadbackIds.size) return;
+    for (const id of payload.pointIds || []) failedReadbackIds.delete(id);
+    if (failedReadbackIds.size) return;
+  } else {
+    if (payload.status !== "connected" && payload.status !== "online") return;
+    failedReadbackIds.clear();
+  }
+  recoverConsoleIssue("readback", "Prethodno neuspjela odabrana očitanja ponovno su dohvaćena.");
+}
 
 function refreshDeviceCards({ full = true } = {}) {
   if (full) deviceCardsFullRefresh = true;
@@ -239,6 +279,25 @@ async function writeDeviceCommand({ widgetId, value }) {
     throw new Error("Nije primljena valjana potvrda upisa. Provjeri očitanje prije ponovnog pokušaja.");
   }
   return payload;
+}
+
+async function refreshDeviceScope(target) {
+  try {
+    const response = await fetch("/api/dashboard/refresh-scope", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(target),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || `Osvježavanje nije uspjelo (HTTP ${response.status}).`);
+    if (payload.scope !== target.scope || payload.id !== target.id || !Number.isFinite(Date.parse(payload.readAt))
+      || !Number.isInteger(payload.pointCount) || payload.pointCount < 1 || !Number.isInteger(payload.errorCount)) {
+      throw new Error("Nije primljena valjana potvrda osvježavanja.");
+    }
+    recoverConsoleIssue("manual-refresh", "Ručno osvježavanje ponovno radi.");
+    return payload;
+  } catch (error) {
+    reportConsoleIssue("manual-refresh", error.message, target);
+    throw error;
+  }
 }
 
 function visualForUnit(unit = "") {
@@ -756,6 +815,12 @@ function showStatus(status = {}) {
   if (isOffline) {
     errorMessage.textContent =
       status.error || status.message || "Servis će pokušati ponovno.";
+    // Polling-state notifications can redraw this status without a new error.
+    if (state === "error" && (status.error || status.message)) {
+      reportConsoleIssue("read", status.error || status.message, { scope: "all", endpoint: "/api/values/read", requestFrom: "dashboard backend" });
+    }
+  } else if (isOnline && status.scope !== "partial") {
+    recoverConsoleIssue("read", "Osvježavanje očitanja ponovno radi.");
   }
   refreshDeviceCards({ full: false });
 }
@@ -2166,11 +2231,13 @@ writeForm?.addEventListener("submit", async (event) => {
 });
 
 async function boot() {
+  let phase = "configuration";
   try {
     const response = await fetch("/api/config", { cache: "no-store" });
-    if (!response.ok) throw new Error("Konfiguracija nije dostupna.");
+    if (!response.ok) throw new Error(`Konfiguracija nije dostupna (HTTP ${response.status}).`);
 
     const config = await response.json();
+    phase = "initialization";
     deviceDemoMode = config.demoMode === true;
     const deviceContainer = document.querySelector("#device-cards-section");
     deviceCardView = deviceContainer && globalThis.IoTDeviceCards?.create({
@@ -2179,6 +2246,7 @@ async function boot() {
       onSettings: openDeviceCardSettingsDialog,
       onRooms: openRoomsDialog,
       onMove: openBulkRoomDialog,
+      onRefresh: refreshDeviceScope,
     });
     demoBadge.hidden = !config.demoMode;
     widgetEditingEnabled = config.widgetEditingEnabled === true;
@@ -2216,7 +2284,13 @@ async function boot() {
     const events = new EventSource("/events");
     events.addEventListener("dashboard-settings", event => generalSettingsView?.setSettings(JSON.parse(event.data)));
     events.addEventListener("polling", event => generalSettingsView?.setPolling(JSON.parse(event.data)));
-    events.addEventListener("refresh-error", event => { generalSettingsView?.showError(`Provjera nakon naredbe nije uspjela: ${JSON.parse(event.data).error}`); });
+    events.addEventListener("refresh-error", event => {
+      const payload = JSON.parse(event.data);
+      const ids = Array.isArray(payload.pointIds) ? payload.pointIds : [];
+      for (const id of ids) failedReadbackIds.add(id);
+      reportConsoleIssue("readback", payload.error, { scope: "partial", pointCount: ids.length, samplePointIds: ids.slice(0, 3) });
+      generalSettingsView?.showError(`Provjera odabranih očitanja nije uspjela: ${payload.error}`);
+    });
     events.addEventListener("dashboard-imported", () => window.location.reload());
     events.addEventListener("snapshot", (event) => {
       reconcileSnapshot(JSON.parse(event.data));
@@ -2228,7 +2302,9 @@ async function boot() {
       applyPayload(JSON.parse(event.data));
     });
     events.addEventListener("sync", (event) => {
-      applyPayload(JSON.parse(event.data));
+      const payload = JSON.parse(event.data);
+      applyPayload(payload);
+      recordReadbackSuccess(payload);
     });
     events.addEventListener("config", (event) => {
       const payload = JSON.parse(event.data);
@@ -2253,14 +2329,18 @@ async function boot() {
       removeConfiguredWidgets(Array.isArray(payload.ids) ? payload.ids : [payload.id]);
     });
     events.onopen = () => {
+      recoverConsoleIssue("events", "Veza preglednika s dashboard servisom ponovno je uspostavljena.");
       showStatus({ state: "connecting" });
       void refreshSavedDeviceSettings();
     };
-    events.onerror = () => showStatus({
-      state: "offline",
-      message: "Veza s dashboard servisom je prekinuta. Pokušavam ponovno.",
-    });
+    events.onerror = () => {
+      reportConsoleIssue("events", "SSE veza nije dostupna.", {
+        endpoint: "/events", readyState: events.readyState, browserOnline: globalThis.navigator?.onLine,
+      });
+      showStatus({ state: "offline", message: "Veza s dashboard servisom je prekinuta. Pokušavam ponovno." });
+    };
   } catch (error) {
+    reportConsoleIssue("startup", error.message, { phase, ...(phase === "configuration" ? { endpoint: "/api/config" } : {}) });
     showStatus({ state: "offline", message: error.message });
   }
 }

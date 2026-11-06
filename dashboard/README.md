@@ -2,6 +2,8 @@
 
 This is the second, independent Node.js service. It polls the protected DDC middleware, detects changed values with `EventEmitter`, and pushes only those changes to open browsers over Server-Sent Events. The browser never receives the middleware username or password.
 
+For end users, see the [Croatian dashboard user guide](../docs/korisnicke-upute-dashboard.html). It is a standalone HTML file with embedded screenshots, image zoom and print/PDF styling; it can be opened offline and shared as one file.
+
 ## Quick preview
 
 ```sh
@@ -187,6 +189,12 @@ The sequence shows a successful cycle. A failed batch retains the preceding snap
 The dashboard service starts one shared PointPoller immediately and schedules later polls with `POLL_INTERVAL_MS`. Overlapping ticks reuse the in-flight poll. It reads every configured point in sequential requests to middleware `POST /api/values/read`, bounded by `READ_BATCH_SIZE` and 60 KB request bodies, with `READ_BATCH_DELAY_MS` between batches. Middleware calls SOAP `GetValues` once for each batch. A successful complete cycle compares value, state and error against the previous snapshot. A point retains its `updatedAt` when those fields are unchanged, while the overall `syncedAt` advances after every successful cycle. A failed batch retains the preceding successful snapshot and publishes a connection error.
 
 The browser receives a full cached snapshot when connecting to `/events`, then changed-point `update` messages and successful-cycle `sync` messages over SSE. Changed values are emitted before successful read/status timestamps, so command readback cannot confirm an old value against a newer cycle timestamp. The 25-second stream heartbeat does not read the controller. Multiple browser tabs share the service poller.
+
+SSE backpressure pauses subsequent writes until the response emits `drain`;
+`response.write()` returning `false` does not close a healthy connection. Updates,
+sync messages and heartbeats retain their order. Pending data is bounded to
+8 MiB per client; a stalled client that exceeds this queue is disconnected and
+can reconnect for a fresh snapshot without affecting other clients.
 
 Page settings can pause automatic polling and adjust its interval and batching. Command readback defaults to the device's room, or just the device when it has no room; it does not schedule a full-building refresh. See [settings and targeted refresh](SETTINGS.md) for persistence, scheduling and partial-read behavior, and [floors and rooms](ORGANIZATION.md) for the saved organization model.
 

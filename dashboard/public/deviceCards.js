@@ -9,6 +9,7 @@
     zone: ["M3 11 12 3l9 8M5 9v12h14V9M9 21v-7h6v7"],
     generic: ["M5 5h14v14H5zM9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"],
     settings: ["M10 3h4l.5 2.2 1.5.9 2.2-.6 2 3.5-1.7 1.6v1.8l1.7 1.6-2 3.5-2.2-.6-1.5.9-.5 2.2h-4l-.5-2.2-1.5-.9-2.2.6-2-3.5 1.7-1.6v-1.8L3.8 9l2-3.5 2.2.6 1.5-.9L10 3Z", "M15 11.7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"],
+    refresh: ["M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5", "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5"],
   };
   const roleLabels = {
     brightnessSet: "Zadana svjetlina", brightnessStatus: "Očitana svjetlina",
@@ -102,11 +103,13 @@
     return ({ 0: "U redu", 1: "Nesigurno očitanje", 2: "Forsirano", 3: "Izvan mreže", 4: "Greška" })[String(point?.state)] || "Stanje nije poznato";
   }
 
-  function create({ container, onWrite, onSettings, onRooms, onMove }) {
+  function create({ container, onWrite, onSettings, onRooms, onMove, onRefresh }) {
     if (!container || typeof container.append !== "function") throw new TypeError("Device cards need a DOM container.");
     const cards = new Map();
     const drafts = new Map();
     const commands = new Map();
+    const refreshes = new Map();
+    let refreshSequence = 0;
     let devices = [];
     let connection = "idle";
     let selectedRoom = "all";
@@ -223,6 +226,25 @@
     const roomPanelBody = el("div", "collapsible-body");
     roomPanelBody.append(floorFilters, roomListLabel, filters, floorHint);
     roomPanel.append(roomSummary, roomPanelBody);
+    const scopeActions = el("div", "dc-scope-actions");
+    const refreshFloor = el("button", "btn-small outlined dc-refresh-floor");
+    const refreshRoom = el("button", "btn-small outlined dc-refresh-room");
+    const floorRefreshLabel = el("span");
+    const roomRefreshLabel = el("span");
+    refreshFloor.type = refreshRoom.type = "button";
+    refreshFloor.append(icon("refresh"), floorRefreshLabel);
+    refreshRoom.append(icon("refresh"), roomRefreshLabel);
+    refreshFloor.title = "Osvježi sve uređaje na odabranom katu, bez obzira na pretragu i vrstu uređaja.";
+    refreshRoom.title = "Osvježi sve uređaje u odabranoj prostoriji, bez obzira na pretragu i vrstu uređaja.";
+    const floorTarget = () => ({ scope: "floor", id: selectedFloor === "unknown" ? null : selectedFloor });
+    const roomTarget = () => ({ scope: "room", id: selectedRoom === "unassigned" ? null : selectedRoom.slice(5) });
+    refreshFloor.addEventListener("click", () => { if (!refreshFloor.hidden) void startRefresh(floorTarget(), floorLabel(selectedFloor)); });
+    refreshRoom.addEventListener("click", () => { if (!refreshRoom.hidden) void startRefresh(roomTarget(), selectedRoom === "unassigned" ? "Bez prostorije" : availableRooms.get(selectedRoom)); });
+    scopeActions.append(refreshFloor, refreshRoom);
+    const scopeStatus = el("p", "dc-refresh-status dc-scope-status");
+    scopeStatus.setAttribute("role", "status");
+    scopeStatus.setAttribute("aria-live", "polite");
+    scopeStatus.hidden = true;
     const summary = el("p", "dc-summary");
     const readWarning = el("p", "dc-read-warning");
     readWarning.setAttribute("role", "status");
@@ -241,7 +263,7 @@
     const announce = el("div", "dc-sr-only");
     announce.setAttribute("role", "status");
     announce.setAttribute("aria-live", "polite");
-    container.replaceChildren(searchTools, management, selectionActions, managementStatus, roomPanel, summary, readWarning, grid, loadMore, empty, announce);
+    container.replaceChildren(searchTools, management, selectionActions, managementStatus, roomPanel, scopeActions, scopeStatus, summary, readWarning, grid, loadMore, empty, announce);
     const scrollObserver = typeof IntersectionObserver === "function" ? new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting) && !loadMore.hidden) showMore();
     }, { rootMargin: "0px 0px 500px 0px" }) : null;
@@ -252,6 +274,51 @@
     }
 
     function floorLabel(key) { return floorNames.get(key) || "Kat nije određen"; }
+
+    const refreshKey = target => JSON.stringify([target.scope, target.id]);
+    function paintRefresh(button, target, status) {
+      const state = refreshes.get(refreshKey(target));
+      button.disabled = state?.pending === true;
+      button.setAttribute("aria-busy", String(state?.pending === true));
+      button.classList.toggle("dc-refresh-busy", state?.pending === true);
+      if (status) {
+        status.hidden = !state;
+        status.textContent = state?.message || "";
+        status.classList.toggle("dc-refresh-error", state?.error === true);
+      }
+    }
+    function renderScopeActions() {
+      const enabled = typeof onRefresh === "function";
+      refreshFloor.hidden = !enabled || selectedFloor === "all";
+      refreshRoom.hidden = !enabled || selectedRoom === "all";
+      scopeActions.hidden = refreshFloor.hidden && refreshRoom.hidden;
+      floorRefreshLabel.textContent = "Osvježi kat";
+      roomRefreshLabel.textContent = "Osvježi prostoriju";
+      refreshFloor.setAttribute("aria-label", `Osvježi kat: ${floorLabel(selectedFloor)}`);
+      refreshRoom.setAttribute("aria-label", `Osvježi prostoriju: ${availableRooms.get(selectedRoom) || "Bez prostorije"}`);
+      paintRefresh(refreshFloor, floorTarget());
+      paintRefresh(refreshRoom, roomTarget());
+      const state = [!refreshRoom.hidden && refreshes.get(refreshKey(roomTarget())),
+        !refreshFloor.hidden && refreshes.get(refreshKey(floorTarget()))].filter(Boolean).sort((a, b) => b.sequence - a.sequence)[0];
+      scopeStatus.hidden = !state;
+      scopeStatus.textContent = state?.message || "";
+      scopeStatus.classList.toggle("dc-refresh-error", state?.error === true);
+    }
+    async function startRefresh(target, label, button, status) {
+      if (destroyed || typeof onRefresh !== "function" || refreshes.get(refreshKey(target))?.pending) return;
+      const state = { pending: true, message: `${label}: čekam očitanja…`, error: false, sequence: ++refreshSequence };
+      refreshes.set(refreshKey(target), state);
+      const paint = () => { if (!destroyed) { if (button) paintRefresh(button, target, status); renderScopeActions(); } };
+      paint();
+      try {
+        const result = await onRefresh(target);
+        state.message = `${label}: osvježeno ${new Date(result.readAt).toLocaleTimeString("hr-HR")} · ${result.pointCount} pointova${result.errorCount ? ` · ${result.errorCount} bez očitanja` : ""}.`;
+        state.error = result.errorCount > 0;
+      } catch (error) {
+        state.message = `${label}: osvježavanje nije uspjelo. ${error.message || error}`;
+        state.error = true;
+      } finally { state.pending = false; paint(); }
+    }
 
     function searchText(value) {
       return value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("hr");
@@ -362,6 +429,7 @@
       clearSelected.disabled = selectedKeys.size === 0;
       moveSelected.disabled = selectedKeys.size === 0;
       selectShown.disabled = count === 0;
+      renderScopeActions();
     }
 
     function renderRoomFilters() {
@@ -467,8 +535,19 @@
       settings.addEventListener("click", () => {
         if (!destroyed && settingsEnabled && typeof onSettings === "function") onSettings(card.device);
       });
+      const refresh = el("button", "dc-refresh-button dc-refresh-device");
+      refresh.type = "button";
+      refresh.hidden = typeof onRefresh !== "function";
+      refresh.append(icon("refresh"));
+      const refreshStatus = el("p", "dc-refresh-status");
+      refreshStatus.setAttribute("role", "status");
+      refreshStatus.setAttribute("aria-live", "polite");
+      refreshStatus.hidden = true;
+      refresh.addEventListener("click", () => void startRefresh({ scope: "device", id: card.device.key }, card.device.label, refresh, refreshStatus));
+      const cardActions = el("div", "dc-card-actions");
+      cardActions.append(refresh, settings);
       const type = el("span", "dc-type-label", typeLabels[initial.type] || "Uređaj");
-      top.append(deviceIcon, identity, settings, type);
+      top.append(deviceIcon, identity, cardActions, type);
       const body = el("div", "dc-card-body");
       const states = el("div", "dc-state-line");
       const details = el("details", "dc-details");
@@ -479,7 +558,7 @@
       commandStatus.setAttribute("role", "status");
       commandStatus.setAttribute("aria-live", "polite");
       commandStatus.hidden = true;
-      node.append(selectionLabel, top, body, states, commandStatus, details);
+      node.append(selectionLabel, top, body, states, commandStatus, refreshStatus, details);
 
       const pointFor = (role) => card.device.roles?.[role];
       const draftKey = (role) => `${card.device.key}\u0000${role}`;
@@ -824,6 +903,8 @@
         settings.hidden = !settingsEnabled || typeof onSettings !== "function";
         settings.setAttribute("aria-label", `Postavke uređaja ${device.label}`);
         settings.title = `Postavke uređaja ${device.label}`;
+        refresh.setAttribute("aria-label", `Osvježi uređaj ${device.label}`);
+        refresh.title = `Osvježi očitanja uređaja ${device.label}`;
         room.textContent = roomCaption(device.room) || "Prostorija nije dodijeljena";
         room.classList.toggle("dc-room-unknown", !device.room);
         const command = commands.get(device.key);
@@ -942,7 +1023,7 @@
         selectedKeys.clear(); selectionMode = false; applyFilter();
         managementStatus.textContent = message; managementStatus.hidden = !message;
       },
-      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); cards.clear(); selectedKeys.clear(); devices = []; deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
+      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); selectedKeys.clear(); devices = []; deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
   }
 
   const api = { create };

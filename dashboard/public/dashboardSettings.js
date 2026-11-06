@@ -100,7 +100,7 @@
       refresh.textContent = polling.active ? "Osvježavanje u tijeku…" : "Osvježi sve sada";
       dialog.querySelector(".general-refresh-panel").classList.toggle("is-paused", polling.paused);
       dialog.querySelector("[data-polling-status]").textContent = polling.active
-        ? polling.paused && polling.scope === "all" && !polling.manual ? "Zaustavljam nakon trenutačnog zahtjeva…" : polling.scope === "partial" ? "Provjeravam očitanja nakon naredbe…" : "Provjeravam sve pointove…"
+        ? polling.paused && polling.scope === "all" && !polling.manual ? "Zaustavljam nakon trenutačnog zahtjeva…" : polling.scope === "partial" ? "Provjeravam odabrane uređaje…" : "Provjeravam sve pointove…"
         : polling.paused ? "Automatsko osvježavanje je pauzirano." : "Automatsko osvježavanje je uključeno.";
       onPolling?.(polling);
     }

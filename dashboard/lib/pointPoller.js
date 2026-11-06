@@ -139,6 +139,7 @@ class PointPoller extends EventEmitter {
   #readingManual = false;
   #activeReadGeneration = null;
   #priorityIds = new Set();
+  #priorityRequests = [];
   #priorityPromise = null;
   #resolveWriteRefreshIds = null;
   #pendingWriteIds = new Set();
@@ -301,12 +302,12 @@ class PointPoller extends EventEmitter {
     return this.#runRead(null, manual);
   }
 
-  async #runRead(ids = null, manual = false) {
+  async #runRead(ids = null, manual = false, receipt = null) {
     this.#readingKind = ids ? "partial" : "all";
     this.#readingManual = manual;
     this.#activeReadGeneration = this.#readGeneration;
     this.emit("polling", this.getPollingState());
-    const operation = this.#performPoll(ids);
+    const operation = this.#performPoll(ids, receipt);
     this.#pollPromise = operation;
 
     try {
@@ -327,24 +328,52 @@ class PointPoller extends EventEmitter {
   }
 
   async refreshPoints(ids) {
+    return this.#queueRefresh(ids, false);
+  }
+
+  async refreshScope(ids) {
+    return this.#queueRefresh(ids, true);
+  }
+
+  async #queueRefresh(ids, manual) {
     const configured = new Set(this.#widgets.map(widget => widget.id));
-    for (const id of ids) if (configured.has(id)) this.#priorityIds.add(id);
-    if (!this.#priorityIds.size) return this.getSnapshot();
-    if (this.#readingKind === "all") this.#readGeneration += 1;
-    if (this.#priorityPromise) return this.#priorityPromise;
-    const generation = this.#writeRefreshGeneration;
-    const operation = (async () => {
-      if (this.#pollPromise) await this.#pollPromise;
-      while (this.#priorityIds.size && generation === this.#writeRefreshGeneration) {
-        const pending = [...this.#priorityIds];
-        this.#priorityIds.clear();
-        await this.#runRead(pending);
-      }
+    const selected = [...new Set(ids)].filter(id => configured.has(id));
+    if (!selected.length) {
+      if (manual) throw Object.assign(new Error("Nema pointova za osvježavanje."), { status: 404, code: "EMPTY_REFRESH_SCOPE" });
       return this.getSnapshot();
-    })();
-    this.#priorityPromise = operation;
-    try { return await operation; }
-    finally { if (this.#priorityPromise === operation) this.#priorityPromise = null; }
+    }
+    for (const id of selected) this.#priorityIds.add(id);
+    const request = { receipt: null };
+    this.#priorityRequests.push(request);
+    if (this.#readingKind === "all") this.#readGeneration += 1;
+    request.manual = manual;
+    if (!this.#priorityPromise) {
+      const generation = this.#writeRefreshGeneration;
+      // Defer the drain until its promise is installed, including for callers
+      // triggered synchronously by a polling event.
+      const operation = Promise.resolve().then(async () => {
+        if (this.#pollPromise) await this.#pollPromise;
+        while (this.#priorityIds.size && generation === this.#writeRefreshGeneration) {
+          const pending = [...this.#priorityIds];
+          this.#priorityIds.clear();
+          const requests = this.#priorityRequests.splice(0);
+          const receipt = { completed: false };
+          await this.#runRead(pending, requests.some(item => item.manual), receipt);
+          for (const item of requests) item.receipt = generation === this.#writeRefreshGeneration ? receipt : null;
+        }
+        this.#priorityRequests.length = 0;
+      });
+      this.#priorityPromise = operation;
+      operation.finally(() => { if (this.#priorityPromise === operation) this.#priorityPromise = null; }).catch(() => {});
+    }
+    await this.#priorityPromise;
+    if (!manual) return this.getSnapshot();
+    const receipt = request.receipt;
+    if (!receipt?.completed) throw Object.assign(new Error(receipt?.error || "Osvježavanje je prekinuto. Pokušaj ponovno."), {
+      status: receipt?.error ? 502 : 409, code: receipt?.error ? "SCOPED_REFRESH_FAILED" : "REFRESH_CANCELLED",
+    });
+    return { readAt: receipt.readAt, pointCount: selected.length,
+      errorCount: selected.filter(id => receipt.failedIds.has(id)).length };
   }
 
   replaceWidgets(widgets) {
@@ -897,7 +926,7 @@ class PointPoller extends EventEmitter {
     return this.getSnapshot();
   }
 
-  async #performPoll(ids = null) {
+  async #performPoll(ids = null, receipt = null) {
     const generation = this.#readGeneration;
     const selectedIds = ids ? new Set(ids) : null;
     const selectedWidgets = selectedIds ? this.#widgets.filter(widget => selectedIds.has(widget.id)) : this.#widgets;
@@ -950,6 +979,8 @@ class PointPoller extends EventEmitter {
         error: selectedIds ? this.snapshot.error : null,
         widgets: nextWidgets,
       };
+      if (receipt) Object.assign(receipt, { completed: true, readAt: syncedAt,
+        failedIds: new Set(nextWidgets.filter(widget => selectedIds?.has(widget.id) && widget.error).map(widget => widget.id)) });
 
       // Publish changed values before announcing a fresh successful read.
       // Even if a browser processes these events in separate frames, command
@@ -980,6 +1011,7 @@ class PointPoller extends EventEmitter {
       if (generation !== this.#readGeneration) return this.getSnapshot();
       if (this.#widgets.length === 0) return this.#emptySnapshot();
       const message = error instanceof Error ? error.message : String(error);
+      if (receipt) receipt.error = message;
       if (selectedIds) {
         this.emit("refresh-error", { scope: "partial", pointIds: [...selectedIds], error: message });
         return this.getSnapshot();

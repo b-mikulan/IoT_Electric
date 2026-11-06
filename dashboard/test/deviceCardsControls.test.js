@@ -51,7 +51,7 @@ function setup(t, initialDevices, onWrite, demo = false, initialReadAt, options 
   globalThis.document = { createElement: (tag) => new Element(tag), createElementNS: (_, tag) => new Element(tag), activeElement: null };
   globalThis.IoTDeviceModel = options.model || { buildDevices: () => devices };
   const container = new Element("section");
-  const view = create({ container, onWrite, onSettings: options.onSettings, onRooms: options.onRooms, onMove: options.onMove });
+  const view = create({ container, onWrite, onSettings: options.onSettings, onRooms: options.onRooms, onMove: options.onMove, onRefresh: options.onRefresh });
   const update = (next = devices, nextReadAt = readAt, overrides = {}) => { devices = next; readAt = nextReadAt; view.update({ status: "connected", demo, readAt, settingsEnabled: options.settingsEnabled, floors: options.floors, roomDetails: options.roomDetails, ...overrides }); };
   update();
   t.after(() => { view.destroy(); globalThis.document = previousDocument; globalThis.IoTDeviceModel = previousModel; });
@@ -561,6 +561,76 @@ function selectFloor(container, key) {
   button.dispatch("click");
   return button;
 }
+
+test("a card refresh reads its own stable key, stays usable offline and never writes or resets a draft", async t => {
+  let finish;
+  const calls = [], writes = [];
+  const light = device("light", { brightnessSet: point("brightnessSet", 40) });
+  const { container, update } = setup(t, [light], command => writes.push(command), false, undefined, {
+    onRefresh: target => { calls.push(target); return new Promise(resolve => { finish = resolve; }); },
+  });
+  const slider = byClass(container, "dc-range")[0];
+  slider.value = "62"; slider.dispatch("input");
+  update([light], undefined, { status: "offline" });
+  const button = byClass(container, "dc-refresh-device")[0];
+  assert.equal(button.disabled, undefined);
+  button.dispatch("click"); button.dispatch("click");
+  assert.deepEqual(calls, [{ scope: "device", id: light.key }]);
+  assert.equal(button.disabled, true);
+  assert.equal(button.attributes["aria-busy"], "true");
+  assert.equal(byClass(container, "dc-range")[0], slider);
+  assert.equal(slider.value, "62");
+  finish({ readAt: "2026-11-06T12:00:00Z", pointCount: 2, errorCount: 0 }); await flush();
+  assert.equal(button.disabled, false);
+  assert.match(byClass(container, "dc-refresh-status").at(-1).textContent, /osvježeno.*2 pointova/);
+  assert.deepEqual(writes, []);
+});
+
+test("room and floor refresh targets stay independent of search results and changes of selected room", async t => {
+  let finish;
+  const calls = [];
+  const devices = [
+    { ...device("sensor", {}), key: "ES/A", label: "A", room: { id: "k1", label: "Kitchen", floorId: "f1" } },
+    { ...device("sensor", {}), key: "ES/B", label: "B", room: { id: "office", label: "Office", floorId: "f1" } },
+    { ...device("sensor", {}), key: "ES/C", label: "C", room: { id: "k2", label: "Kitchen", floorId: "f2" } },
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, {
+    floors: [{ id: "f1", name: "1. kat A" }, { id: "f2", name: "1. kat B" }],
+    onRefresh: target => { calls.push(target); return new Promise(resolve => { finish = resolve; }); },
+  });
+  const roomButton = byClass(container, "dc-refresh-room")[0];
+  const floorButton = byClass(container, "dc-refresh-floor")[0];
+  assert.equal(roomButton.hidden, true); assert.equal(floorButton.hidden, true);
+  selectFloor(container, "f1");
+  byClass(container, "dc-room-filter").find(button => button.dataset.room === "room:k1").dispatch("click");
+  const search = byClass(container, "dc-search")[0]; search.value = "no results"; search.dispatch("input");
+  assert.equal(floorButton.hidden, false); assert.equal(roomButton.hidden, false);
+  roomButton.dispatch("click");
+  assert.deepEqual(calls[0], { scope: "room", id: "k1" });
+  selectFloor(container, "f2");
+  finish({ readAt: "2026-11-06T12:00:00Z", pointCount: 1, errorCount: 0 }); await flush();
+  assert.equal(byClass(container, "dc-scope-status")[0].hidden, true, "old room feedback must not appear under a different floor");
+  floorButton.dispatch("click");
+  assert.deepEqual(calls[1], { scope: "floor", id: "f2" });
+  finish({ readAt: "2026-11-06T12:00:01Z", pointCount: 1, errorCount: 1 }); await flush();
+  assert.match(byClass(container, "dc-scope-status")[0].textContent, /1 bez očitanja/);
+  selectFloor(container, "f1");
+  byClass(container, "dc-room-filter").find(button => button.dataset.room === "room:k1").dispatch("click");
+  floorButton.dispatch("click");
+  assert.match(byClass(container, "dc-scope-status")[0].textContent, /1\. kat A: čekam/);
+  finish({ readAt: "2026-11-06T12:00:02Z", pointCount: 2, errorCount: 0 }); await flush();
+  assert.match(byClass(container, "dc-scope-status")[0].textContent, /1\. kat A: osvježeno/);
+});
+
+test("a failed card refresh shows a retryable local error", async t => {
+  const { container } = setup(t, [device("sensor", {})], undefined, false, undefined, {
+    onRefresh: async () => { throw new Error("EWS nedostupan"); },
+  });
+  const button = byClass(container, "dc-refresh-device")[0];
+  button.dispatch("click"); await flush();
+  assert.equal(button.disabled, false);
+  assert.match(byClass(container, "dc-refresh-status").at(-1).textContent, /nije uspjelo.*EWS nedostupan/);
+});
 
 test("many rooms stay behind compact floor buttons and selecting a floor shows only its rooms", t => {
   const devices = Array.from({ length: 52 }, (_, index) => ({

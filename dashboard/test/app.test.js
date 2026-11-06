@@ -416,6 +416,40 @@ test("forwards scalar writes without exposing middleware credentials", async (t)
   assert.equal(poller.writeCalls.length, 2);
 });
 
+test("large building updates retain the SSE connection and deliver following sync events", { timeout: 5000 }, async (t) => {
+  const { baseUrl, poller } = await startApp(t);
+  const widgets = Array.from({ length: 3469 }, (_, i) => ({
+    id: `01/Building/Floor/Controller/Application/Room/Device-${i}/Values/Temperature`,
+    label: `Temperatura ${i}`, description: "Očitanje za provjeru velikog SSE prijenosa", unit: "°C",
+    value: 22.4, state: 0, error: null, updatedAt: "2026-11-06T11:38:32.260Z",
+  }));
+  poller.getSnapshot = () => ({ status: "connected", widgets });
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  const response = await fetch(`${baseUrl}/events`, { signal: controller.signal });
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffered = "";
+  async function receive(marker) {
+    while (!buffered.includes(marker)) {
+      const chunk = await reader.read();
+      assert.equal(chunk.done, false, `SSE ended before ${marker}`);
+      buffered += decoder.decode(chunk.value, { stream: true });
+    }
+  }
+  await receive('event: device-settings\n');
+  assert.ok(buffered.includes(`"id":"${widgets.at(-1).id}"`));
+  for (let cycle = 0; cycle < 2; cycle++) {
+    buffered = "";
+    poller.emit("update", { widgets });
+    poller.emit("sync", { status: "connected", cycle });
+    await receive(`event: sync\ndata: {"status":"connected","cycle":${cycle}}\n\n`);
+    assert.ok(buffered.includes(`"id":"${widgets.at(-1).id}"`));
+    assert.ok(buffered.indexOf('event: update\n') < buffered.indexOf('event: sync\n'));
+  }
+  await reader.cancel();
+});
+
 test("starts an SSE stream with the current snapshot", async (t) => {
   const { baseUrl, poller } = await startApp(t);
   const response = await fetch(`${baseUrl}/events`);

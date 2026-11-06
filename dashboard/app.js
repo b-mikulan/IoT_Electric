@@ -10,19 +10,14 @@ const { DeviceWidgetStore } = require("./lib/deviceWidgetStore");
 const { buildDevices } = require("./public/deviceModel");
 const { DashboardTransfer } = require("./lib/dashboardTransfer");
 const { DashboardSettingsStore } = require("./lib/dashboardSettings");
-const { resolveRefreshScope } = require("./lib/refreshScope");
+const { resolveRefreshScope, resolveManualRefreshScope } = require("./lib/refreshScope");
 const { buildHistoryCatalog } = require("./lib/historyCatalog");
+const { sendEvent, sendHeartbeat } = require("./lib/eventStream");
 
 const publicDirectory = path.join(__dirname, "public");
 const materializeDirectory = path.dirname(
   require.resolve("@materializecss/materialize/dist/css/materialize.min.css")
 );
-
-function sendEvent(response, event, payload) {
-  return response.write(
-    `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`
-  );
-}
 
 function publicWidget(widget) {
   const { id, label, description, unit, precision, writable, visible } = widget;
@@ -124,13 +119,14 @@ function createApp({
   let activeConfigurationRequests = 0;
   Object.assign(config, dashboardSettings.values);
   poller.configurePolling?.(dashboardSettings.values);
-  poller.setWriteRefreshResolver?.(id => resolveRefreshScope(config.widgets, {
+  const refreshModelOptions = () => ({
     ...(deviceMetadata.groupingMetadata?.() || {}),
     deviceSettings: deviceWidgetStore.devices,
     roomRules: deviceWidgetStore.roomRules,
     floors: deviceWidgetStore.floors,
     roomDetails: deviceWidgetStore.roomDetails,
-  }, id, config.afterWriteScope));
+  });
+  poller.setWriteRefreshResolver?.(id => resolveRefreshScope(config.widgets, refreshModelOptions(), id, config.afterWriteScope));
   app.disable("x-powered-by");
 
   // Hold configuration writes and reads that synchronize settings during an
@@ -324,8 +320,8 @@ function createApp({
     sendEvent(response, "dashboard-settings", { settings: dashboardSettings.values, persisted: Boolean(dashboardSettings.filePath) });
     sendEvent(response, "polling", poller.getPollingState?.());
     settingsClients.add(response);
-    const heartbeat = setInterval(() => response.write(": heartbeat\n\n"), 25_000);
-    request.on("close", () => { clearInterval(heartbeat); settingsClients.delete(response); });
+    const heartbeat = setInterval(() => sendHeartbeat(response), 25_000);
+    response.once("close", () => { clearInterval(heartbeat); settingsClients.delete(response); });
   });
   app.post("/api/dashboard/settings", requireJson, express.json({ limit: "4kb" }), (request, response) => {
     try {
@@ -345,6 +341,14 @@ function createApp({
     if (poller.getPollingState?.().active) return response.status(409).json({ error: "Osvježavanje je već u tijeku.", code: "REFRESH_IN_PROGRESS" });
     void poller.poll({ manual: true });
     return response.status(202).json({ polling: poller.getPollingState?.() });
+  });
+  app.post("/api/dashboard/refresh-scope", requireJson, express.json({ limit: "8kb" }), async (request, response) => {
+    response.set("Cache-Control", "no-store");
+    try {
+      const { ids, deviceCount } = resolveManualRefreshScope(config.widgets, refreshModelOptions(), request.body);
+      const result = await poller.refreshScope(ids);
+      return response.json({ ...request.body, deviceCount, ...result });
+    } catch (error) { return sendOperationError(response, error, "SCOPED_REFRESH_FAILED", "Osvježavanje odabranih uređaja nije uspjelo."); }
   });
 
   app.get("/api/devices/settings", async (request, response) => {
@@ -869,9 +873,9 @@ function createApp({
     sendEvent(response, "discovery", autoDiscovery);
     sendEvent(response, "device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
     eventClients.add(response);
-    const heartbeat = setInterval(() => response.write(": heartbeat\n\n"), 25_000);
+    const heartbeat = setInterval(() => sendHeartbeat(response), 25_000);
 
-    request.on("close", () => {
+    response.once("close", () => {
       clearInterval(heartbeat);
       eventClients.delete(response);
     });

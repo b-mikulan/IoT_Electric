@@ -82,6 +82,7 @@ function setup({ saved = [], enabled = true, editable = true, technical = true }
   };
   const requests = [];
   const eventSources = [];
+  const logs = [];
   let releaseBoot;
   let requestHandler = (url, options) => options?.method === "POST"
     ? response({ device: JSON.parse(options.body) })
@@ -96,12 +97,14 @@ function setup({ saved = [], enabled = true, editable = true, technical = true }
     getDevices() { return models.slice(); },
   };
   const context = vm.createContext({
+    console: Object.fromEntries(["error", "warn", "info"].map(level => [level, (...args) => logs.push({ level, args: json(args) })])),
+    navigator: { onLine: true },
     document: { querySelector: (selector) => !technical && ["#widget-grid", "#widget-template", "#empty-state", "#control-panel", "#write-form", "#write-widget", "#write-value", "#write-value-label", "#write-submit", "#write-status"].includes(selector) ? null : node(selector), createElement: (tag) => new Element(tag) },
     IoTWidgetGrouping: grouping, IoTDeviceModel: deviceModel,
-    IoTDeviceCards: { create: () => view },
+    IoTDeviceCards: { create: options => { view.callbacks = options; return view; } },
     Option: function Option(label, value) { const option = new Element("option"); option.textContent = label; option.value = value; return option; },
     EventSource: class {
-      constructor(url) { this.url = url; this.listeners = new Map(); eventSources.push(this); }
+      constructor(url) { this.url = url; this.readyState = 1; this.listeners = new Map(); eventSources.push(this); }
       addEventListener(name, callback) { this.listeners.set(name, callback); }
       emit(name, payload) { this.listeners.get(name)?.({ data: JSON.stringify(payload) }); }
     },
@@ -126,14 +129,120 @@ function setup({ saved = [], enabled = true, editable = true, technical = true }
   const checkbox = (id) => cardNode("secondary-list").children.map((label) => label.children[0]).find((input) => input?.value === id);
   const posts = () => requests.filter((request) => request.options.method === "POST");
   return {
-    node, cardNode, context, run, open, checkbox, posts, requests, eventSources,
+    node, cardNode, context, run, open, checkbox, posts, requests, eventSources, logs,
     models: () => view.getDevices(),
     renders: () => ({ fullUpdates, valueUpdates }),
     setHandler(handler) { requestHandler = handler; },
-    boot(config = {}) { releaseBoot(response({ widgets: [], intervalMs: 15000, widgetEditingEnabled: editable, deviceSettingsEnabled: enabled, deviceSettings: saved, ...config })); },
+    boot(config = {}, status = 200) { releaseBoot(response({ widgets: [], intervalMs: 15000, widgetEditingEnabled: editable, deviceSettingsEnabled: enabled, deviceSettings: saved, ...config }, status)); },
     saved: () => json(run("[...deviceSettingsByKey.values()]")),
   };
 }
+
+test("manual refresh callback checks the server receipt and reports HTTP failures without changing full freshness", async () => {
+  const f = setup({ technical: false }); f.boot(); await flush();
+  f.setHandler((url, options) => {
+    assert.equal(url, "/api/dashboard/refresh-scope");
+    return response({ ...JSON.parse(options.body), readAt: "2026-11-06T12:00:00Z", pointCount: 3, errorCount: 0 });
+  });
+  const before = f.node("#last-sync").textContent;
+  const result = await f.run(`fixtureView.callbacks.onRefresh({ scope: "room", id: "kitchen-1" })`);
+  assert.equal(result.pointCount, 3);
+  assert.deepEqual(JSON.parse(f.posts().at(-1).options.body), { scope: "room", id: "kitchen-1" });
+  assert.equal(f.node("#last-sync").textContent, before);
+  f.setHandler(() => response({ error: "EWS offline" }, 502));
+  await assert.rejects(f.run(`fixtureView.callbacks.onRefresh({ scope: "device", id: "ES/A" })`), /EWS offline/);
+  assert.equal(f.logs.at(-1).args[1].source, "manual-refresh");
+  f.setHandler(() => response({ readAt: "bad", pointCount: 3 }));
+  await assert.rejects(f.run(`fixtureView.callbacks.onRefresh({ scope: "floor", id: "floor-1" })`), /valjana potvrda/);
+});
+
+test("refresh diagnostics retain failure context, suppress repeated status redraws and report recovery once", async () => {
+  const f = setup({ technical: false });
+  f.boot(); await flush();
+  const events = f.eventSources[0];
+  const syncedAt = "2026-11-06T10:00:00.000Z";
+  events.emit("sync", { status: "connected", syncedAt });
+  events.emit("status", { status: "error", error: "Middleware request timed out after 30000 ms", syncedAt, privatePayload: "must-not-be-logged" });
+  assert.equal(f.node("#error-banner").hidden, false);
+  assert.equal(f.logs.length, 1);
+  const first = f.logs[0];
+  assert.equal(first.level, "error");
+  assert.equal(first.args[1].source, "read");
+  assert.equal(first.args[1].scope, "all");
+  assert.equal(first.args[1].lastSuccessfulFullRead, syncedAt);
+  assert.equal(first.args[1].configuredPointCount, widgets.length);
+  assert.equal(first.args[1].endpoint, "/api/values/read");
+  assert.ok(Number.isFinite(Date.parse(first.args[1].timestamp)));
+  assert.doesNotMatch(JSON.stringify(first), /must-not-be-logged/);
+  events.emit("status", { status: "error", error: first.args[1].reason });
+  f.run('showStatus({ state: "error" }); showStatus({ state: "connecting" });');
+  assert.equal(f.logs.length, 1);
+  events.emit("sync", { status: "connected", syncedAt: "2026-11-06T10:03:00.000Z" });
+  events.emit("sync", { status: "connected", syncedAt: "2026-11-06T10:06:00.000Z" });
+  assert.equal(f.node("#error-banner").hidden, true);
+  assert.deepEqual(f.logs.map(log => log.level), ["error", "info"]);
+  events.emit("status", { status: "error", error: first.args[1].reason });
+  events.emit("status", { status: "error", error: "Middleware request failed 503" });
+  assert.deepEqual(f.logs.map(log => log.level), ["error", "info", "error", "error"]);
+});
+
+test("SSE diagnostics separate connection recovery from a persistent upstream read failure", async () => {
+  const f = setup({ technical: false });
+  f.boot(); await flush();
+  const events = f.eventSources[0];
+  events.emit("status", { status: "error", error: "fetch failed" });
+  events.readyState = 0;
+  events.onerror(); events.onerror();
+  assert.deepEqual(f.logs.map(log => log.level), ["error", "warn"]);
+  assert.equal(f.logs[1].args[1].source, "events");
+  assert.equal(f.logs[1].args[1].readyState, 0);
+  assert.equal(f.logs[1].args[1].browserOnline, true);
+  assert.equal(f.node("#error-banner").hidden, false);
+  events.readyState = 1;
+  events.onopen(); events.onopen();
+  events.emit("snapshot", { status: "error", error: "fetch failed", widgets: [] });
+  assert.deepEqual(f.logs.map(log => log.level), ["error", "warn", "info"]);
+  assert.equal(f.logs[2].args[1].source, "events");
+  assert.equal(f.node("#error-banner").hidden, false);
+});
+
+test("readback diagnostics recover only after failed points are read, or after a successful full sync", async () => {
+  const f = setup({ technical: false });
+  f.boot(); await flush();
+  const events = f.eventSources[0];
+  const syncedAt = "2026-11-06T10:00:00.000Z";
+  events.emit("sync", { status: "connected", syncedAt });
+  const failure = { scope: "partial", pointIds: [temperature.id, humidity.id], error: "Middleware request failed 502" };
+  events.emit("refresh-error", failure); events.emit("refresh-error", failure);
+  events.emit("refresh-error", { ...failure, pointIds: [co2.id] });
+  assert.equal(f.logs.length, 2);
+  assert.equal(f.logs[0].args[1].pointCount, 2);
+  assert.deepEqual(f.logs[0].args[1].samplePointIds, failure.pointIds);
+  assert.equal(f.node("#error-banner").hidden, true);
+  for (const pointIds of [[temperature.id], [mode.id]]) events.emit("sync", { scope: "partial", status: "connected", pointIds, readAt: "2026-11-06T10:01:00.000Z" });
+  assert.equal(f.logs.length, 2);
+  events.emit("sync", { scope: "partial", status: "connected", pointIds: [humidity.id, co2.id], readAt: "2026-11-06T10:02:00.000Z" });
+  assert.equal(f.logs[2].level, "info");
+  assert.equal(f.logs[2].args[1].source, "readback");
+  assert.equal(f.run("deviceReadAt"), syncedAt);
+  events.emit("refresh-error", failure);
+  events.emit("sync", { status: "error", error: "fetch failed", syncedAt });
+  assert.equal(f.logs.filter(log => log.level === "info").length, 1);
+  events.emit("sync", { status: "connected", syncedAt: "2026-11-06T10:03:00.000Z" });
+  assert.equal(f.logs.filter(log => log.level === "info" && log.args[1].source === "readback").length, 2);
+});
+
+test("initial configuration failures are logged with their HTTP status and startup phase", async () => {
+  const f = setup({ technical: false });
+  f.boot({}, 503); await flush();
+  assert.equal(f.logs.length, 1);
+  assert.equal(f.logs[0].level, "error");
+  assert.equal(f.logs[0].args[1].source, "startup");
+  assert.equal(f.logs[0].args[1].phase, "configuration");
+  assert.equal(f.logs[0].args[1].endpoint, "/api/config");
+  assert.match(f.logs[0].args[1].reason, /503/);
+  assert.equal(f.node("#error-banner").hidden, false);
+});
 
 test("card settings save custom identity and device-local secondary readings through the settings endpoint only", async () => {
   const fixture = setup();
