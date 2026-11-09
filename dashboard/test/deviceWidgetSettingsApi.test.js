@@ -6,7 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { createApp } = require("../app");
 const { loadConfig } = require("../lib/config");
-const { buildDevices } = require("../public/deviceModel");
+const { buildDevices } = require("../public/devices/deviceModel");
 
 async function start(t, { inline = false } = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "device-widget-api-"));

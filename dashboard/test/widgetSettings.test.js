@@ -3,8 +3,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const grouping = require("../public/widgetGrouping");
-const deviceModel = require("../public/deviceModel");
+const grouping = require("../public/devices/widgetGrouping");
+const deviceModel = require("../public/devices/deviceModel");
 
 // Evaluate the actual browser entry point. Only boot's initial fetch is paused;
 // settings code, helper imports and registered event handlers run unmodified.
@@ -53,7 +53,7 @@ function setup(widgets) {
     requestAnimationFrame: (callback) => callback(),
     fixtureWidgets: structuredClone(widgets),
   });
-  vm.runInContext(fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../public/dashboard/app.js"), "utf8"), context);
   vm.runInContext("widgetEditingEnabled = true; for (const widget of fixtureWidgets) configById.set(widget.id, widget);", context);
   return { node, context, run: (source) => vm.runInContext(source, context) };
 }

@@ -1,8 +1,8 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
-const { deriveWidgetGrouping } = require("../public/widgetGrouping");
-const organization = require("./roomOrganization");
+const { deriveWidgetGrouping } = require("../../public/devices/widgetGrouping");
+const organization = require("../devices/roomOrganization");
 
 const fields = ["label", "room", "primaryPointId", "secondaryPointIds"];
 

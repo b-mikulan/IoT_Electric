@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
 const { createApp } = require("../app");
-const { buildDevices } = require("../public/deviceModel");
+const { buildDevices } = require("../public/devices/deviceModel");
 
 async function serve(t, config, deviceMetadata) {
   const poller = new EventEmitter();

@@ -4,12 +4,12 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { once } = require("node:events");
-const { DashboardSettingsStore } = require("../lib/dashboardSettings");
-const { resolveRefreshScope } = require("../lib/refreshScope");
-const { PointPoller } = require("../lib/pointPoller");
+const { DashboardSettingsStore } = require("../lib/storage/dashboardSettings");
+const { resolveRefreshScope } = require("../lib/telemetry/refreshScope");
+const { PointPoller } = require("../lib/telemetry/pointPoller");
 const { loadConfig } = require("../lib/config");
 const { createApp } = require("../app");
-const { DashboardTransfer, initializeTransferFiles } = require("../lib/dashboardTransfer");
+const { DashboardTransfer, initializeTransferFiles } = require("../lib/storage/dashboardTransfer");
 
 const defaults = { intervalMs: 180_000, readBatchSize: 128, readBatchDelayMs: 1000, timeoutMs: 30_000, afterWriteScope: "room" };
 const json = body => ({ ok: true, json: async () => body });

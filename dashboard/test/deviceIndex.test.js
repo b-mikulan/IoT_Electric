@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildDevices, createDeviceIndex } = require("../public/deviceModel");
+const { buildDevices, createDeviceIndex } = require("../public/devices/deviceModel");
 
 const owner = (index) => `ES/Application/Items/AC${index}`;
 const reading = (index, name, value) => ({ id: `01/${owner(index)}/Values/${name}`, label: name, value, state: 0, error: null, updatedAt: "initial", visible: true, writable: false });

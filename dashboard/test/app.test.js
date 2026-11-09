@@ -6,9 +6,9 @@ const os = require("node:os");
 const path = require("node:path");
 const { createApp } = require("../app");
 const { createRuntime } = require("../server");
-const { PointPoller } = require("../lib/pointPoller");
-const { WidgetStore } = require("../lib/widgetStore");
-const { DeviceWidgetStore } = require("../lib/deviceWidgetStore");
+const { PointPoller } = require("../lib/telemetry/pointPoller");
+const { WidgetStore } = require("../lib/storage/widgetStore");
+const { DeviceWidgetStore } = require("../lib/storage/deviceWidgetStore");
 const { loadConfig } = require("../lib/config");
 
 function persistedDashboardCleanup(t, directory, widgetFile) {

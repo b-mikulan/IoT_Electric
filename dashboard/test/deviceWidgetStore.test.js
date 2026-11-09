@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
-const { DeviceWidgetStore } = require("../lib/deviceWidgetStore");
+const { DeviceWidgetStore } = require("../lib/storage/deviceWidgetStore");
 
 async function fixture(t) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "device-widget-store-"));
@@ -57,7 +57,7 @@ test("automatic room renames and deletion stay resolved after restart and apply 
   assert.deepEqual(restarted.rooms, []);
   assert.ok(restarted.roomRules.every((rule) => rule.to === ""));
   await assert.rejects(restarted.deleteRoom("Server room", rooms), { code: "ROOM_NOT_FOUND" });
-  const { buildDevices } = require("../public/deviceModel");
+  const { buildDevices } = require("../public/devices/deviceModel");
   const future = buildDevices([{ id: "01/ES/Future/Values/RmTmp" }], { roomByZone: { ES: "Server room" }, roomRules: restarted.roomRules });
   assert.equal(future[0].room, null);
 });

@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { create } = require("../public/deviceCards");
+const { create } = require("../public/devices/deviceCards");
 
 // A small DOM fixture keeps these interaction tests independent of a browser or controller.
 class Element {
@@ -294,7 +294,7 @@ test("device settings remain hidden without a settings callback", (t) => {
 });
 
 test("persisted card title, room and device-local metrics update without changing the controlled point", async (t) => {
-  const model = require("../public/deviceModel");
+  const model = require("../public/devices/deviceModel");
   const owner = "ES/Room/L1";
   const set = { id: `01/${owner}/Values/LtPct`, value: 40, state: 0, writable: true };
   const feedback = { id: `01/${owner}/Values/LtVal`, value: 11, state: 0 };
@@ -338,7 +338,7 @@ test("persisted card title, room and device-local metrics update without changin
 });
 
 test("a missing chosen metric displays an unavailable placeholder instead of owner feedback", (t) => {
-  const model = require("../public/deviceModel");
+  const model = require("../public/devices/deviceModel");
   const owner = "ES/Room/L1";
   const { container, update } = setup(t, [], undefined, false, undefined, { model });
   const widgets = [
@@ -354,7 +354,7 @@ test("a missing chosen metric displays an unavailable placeholder instead of own
 });
 
 test("primary display units update between automatic, literal and unitless without altering secondary units or controls", async (t) => {
-  const model = require("../public/deviceModel");
+  const model = require("../public/devices/deviceModel");
   const owner = "ES/Room/Group1";
   const set = { id: `01/${owner}/Values/GrpPct`, value: 80, state: 0, writable: true, unit: "None" };
   const secondary = { id: `01/${owner}/Values/RmCO2`, value: 580, state: 0, unit: "ppm" };
@@ -379,7 +379,7 @@ test("primary display units update between automatic, literal and unitless witho
 });
 
 test("an explicit humidity display unit remains literal instead of applying the automatic RH abbreviation", (t) => {
-  const model = require("../public/deviceModel");
+  const model = require("../public/devices/deviceModel");
   const owner = "ES/Room/Sensor1";
   const humidity = { id: `01/${owner}/Values/RmRh`, value: 52, state: 0, unit: "%RH" };
   const { container, update } = setup(t, [], undefined, false, undefined, { model });
@@ -718,7 +718,7 @@ test("floor filtering combines with search, type, paging and selection across un
 });
 
 test("incremental readings retain floor selection and button identity, and removed floors reset safely", t => {
-  const model = require("../public/deviceModel");
+  const model = require("../public/devices/deviceModel");
   const first = { id: "01/ES/Zones/Z101/S1/Values/RmTmp", value: 20, state: 0, unit: "°C" };
   const second = { id: "01/ES/Zones/Z201/S2/Values/RmTmp", value: 21, state: 0, unit: "°C" };
   const { container, update, view } = setup(t, [], undefined, false, "first", { model });
@@ -740,7 +740,7 @@ test("incremental readings retain floor selection and button identity, and remov
 
 test("incremental values touch only the changed visible card and skip filtering and unchanged syncs", (t) => {
   const widgets = sensorWidgets();
-  const { container, view, update } = setup(t, [], undefined, false, "initial", { model: require("../public/deviceModel") });
+  const { container, view, update } = setup(t, [], undefined, false, "initial", { model: require("../public/devices/deviceModel") });
   update([], "initial", { widgets });
   const cards = byClass(container, "dc-card");
   const untouched = byClass(cards[0], "dc-metric-value")[0];
@@ -761,7 +761,7 @@ test("incremental values touch only the changed visible card and skip filtering 
 
 test("unloaded card readings stay current without mounting cards or losing bulk selections", (t) => {
   const widgets = sensorWidgets();
-  const { container, view, update } = setup(t, [], undefined, false, "initial", { model: require("../public/deviceModel"), onMove() {} });
+  const { container, view, update } = setup(t, [], undefined, false, "initial", { model: require("../public/devices/deviceModel"), onMove() {} });
   update([], "initial", { widgets, roomEditingEnabled: true });
   byClass(container, "dc-select-devices")[0].dispatch("click");
   byClass(container, "dc-select-shown")[0].dispatch("click");
@@ -777,7 +777,7 @@ test("unloaded card readings stay current without mounting cards or losing bulk 
 test("a no-op command receives readback on an unchanged incremental sync and status changes still disable controls", async (t) => {
   const set = { id: "01/ES/Application/Items/Light/Values/LtPct", value: 40, state: 0, writable: true, updatedAt: "same" };
   const calls = [];
-  const { container, view, update } = setup(t, [], async (command) => calls.push(command), false, "initial", { model: require("../public/deviceModel") });
+  const { container, view, update } = setup(t, [], async (command) => calls.push(command), false, "initial", { model: require("../public/devices/deviceModel") });
   update([], "initial", { widgets: [set], metadataById: { [set.id]: { writeable: 1 } } });
   const input = byClass(container, "dc-range")[0];
   input.value = "40";
@@ -799,7 +799,7 @@ test("a no-op command receives readback on an unchanged incremental sync and sta
 test("a filtered-out command confirms from a fresh sync and shows its current result when revealed", async (t) => {
   const set = { id: "01/ES/Application/Items/Light/Values/LtPct", value: 40, state: 0, writable: true, updatedAt: "same" };
   let calls = 0;
-  const { container, view, update } = setup(t, [], async () => calls++, false, "initial", { model: require("../public/deviceModel") });
+  const { container, view, update } = setup(t, [], async () => calls++, false, "initial", { model: require("../public/devices/deviceModel") });
   update([], "initial", { widgets: [set, ...sensorWidgets(1)], metadataById: { [set.id]: { writeable: 1 } } });
   const input = byClass(container, "dc-range")[0];
   input.value = "40";
@@ -818,7 +818,7 @@ test("a filtered-out command confirms from a fresh sync and shows its current re
 
 test("a changed read that contradicts a no-op target cannot confirm that command", async (t) => {
   const set = { id: "01/ES/Application/Items/Light/Values/LtPct", value: 40, state: 0, writable: true, updatedAt: "initial" };
-  const { container, view, update } = setup(t, [], async () => {}, false, "initial", { model: require("../public/deviceModel") });
+  const { container, view, update } = setup(t, [], async () => {}, false, "initial", { model: require("../public/devices/deviceModel") });
   update([], "initial", { widgets: [set], metadataById: { [set.id]: { writeable: 1 } } });
   const input = byClass(container, "dc-range")[0];
   input.value = "40";
@@ -834,7 +834,7 @@ test("a changed read that contradicts a no-op target cannot confirm that command
 test("only the command's own fresh point can confirm a partial read, including a no-op command", async t => {
   const a = { id: "01/ES/Application/Items/LightA/Values/LtPct", value: 40, state: 0, writable: true, updatedAt: "initial", readAt: "first" };
   const b = { ...a, id: "01/ES/Application/Items/LightB/Values/LtPct" };
-  const { container, view, update } = setup(t, [], async () => {}, false, "full-first", { model: require("../public/deviceModel") });
+  const { container, view, update } = setup(t, [], async () => {}, false, "full-first", { model: require("../public/devices/deviceModel") });
   update([], "full-first", { widgets: [a, b], metadataById: { [a.id]: { writeable: 1 }, [b.id]: { writeable: 1 } } });
   const input = byClass(container, "dc-range")[0]; input.value = "40"; input.dispatch("change"); await flush();
   view.updateValues({ widgets: [{ id: b.id, readAt: "other-room" }] });

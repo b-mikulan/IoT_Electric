@@ -1,5 +1,5 @@
-const { buildDevices } = require("../public/deviceModel");
-const { deriveWidgetGrouping } = require("../public/widgetGrouping");
+const { buildDevices } = require("../../public/devices/deviceModel");
+const { deriveWidgetGrouping } = require("../../public/devices/widgetGrouping");
 
 // Resolve against saved room identities, including manual moves and room rules.
 // This uses local metadata only; a command never starts a topology traversal.

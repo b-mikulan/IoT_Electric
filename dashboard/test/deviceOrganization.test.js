@@ -5,10 +5,10 @@ const os = require("node:os");
 const path = require("node:path");
 const { createApp } = require("../app");
 const { loadConfig } = require("../lib/config");
-const { PointPoller } = require("../lib/pointPoller");
-const { WidgetStore } = require("../lib/widgetStore");
-const { DeviceWidgetStore } = require("../lib/deviceWidgetStore");
-const { deriveWidgetGrouping } = require("../public/widgetGrouping");
+const { PointPoller } = require("../lib/telemetry/pointPoller");
+const { WidgetStore } = require("../lib/storage/widgetStore");
+const { DeviceWidgetStore } = require("../lib/storage/deviceWidgetStore");
+const { deriveWidgetGrouping } = require("../public/devices/widgetGrouping");
 
 const first = "ES/RP1/Application/Items/AC1";
 const second = "ES/RP2/Application/Items/AC1";

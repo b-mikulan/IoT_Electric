@@ -1,5 +1,5 @@
-const model = require("../public/deviceModel");
-const { deriveWidgetGrouping } = require("../public/widgetGrouping");
+const model = require("../../public/devices/deviceModel");
+const { deriveWidgetGrouping } = require("../../public/devices/widgetGrouping");
 
 class DeviceCommandError extends Error {
   constructor(message, status, code) {

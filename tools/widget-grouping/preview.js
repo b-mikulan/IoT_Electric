@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { parseWidgets } = require("../../dashboard/lib/config");
-const { describeWidgetGroup } = require("../../dashboard/public/widgetGrouping");
+const { describeWidgetGroup } = require("../../dashboard/public/devices/widgetGrouping");
 
 function extractWidgets(data) {
   if (Array.isArray(data)) return data;

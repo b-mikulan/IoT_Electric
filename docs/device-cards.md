@@ -1,6 +1,6 @@
 # Pravila kartica uređaja i stvarnog upravljanja
 
-Kartice koriste eksplicitna pravila prilagođena pregledanoj EBO instalaciji. Ne koriste Ontology Graph niti pretpostavljaju da EWS sam opisuje kompletan uređaj. Ista logika `dashboard/public/deviceModel.js` izvršava se u pregledniku i na backendu.
+Kartice koriste eksplicitna pravila prilagođena pregledanoj EBO instalaciji. Ne koriste Ontology Graph niti pretpostavljaju da EWS sam opisuje kompletan uređaj. Ista logika `dashboard/public/devices/deviceModel.js` izvršava se u pregledniku i na backendu.
 
 Kartice uređaja glavni su prikaz dashboarda. Sirovi widgeti i obrazac ručnog upisa skriveni su u početno zatvorenom odjeljku **Tehnički prikaz vrijednosti** ispod kartica. Točke ostaju konfigurirane i nastavljaju se dohvaćati; ne mijenjamo njihovo polje `visible`, jer ono utječe i na kartice uređaja.
 

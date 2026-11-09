@@ -8,7 +8,7 @@ const CACHE_TTL_MS = 60_000;
 const asArray = (value) => value == null || value === "" ? [] : Array.isArray(value) ? value : [value];
 const scalar = (value) => ["string", "number", "boolean"].includes(typeof value) ? String(value) : "";
 const flag = (value) => value === true || value === 1 || value === "1" || value === "true";
-const { normalizeHistoryItems } = require("./historyCatalog");
+const { normalizeHistoryItems } = require("../telemetry/historyCatalog");
 
 function zonePath(id) {
   if (!/^(?:01|11)\//.test(id)) return "";

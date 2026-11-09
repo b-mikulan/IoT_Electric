@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
-const { createEventWriter, sendEvent, sendHeartbeat } = require("../lib/eventStream");
+const { createEventWriter, sendEvent, sendHeartbeat } = require("../lib/http/eventStream");
 
 class Response extends EventEmitter {
   constructor(results = []) { super(); this.results = results; this.chunks = []; this.destroyed = false; }

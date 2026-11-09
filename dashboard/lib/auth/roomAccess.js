@@ -1,5 +1,5 @@
-const { buildDevices } = require("../public/deviceModel");
-const { deriveWidgetGrouping } = require("../public/widgetGrouping");
+const { buildDevices } = require("../../public/devices/deviceModel");
+const { deriveWidgetGrouping } = require("../../public/devices/widgetGrouping");
 
 function createRoomIndex(widgets, options, roomNames = []) {
   const rooms = new Map(roomNames.map(id => [id, { id, name: id, floorId: null }]));

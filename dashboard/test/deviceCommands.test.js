@@ -1,8 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
-const { DeviceCommandService } = require("../lib/deviceCommands");
-const { DeviceMetadataClient } = require("../lib/deviceMetadata");
+const { DeviceCommandService } = require("../lib/devices/deviceCommands");
+const { DeviceMetadataClient } = require("../lib/devices/deviceMetadata");
 const { createApp } = require("../app");
 
 const light = "01/ES/Network/RP31/Application/Items/L1/Values/LtPct";

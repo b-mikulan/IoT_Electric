@@ -4,11 +4,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const { EventEmitter, once } = require("node:events");
-const { normalizeHistoryItems, buildHistoryCatalog } = require("../lib/historyCatalog");
-const { DeviceMetadataClient } = require("../lib/deviceMetadata");
+const { normalizeHistoryItems, buildHistoryCatalog } = require("../lib/telemetry/historyCatalog");
+const { DeviceMetadataClient } = require("../lib/devices/deviceMetadata");
 const { loadConfig } = require("../lib/config");
 const { createApp } = require("../app");
-const { DashboardTransfer } = require("../lib/dashboardTransfer");
+const { DashboardTransfer } = require("../lib/storage/dashboardTransfer");
 
 const valueId = "01/AS/Zones/Z1/Device/Values/RmTmp";
 const historyId = "03/AS/Logs/Temperature";

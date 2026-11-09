@@ -4,6 +4,13 @@ This is the second, independent Node.js service. It polls the protected DDC midd
 
 For end users, see the [Croatian dashboard user guide](../docs/korisnicke-upute-dashboard.html). It is a standalone HTML file with embedded screenshots, image zoom and print/PDF styling; it can be opened offline and shared as one file.
 
+## Source layout
+
+- `public/pages/` contains the HTML entry points. Frontend assets are grouped under `public/dashboard/`, `public/devices/`, `public/admin/`, `public/trends/`, `public/transfer/` and `public/shared/`.
+- `lib/auth/` handles accounts, sessions and room access. `lib/devices/` handles device commands, metadata and room organization.
+- `lib/telemetry/` handles polling, history and refresh scopes. `lib/storage/` holds SQLite, the configuration stores and import/export.
+- `lib/http/` serves the existing asset URLs and writes Server-Sent Events.
+
 ## Quick preview
 
 ```sh

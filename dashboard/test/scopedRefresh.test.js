@@ -1,8 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { once } = require("node:events");
-const { resolveManualRefreshScope } = require("../lib/refreshScope");
-const { PointPoller } = require("../lib/pointPoller");
+const { resolveManualRefreshScope } = require("../lib/telemetry/refreshScope");
+const { PointPoller } = require("../lib/telemetry/pointPoller");
 const { loadConfig } = require("../lib/config");
 const { createApp } = require("../app");
 

@@ -2,7 +2,7 @@ const fsSync = require("node:fs");
 const fs = require("node:fs/promises");
 const { randomUUID } = require("node:crypto");
 
-const { parseWidgets, widgetGroup } = require("./config");
+const { parseWidgets, widgetGroup } = require("../config");
 
 class WidgetStoreError extends Error {
   constructor(message, status, code) {

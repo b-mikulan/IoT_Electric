@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
-const { normalizeHistoryItems } = require("../dashboard/lib/historyCatalog");
+const { normalizeHistoryItems } = require("../dashboard/lib/telemetry/historyCatalog");
 
 function historyDefinitions(catalog, { building = "default", snapshotId } = {}) {
   const snapshot = catalog.snapshot({ building, snapshotId });

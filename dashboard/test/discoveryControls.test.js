@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const grouping = require("../public/widgetGrouping");
+const grouping = require("../public/devices/widgetGrouping");
 
 class Element {
   constructor() {
@@ -51,7 +51,7 @@ function setup({ editable = true, canAdd = true } = {}) {
     fixtureEditable: editable,
     fixturePayload: { canAdd, items: [{ id: "00/Floor & room", name: "Floor", kind: "container" }] },
   });
-  vm.runInContext(fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "../public/dashboard/app.js"), "utf8"), context);
   const run = (source) => vm.runInContext(source, context);
   run("widgetEditingEnabled = fixtureEditable; renderDiscoveryItems(fixturePayload);");
   return { node, requests, run, scan: run("Array.from(discoveryContainerButtons)[0]") };

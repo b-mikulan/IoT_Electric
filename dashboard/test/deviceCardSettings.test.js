@@ -3,8 +3,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const grouping = require("../public/widgetGrouping");
-const deviceModel = require("../public/deviceModel");
+const grouping = require("../public/devices/widgetGrouping");
+const deviceModel = require("../public/devices/deviceModel");
 
 // Run the complete browser entry point and its registered handlers. The DOM,
 // transport and rendering sink are fixtures; card models use the production
@@ -119,7 +119,7 @@ function setup({ saved = [], enabled = true, editable = true, technical = true }
     fixtureWidgets: json(widgets), fixtureSaved: json(saved), fixtureView: view,
   });
   const run = (source) => vm.runInContext(source, context);
-  run(fs.readFileSync(path.join(__dirname, "../public/app.js"), "utf8"));
+  run(fs.readFileSync(path.join(__dirname, "../public/dashboard/app.js"), "utf8"));
   run(`widgetEditingEnabled = ${editable}; deviceSettingsEnabled = ${enabled};
     for (const widget of fixtureWidgets) configById.set(widget.id, widget);
     deviceMetadata = { metadataById: {}, roomByZone: { "ES/Application/Items": "Office" } };
@@ -363,8 +363,8 @@ test("a queued live update cannot restore a device removed before the next frame
 });
 
 test("technical value view lives on its own page instead of the main dashboard", () => {
-  const main = fs.readFileSync(path.join(__dirname, "../public/index.html"), "utf8");
-  const technical = fs.readFileSync(path.join(__dirname, "../public/technical.html"), "utf8");
+  const main = fs.readFileSync(path.join(__dirname, "../public/pages/index.html"), "utf8");
+  const technical = fs.readFileSync(path.join(__dirname, "../public/pages/technical.html"), "utf8");
   assert.doesNotMatch(main, /id="(?:raw-widgets-panel|widget-grid|widget-template|write-form)"/);
   assert.match(technical, /id="widget-grid"/);
   assert.match(technical, /id="widget-template"/);

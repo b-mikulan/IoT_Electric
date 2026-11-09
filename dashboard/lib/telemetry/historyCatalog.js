@@ -1,5 +1,5 @@
-const { buildDevices } = require("../public/deviceModel");
-const { deriveWidgetGrouping } = require("../public/widgetGrouping");
+const { buildDevices } = require("../../public/devices/deviceModel");
+const { deriveWidgetGrouping } = require("../../public/devices/widgetGrouping");
 
 function normalizeHistoryItems(items) {
   if (!Array.isArray(items) || items.length > 50_000) throw new Error("Neispravan popis trendova.");

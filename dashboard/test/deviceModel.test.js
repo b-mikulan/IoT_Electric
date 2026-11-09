@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-const { buildDevices, normalizePoint, validateDeviceCommand } = require("../public/deviceModel");
+const { buildDevices, normalizePoint, validateDeviceCommand } = require("../public/devices/deviceModel");
 
 const rp = (controller) => `03AS001/[BACnet Interface]/IP Network/${controller}`;
 const zone = `${rp("RP32")}/Application/Zones/Z312`;
@@ -256,8 +256,8 @@ test("groups the observed 55 functions, 34 Value references and 63 auxiliary pro
 
 test("browser and server use the same pure model and do not mutate snapshots", () => {
   const context = vm.createContext({});
-  vm.runInContext(fs.readFileSync(require.resolve("../public/widgetGrouping"), "utf8"), context);
-  vm.runInContext(fs.readFileSync(require.resolve("../public/deviceModel"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(require.resolve("../public/devices/widgetGrouping"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(require.resolve("../public/devices/deviceModel"), "utf8"), context);
   const values = [point(light, "LtPct"), point(light, "LtVal")];
   const original = JSON.stringify(values);
   assert.deepEqual(JSON.parse(JSON.stringify(context.IoTDeviceModel.buildDevices(values))), buildDevices(values));

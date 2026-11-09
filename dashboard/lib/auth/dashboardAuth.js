@@ -1,7 +1,7 @@
 const { randomBytes } = require("node:crypto");
 const express = require("express");
 const { normalizeUsername, verifyPassword } = require("./dashboardUsers");
-const { sendEvent } = require("./eventStream");
+const { sendEvent } = require("../http/eventStream");
 
 const cookieName = "iot_dashboard_session";
 const sessionDuration = 12 * 60 * 60 * 1000;

@@ -1,13 +1,13 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { createHash, randomUUID } = require("node:crypto");
-const { parseWidgets } = require("./config");
+const { parseWidgets } = require("../config");
 const { parseDeviceDocument, normalizeSettings } = require("./deviceWidgetStore");
-const { buildDevices } = require("../public/deviceModel");
-const { deriveWidgetGrouping } = require("../public/widgetGrouping");
-const { migrateOrganization } = require("./roomOrganization");
+const { buildDevices } = require("../../public/devices/deviceModel");
+const { deriveWidgetGrouping } = require("../../public/devices/widgetGrouping");
+const { migrateOrganization } = require("../devices/roomOrganization");
 const { validateSettings, settingsFromConfig, settingsFile } = require("./dashboardSettings");
-const { normalizeHistoryItems } = require("./historyCatalog");
+const { normalizeHistoryItems } = require("../telemetry/historyCatalog");
 
 const FORMAT = "iot-electric-dashboard";
 const MAX_POINTS = 50_000;

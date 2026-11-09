@@ -4,14 +4,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createApp } = require("./app");
 const { loadConfig, readWidgetConfiguration } = require("./lib/config");
-const { PointPoller } = require("./lib/pointPoller");
-const { WidgetStore } = require("./lib/widgetStore");
-const { DeviceWidgetStore, parseDeviceDocument } = require("./lib/deviceWidgetStore");
-const { DashboardTransfer, initializeTransferFiles } = require("./lib/dashboardTransfer");
-const { DashboardSettingsStore, settingsFromConfig } = require("./lib/dashboardSettings");
-const { DeviceMetadataClient, readCatalog } = require("./lib/deviceMetadata");
-const { createDashboardAuth } = require("./lib/dashboardAuth");
-const { DashboardUsers } = require("./lib/dashboardUsers");
+const { PointPoller } = require("./lib/telemetry/pointPoller");
+const { WidgetStore } = require("./lib/storage/widgetStore");
+const { DeviceWidgetStore, parseDeviceDocument } = require("./lib/storage/deviceWidgetStore");
+const { DashboardTransfer, initializeTransferFiles } = require("./lib/storage/dashboardTransfer");
+const { DashboardSettingsStore, settingsFromConfig } = require("./lib/storage/dashboardSettings");
+const { DeviceMetadataClient, readCatalog } = require("./lib/devices/deviceMetadata");
+const { createDashboardAuth } = require("./lib/auth/dashboardAuth");
+const { DashboardUsers } = require("./lib/auth/dashboardUsers");
 
 const configDirectory = path.join(__dirname, "config");
 
@@ -67,7 +67,7 @@ function createRuntime(env = process.env, { databaseFile = env.DASHBOARD_DB_FILE
     if (target.startsWith(publicDirectory) || target === usersFile.toLowerCase() || legacyFiles.includes(target)) {
       throw new Error("DASHBOARD_DB_FILE must be outside the public directory and separate from legacy configuration files.");
     }
-    const { DashboardDatabase } = require("./lib/dashboardDatabase");
+    const { DashboardDatabase } = require("./lib/storage/dashboardDatabase");
     database = new DashboardDatabase(filename);
   }
   try {

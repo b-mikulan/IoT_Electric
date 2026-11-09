@@ -3,8 +3,8 @@ const path = require("node:path");
 const { createHash } = require("node:crypto");
 const { DatabaseSync } = require("node:sqlite");
 const { BuildingCatalog } = require("./store");
-const { buildDevices } = require("../dashboard/public/deviceModel");
-const { deriveWidgetGrouping } = require("../dashboard/public/widgetGrouping");
+const { buildDevices } = require("../dashboard/public/devices/deviceModel");
+const { deriveWidgetGrouping } = require("../dashboard/public/devices/widgetGrouping");
 
 const KINDS = new Set(["container", "value", "history", "alarm"]);
 const text = (value) => value === null || value === undefined ? "" : String(value);
@@ -19,7 +19,7 @@ function objectJson(raw, context) {
 
 function recognizerHash() {
   const hash = createHash("sha256");
-  for (const filename of ["deviceModel.js", "widgetGrouping.js"]) hash.update(fs.readFileSync(path.join(__dirname, "..", "dashboard", "public", filename)));
+  for (const filename of ["deviceModel.js", "widgetGrouping.js"]) hash.update(fs.readFileSync(path.join(__dirname, "..", "dashboard", "public", "devices", filename)));
   return hash.digest("hex");
 }
 

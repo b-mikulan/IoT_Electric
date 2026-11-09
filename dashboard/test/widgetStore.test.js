@@ -4,7 +4,7 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 
-const { WidgetStore } = require("../lib/widgetStore");
+const { WidgetStore } = require("../lib/storage/widgetStore");
 
 test("failed atomic replacement during bulk removal retains every point and cleans its temporary file", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "widget-store-atomic-"));

@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
-const { TelemetryClient, normalizeResponse } = require("../lib/telemetry");
+const { TelemetryClient, normalizeResponse } = require("../lib/telemetry/telemetry");
 const { createApp } = require("../app");
 
 const options = { historyItemId: "03/trend", timeFrom: "2026-09-21T02:00:00+02:00", timeTo: "2026-09-22T02:00:00+02:00" };

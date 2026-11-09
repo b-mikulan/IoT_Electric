@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { readSavedSettings, settingsFile, settingsFromConfig, validateSettings } = require("./dashboardSettings");
-const { deriveWidgetGroup, widgetGroup } = require("../public/widgetGrouping");
+const { readSavedSettings, settingsFile, settingsFromConfig, validateSettings } = require("./storage/dashboardSettings");
+const { deriveWidgetGroup, widgetGroup } = require("../public/devices/widgetGrouping");
 
 const DEFAULT_DEMO_WIDGETS = [
   {

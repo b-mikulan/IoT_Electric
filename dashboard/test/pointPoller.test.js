@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { PointPoller } = require("../lib/pointPoller");
+const { PointPoller } = require("../lib/telemetry/pointPoller");
 
 function jsonResponse(body, status = 200) {
   return {

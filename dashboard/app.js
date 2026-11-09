@@ -1,25 +1,21 @@
 const express = require("express");
 const path = require("node:path");
-const { TelemetryClient } = require("./lib/telemetry");
+const { TelemetryClient } = require("./lib/telemetry/telemetry");
 const { widgetGroup } = require("./lib/config");
-const { deriveWidgetGrouping } = require("./public/widgetGrouping");
-const { DeviceMetadataClient } = require("./lib/deviceMetadata");
-const { createDeviceDemo } = require("./lib/deviceDemo");
-const { DeviceCommandService } = require("./lib/deviceCommands");
-const { DeviceWidgetStore } = require("./lib/deviceWidgetStore");
-const { buildDevices } = require("./public/deviceModel");
-const { DashboardTransfer } = require("./lib/dashboardTransfer");
-const { DashboardSettingsStore } = require("./lib/dashboardSettings");
-const { resolveRefreshScope, resolveManualRefreshScope } = require("./lib/refreshScope");
-const { buildHistoryCatalog } = require("./lib/historyCatalog");
-const { sendEvent, sendHeartbeat } = require("./lib/eventStream");
-const { trackDashboardStream } = require("./lib/dashboardAuth");
-const { createRoomIndex, scopeRooms } = require("./lib/roomAccess");
-
-const publicDirectory = path.join(__dirname, "public");
-const materializeDirectory = path.dirname(
-  require.resolve("@materializecss/materialize/dist/css/materialize.min.css")
-);
+const { deriveWidgetGrouping } = require("./public/devices/widgetGrouping");
+const { DeviceMetadataClient } = require("./lib/devices/deviceMetadata");
+const { createDeviceDemo } = require("./lib/devices/deviceDemo");
+const { DeviceCommandService } = require("./lib/devices/deviceCommands");
+const { DeviceWidgetStore } = require("./lib/storage/deviceWidgetStore");
+const { buildDevices } = require("./public/devices/deviceModel");
+const { DashboardTransfer } = require("./lib/storage/dashboardTransfer");
+const { DashboardSettingsStore } = require("./lib/storage/dashboardSettings");
+const { resolveRefreshScope, resolveManualRefreshScope } = require("./lib/telemetry/refreshScope");
+const { buildHistoryCatalog } = require("./lib/telemetry/historyCatalog");
+const { sendEvent, sendHeartbeat } = require("./lib/http/eventStream");
+const { createStaticAssets } = require("./lib/http/staticAssets");
+const { trackDashboardStream } = require("./lib/auth/dashboardAuth");
+const { createRoomIndex, scopeRooms } = require("./lib/auth/roomAccess");
 
 function publicWidget(widget) {
   const { id, label, description, unit, precision, writable, visible } = widget;
@@ -1027,22 +1023,7 @@ function createApp({
     });
   });
 
-  app.use(
-    "/vendor/materialize",
-    express.static(materializeDirectory, {
-      immutable: true,
-      maxAge: "7d",
-    })
-  );
-  const vendorFiles = {
-    "/vendor/datatables.js": require.resolve("datatables.net/js/dataTables.min.js"),
-    "/vendor/datatables.css": require.resolve("datatables.net-dt/css/dataTables.dataTables.min.css"),
-    "/vendor/chart.js": path.join(path.dirname(require.resolve("chart.js")), "chart.umd.min.js"),
-  };
-  for (const [url, file] of Object.entries(vendorFiles)) {
-    app.get(url, (request, response) => response.sendFile(file));
-  }
-  app.use(express.static(publicDirectory));
+  app.use(createStaticAssets());
 
   app.use((error, request, response, next) => {
     if (response.headersSent) return next(error);

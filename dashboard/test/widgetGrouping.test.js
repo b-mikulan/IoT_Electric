@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-const { deriveWidgetGrouping, deriveWidgetGroup, widgetGroup, describeWidgetGroup } = require("../public/widgetGrouping");
+const { deriveWidgetGrouping, deriveWidgetGroup, widgetGroup, describeWidgetGroup } = require("../public/devices/widgetGrouping");
 const { parseWidgets } = require("../lib/config");
 
 const rp = (controller) => `AS/[BACnet Interface]/IP Network/${controller}`;
@@ -52,7 +52,7 @@ test("preserves custom group overrides and the old fallback for unknown identifi
 
 test("the browser uses the same grouping rules as the server", () => {
   const context = vm.createContext({});
-  vm.runInContext(fs.readFileSync(require.resolve("../public/widgetGrouping"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(require.resolve("../public/devices/widgetGrouping"), "utf8"), context);
   const id = `11/${ac}/Points/Input Registers/RmTmp/Reliability`;
   assert.equal(context.IoTWidgetGrouping.deriveWidgetGroup(id), deriveWidgetGroup(id));
   assert.equal(context.IoTWidgetGrouping.widgetGroup({ id, group: "Custom" }), "Custom");

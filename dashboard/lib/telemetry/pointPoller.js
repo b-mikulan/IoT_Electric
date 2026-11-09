@@ -1,6 +1,6 @@
 const { EventEmitter } = require("node:events");
 const { isDeepStrictEqual } = require("node:util");
-const { widgetGroup } = require("./config");
+const { widgetGroup } = require("../config");
 
 const NO_VALUE_ERROR = "No value returned by middleware";
 
