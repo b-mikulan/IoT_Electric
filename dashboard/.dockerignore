@@ -5,3 +5,7 @@ npm-debug.log
 test
 README.md
 /config
+**/dashboard-users.json
+**/dashboard-users.json.*.tmp
+**/dashboard.sqlite
+**/dashboard.sqlite-*

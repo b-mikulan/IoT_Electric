@@ -37,6 +37,76 @@
   display: none !important;
 }
 
+.dashboard-auth-page {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.dashboard-auth-panel {
+  width: min(100%, 440px);
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.dashboard-auth-panel form {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.dashboard-auth-panel input:not([type="checkbox"]),
+.dashboard-auth-panel select,
+.dashboard-auth-panel button {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.dashboard-auth-panel button {
+  margin-top: 8px;
+  border-color: var(--brand);
+  color: #fff;
+  background: var(--brand);
+  cursor: pointer;
+}
+
+.dashboard-auth-error {
+  color: var(--error);
+}
+
+.dashboard-auth-panel:has(#admin-user-form) {
+  width: min(100%, 580px);
+}
+
+#admin-users {
+  display: block;
+  width: 100%;
+}
+
+#admin-room-field {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+#admin-room-search {
+  display: block;
+  width: 100%;
+  margin: 4px 0 12px;
+}
+
+.dashboard-admin-rooms {
+  display: grid;
+  gap: 8px;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
 * {
   box-sizing: border-box;
 }

@@ -103,7 +103,7 @@
     return ({ 0: "U redu", 1: "Nesigurno očitanje", 2: "Forsirano", 3: "Izvan mreže", 4: "Greška" })[String(point?.state)] || "Stanje nije poznato";
   }
 
-  function create({ container, onWrite, onSettings, onRooms, onMove, onRefresh }) {
+  function create({ container, onWrite, onSettings, onRooms, onMove, onRefresh, readOnly = false }) {
     if (!container || typeof container.append !== "function") throw new TypeError("Device cards need a DOM container.");
     const cards = new Map();
     const drafts = new Map();
@@ -833,17 +833,19 @@
           metric("humidity");
           metric("co2");
         }
-        if (card.device.type === "light" || card.device.type === "lightGroup") {
-          lightToggle();
-          range("brightnessSet", demoMode ? "Svjetlina · simulacija" : "Svjetlina");
-        } else if (card.device.type === "climate") {
-          stepper("setpoint", "Zadana temperatura");
-          selection("modeSet", "Način rada");
-          selection("fanSpeed", "Ventilator");
-          selection("power", "Napajanje");
-        } else if (card.device.type === "blind") {
-          range("positionSet", demoMode ? "Položaj · simulacija" : "Položaj");
-          range("slatSet", demoMode ? "Kut lamela · simulacija" : "Kut lamela");
+        if (!readOnly) {
+          if (card.device.type === "light" || card.device.type === "lightGroup") {
+            lightToggle();
+            range("brightnessSet", demoMode ? "Svjetlina · simulacija" : "Svjetlina");
+          } else if (card.device.type === "climate") {
+            stepper("setpoint", "Zadana temperatura");
+            selection("modeSet", "Način rada");
+            selection("fanSpeed", "Ventilator");
+            selection("power", "Napajanje");
+          } else if (card.device.type === "blind") {
+            range("positionSet", demoMode ? "Položaj · simulacija" : "Položaj");
+            range("slatSet", demoMode ? "Kut lamela · simulacija" : "Kut lamela");
+          }
         }
         if (!body.childElementCount) {
           const list = el("div", "dc-generic-readings");
@@ -861,7 +863,7 @@
             });
           }
           if (!readings.length) list.append(el("p", "dc-muted", "Očitanja i svojstva dostupni su u detaljima."));
-          body.append(el("p", "dc-muted", "Funkcije za upravljanje još nisu prepoznate."));
+          if (!readOnly) body.append(el("p", "dc-muted", "Funkcije za upravljanje još nisu prepoznate."));
         }
       }
 
@@ -953,9 +955,9 @@
       readClockAvailable = readAt !== undefined || syncedAt !== undefined;
       latestReadAt = readAt !== undefined ? readAt : syncedAt;
       connection = typeof status === "string" ? status : status?.status || status?.state || "idle";
-      simulationBadge.textContent = demoMode ? "Simulacija upravljanja" : "Stvarno upravljanje";
-      simulationBadge.classList.toggle("dc-live-badge", !demoMode);
-      simulationBadge.title = demoMode ? "Kontrole mijenjaju samo lokalnu simulaciju." : "Aktivne kontrole mijenjaju stvarne uređaje u stanu.";
+      simulationBadge.textContent = readOnly ? "Samo pregled" : demoMode ? "Simulacija upravljanja" : "Stvarno upravljanje";
+      simulationBadge.classList.toggle("dc-live-badge", !readOnly && !demoMode);
+      simulationBadge.title = readOnly ? "" : demoMode ? "Kontrole mijenjaju samo lokalnu simulaciju." : "Aktivne kontrole mijenjaju stvarne uređaje u stanu.";
       const warningTexts = (Array.isArray(warnings) ? warnings : []).filter((warning) => typeof warning === "string" && warning.trim());
       readWarning.hidden = warningTexts.length === 0;
       readWarning.textContent = warningTexts[0] || "";

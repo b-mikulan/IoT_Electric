@@ -49,20 +49,26 @@ function readSavedSettings(config) {
 }
 
 class DashboardSettingsStore {
-  constructor(config) {
-    this.filePath = settingsFile(config);
-    this.values = readSavedSettings(config);
+  constructor(config, { database } = {}) {
+    this.database = database;
+    this.filePath = database ? "" : settingsFile(config);
+    this.values = database ? database.readDocument("settings") ?? settingsFromConfig(config) : readSavedSettings(config);
   }
+
+  get persisted() { return Boolean(this.database || this.filePath); }
 
   save(value) {
     const next = validateSettings(value, this.values);
-    if (this.filePath) {
-      const temporary = `${this.filePath}.${randomUUID()}.tmp`;
+    if (this.persisted) {
+      const temporary = this.database ? null : `${this.filePath}.${randomUUID()}.tmp`;
       try {
-        fs.writeFileSync(temporary, `${JSON.stringify({ version: 1, settings: next }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
-        fs.renameSync(temporary, this.filePath);
+        if (this.database) this.database.saveDocument("settings", next);
+        else {
+          fs.writeFileSync(temporary, `${JSON.stringify({ version: 1, settings: next }, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+          fs.renameSync(temporary, this.filePath);
+        }
       } catch (error) {
-        try { fs.unlinkSync(temporary); } catch {}
+        if (temporary) { try { fs.unlinkSync(temporary); } catch {} }
         throw Object.assign(new Error("Spremanje općih postavki nije uspjelo. Prethodne postavke su sačuvane."), { code: "DASHBOARD_SETTINGS_SAVE_FAILED" });
       }
     }

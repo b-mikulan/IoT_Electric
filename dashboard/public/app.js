@@ -2234,19 +2234,33 @@ async function boot() {
   let phase = "configuration";
   try {
     const response = await fetch("/api/config", { cache: "no-store" });
+    if (response.status === 401) {
+      globalThis.location?.replace("/login");
+      return;
+    }
     if (!response.ok) throw new Error(`Konfiguracija nije dostupna (HTTP ${response.status}).`);
 
     const config = await response.json();
+    const adminLink = document.querySelector("#admin-link");
+    if (adminLink) adminLink.hidden = config.isAdmin !== true;
+    const readOnly = config.readOnly === true;
+    if (readOnly) {
+      for (const selector of [".trends-open", "#general-settings-open", "#refresh-pause"]) {
+        const control = document.querySelector(selector);
+        if (control) control.hidden = true;
+      }
+    }
     phase = "initialization";
     deviceDemoMode = config.demoMode === true;
     const deviceContainer = document.querySelector("#device-cards-section");
     deviceCardView = deviceContainer && globalThis.IoTDeviceCards?.create({
       container: deviceContainer,
-      onWrite: writeDeviceCommand,
+      readOnly,
+      onWrite: readOnly ? undefined : writeDeviceCommand,
       onSettings: openDeviceCardSettingsDialog,
       onRooms: openRoomsDialog,
       onMove: openBulkRoomDialog,
-      onRefresh: refreshDeviceScope,
+      onRefresh: readOnly ? undefined : refreshDeviceScope,
     });
     demoBadge.hidden = !config.demoMode;
     widgetEditingEnabled = config.widgetEditingEnabled === true;
@@ -2262,7 +2276,7 @@ async function boot() {
     configureWriteValueInput();
     setupVisibilityControls(config.widgets);
     updateEmptyState();
-    generalSettingsView = globalThis.IoTDashboardSettings?.create({
+    if (!readOnly) generalSettingsView = globalThis.IoTDashboardSettings?.create({
       onAction(action) {
         if (action === "rooms") openRoomsDialog();
         else if (action === "visibility") visibilityOpen.click();
@@ -2282,6 +2296,10 @@ async function boot() {
     void refreshDeviceMetadata();
 
     const events = new EventSource("/events");
+    events.addEventListener("session-ended", () => {
+      events.close();
+      window.location.replace("/login");
+    });
     events.addEventListener("dashboard-settings", event => generalSettingsView?.setSettings(JSON.parse(event.data)));
     events.addEventListener("polling", event => generalSettingsView?.setPolling(JSON.parse(event.data)));
     events.addEventListener("refresh-error", event => {

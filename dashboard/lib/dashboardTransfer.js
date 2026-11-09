@@ -47,7 +47,7 @@ function atomicWrite(file, data, fsImpl = fs) {
 
 // Called before loadConfig, so a first deployment needs no manually seeded JSON.
 // An interrupted multi-file import is restored before any runtime reads it.
-function initializeTransferFiles(env) {
+function initializeTransferFiles(env, { createMissing = true } = {}) {
   if (!env.WIDGETS_FILE || String(env.WIDGETS_JSON || "").trim()) return;
   const location = targets({ widgetsFile: env.WIDGETS_FILE, deviceWidgetsFile: env.DEVICE_WIDGETS_FILE, deviceMetadataFile: env.DEVICE_METADATA_FILE });
   if (exists(location.journal)) {
@@ -66,7 +66,7 @@ function initializeTransferFiles(env) {
     }
     fs.unlinkSync(location.journal);
   }
-  if (!exists(location.files[0])) {
+  if (createMissing && !exists(location.files[0])) {
     fs.mkdirSync(location.root, { recursive: true });
     fs.writeFileSync(location.files[0], "[]\n", { flag: "wx" });
   }
@@ -151,12 +151,22 @@ function normalizeMetadata(document, widgets) {
 }
 
 class DashboardTransfer {
-  constructor(config, { fsImpl = fs } = {}) { this.config = config; this.location = targets(config); this.fs = fsImpl; }
-  get enabled() { return !this.config.demoMode && Boolean(this.location); }
+  constructor(config, { fsImpl = fs, database } = {}) {
+    this.config = config;
+    this.database = database;
+    this.location = database ? null : targets(config);
+    this.fs = fsImpl;
+  }
+  get enabled() { return !this.config.demoMode && Boolean(this.database || this.location); }
   fingerprint() {
+    if (this.database) return digest(JSON.stringify(this.database.readConfiguration()));
     return digest(JSON.stringify(this.location?.files.map(file => this.fs.existsSync(file) ? digest(this.fs.readFileSync(file)) : null) || []));
   }
   current() {
+    if (this.database) {
+      const stored = this.database.readConfiguration();
+      return { ...stored, widgets: normalizeWidgets(stored.widgets), dashboardSettings: stored.dashboardSettings ?? settingsFromConfig(this.config) };
+    }
     if (!this.location) return { widgets: this.config.widgets, deviceWidgets: { version: 1, devices: [] }, metadata: null, dashboardSettings: settingsFromConfig(this.config) };
     const [widgetsFile, devicesFile, metadataFile, settingsPath] = this.location.files;
     return { widgets: normalizeWidgets(readJson(widgetsFile)), deviceWidgets: exists(devicesFile) ? readJson(devicesFile) : { version: 1, devices: [] }, metadata: exists(metadataFile) ? readJson(metadataFile) : null,
@@ -193,10 +203,33 @@ class DashboardTransfer {
     const normalized = this.prepare({ format: FORMAT, version: 1, ...current }).payload;
     return { format: FORMAT, version: 2, exportedAt: new Date().toISOString(), ...normalized };
   }
-  apply(document, token) {
-    if (!this.enabled) throw new TransferError("Za uvoz uključi stvarni način rada i trajnu datoteku WIDGETS_FILE.", 409, "TRANSFER_UNAVAILABLE");
+  exportBackup(id) {
+    const backup = this.database?.readBackup(id);
+    if (!backup) throw new TransferError("Sigurnosna kopija nije pronađena.", 404, "TRANSFER_BACKUP_NOT_FOUND");
+    const payload = this.prepare({ format: FORMAT, version: 2, ...backup }).payload;
+    return { format: FORMAT, version: 2, exportedAt: backup.exportedAt, ...payload };
+  }
+
+  confirm(document, token) {
     const prepared = this.prepare(document);
     if (typeof token !== "string" || token !== prepared.token) throw new TransferError("Postavke ili datoteka promijenile su se nakon pregleda. Ponovno pregledaj uvoz.", 409, "TRANSFER_PREVIEW_CHANGED");
+    return prepared;
+  }
+
+  apply(document, token) {
+    if (!this.enabled) throw new TransferError("Za uvoz uključi stvarni način rada i trajnu pohranu dashboarda.", 409, "TRANSFER_UNAVAILABLE");
+    if (this.database) {
+      return this.database.transaction(() => {
+        const prepared = this.confirm(document, token);
+        try {
+          const backupId = this.database.replaceConfiguration(prepared.payload, this.current().dashboardSettings);
+          return { ...prepared, backupId };
+        } catch {
+          throw new TransferError("Uvoz nije spremljen. Prethodne postavke su zadržane.", 500, "TRANSFER_SAVE_FAILED");
+        }
+      });
+    }
+    const prepared = this.confirm(document, token);
     const { root, files, journal } = this.location;
     const id = `${new Date().toISOString().replace(/[:]/g, '-')}-${randomUUID()}`;
     const backup = path.join(root, "transfer-backups", id), existed = files.map(file => this.fs.existsSync(file));

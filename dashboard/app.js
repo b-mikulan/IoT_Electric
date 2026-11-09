@@ -13,6 +13,8 @@ const { DashboardSettingsStore } = require("./lib/dashboardSettings");
 const { resolveRefreshScope, resolveManualRefreshScope } = require("./lib/refreshScope");
 const { buildHistoryCatalog } = require("./lib/historyCatalog");
 const { sendEvent, sendHeartbeat } = require("./lib/eventStream");
+const { trackDashboardStream } = require("./lib/dashboardAuth");
+const { createRoomIndex, scopeRooms } = require("./lib/roomAccess");
 
 const publicDirectory = path.join(__dirname, "public");
 const materializeDirectory = path.dirname(
@@ -30,6 +32,19 @@ function publicWidget(widget) {
     ...(precision === undefined ? {} : { precision }),
     writable: writable === true,
     visible: visible !== false,
+  };
+}
+
+function viewerReadings(payload, points) {
+  const { status, syncedAt, readAt, scope, widgets, error } = payload;
+  return {
+    status, syncedAt, readAt, scope,
+    error: error ? "Očitanja trenutačno nisu dostupna." : error,
+    ...(widgets && { widgets: widgets.filter(widget => points.has(widget.id)).map(widget => ({
+      ...publicWidget(widget), writable: false, value: widget.value, state: widget.state,
+      updatedAt: widget.updatedAt, readAt: widget.readAt,
+      error: widget.error ? "Očitanje trenutačno nije dostupno." : widget.error,
+    })) }),
   };
 }
 
@@ -93,6 +108,7 @@ function parseWidgetSettings(body) {
 function createApp({
   poller,
   config,
+  dashboardAuth,
   widgetStore = null,
   deviceWidgetStore = new DeviceWidgetStore(
     config.demoMode ? "" : config.deviceWidgetsFile ||
@@ -117,6 +133,8 @@ function createApp({
   let automaticRoomNames = deviceMetadata.roomNames?.() || [];
   let transferBusy = false;
   let activeConfigurationRequests = 0;
+  let roomStateReady;
+  const demo = config.demoMode ? createDeviceDemo() : null;
   Object.assign(config, dashboardSettings.values);
   poller.configurePolling?.(dashboardSettings.values);
   const refreshModelOptions = () => ({
@@ -128,6 +146,74 @@ function createApp({
   });
   poller.setWriteRefreshResolver?.(id => resolveRefreshScope(config.widgets, refreshModelOptions(), id, config.afterWriteScope));
   app.disable("x-powered-by");
+  if (dashboardAuth) app.use(dashboardAuth.router);
+
+  function currentRoomIndex(metadata = demo || deviceMetadata.groupingMetadata?.()) {
+    return createRoomIndex([...(demo?.widgets || []), ...config.widgets], {
+      ...refreshModelOptions(), ...metadata,
+    }, deviceWidgetStore.rooms);
+  }
+
+  async function prepareRoomState() {
+    roomStateReady ??= synchronizeDeviceSettings().catch(error => {
+      roomStateReady = undefined;
+      throw error;
+    });
+    await roomStateReady;
+    if (demo) return demo;
+    const cached = deviceMetadata.groupingMetadata?.();
+    if (Object.keys(cached?.roomByZone || {}).length || !config.widgets.length) return cached;
+    try {
+      const metadata = await deviceMetadata.read(config.widgets);
+      return deviceMetadata.groupingMetadata?.() || metadata;
+    }
+    catch { return cached; }
+  }
+
+  app.use(["/api", "/events"], async (request, response, next) => {
+    const session = response.locals.dashboardSession;
+    if (session?.role !== "user") return next();
+    const metadata = await prepareRoomState();
+    if (!response.locals.isSessionActive()) return response.status(401).json({ code: "LOGIN_REQUIRED" });
+    response.locals.roomAccess = scopeRooms(currentRoomIndex(metadata), session.roomIds);
+    response.locals.viewerMetadata = metadata;
+    return next();
+  });
+
+  if (dashboardAuth) {
+    const { users, revoke } = dashboardAuth;
+    app.use("/api/admin", (request, response, next) => {
+      if (response.locals.dashboardSession?.role === "admin") return next();
+      return response.status(403).json({ code: "ADMIN_REQUIRED" });
+    });
+    app.get("/api/admin/users", async (request, response) => {
+      const metadata = await prepareRoomState();
+      const { rooms, floors } = currentRoomIndex(metadata);
+      const floorNames = new Map(floors.map(floor => [floor.id, floor.name]));
+      return response.json({ users: users.list(), rooms: [...rooms.values()].map(room => ({
+        id: room.id, name: room.name, floor: floorNames.get(room.floorId) || null,
+      })) });
+    });
+    app.post("/api/admin/users", requireJson, express.json({ limit: "512kb" }), async (request, response) => {
+      const previous = request.body?.previousUsername;
+      if (previous !== null && typeof previous !== "string") return response.status(400).json({ error: "Odaberi korisnika." });
+      try {
+        const metadata = await prepareRoomState();
+        if (!response.locals.isSessionActive()) return response.status(401).json({ code: "LOGIN_REQUIRED" });
+        const user = users.save(previous, request.body, currentRoomIndex(metadata).rooms);
+        revoke(previous);
+        return response.status(previous === null ? 201 : 200).json({ user });
+      } catch (error) { return sendOperationError(response, error, "USER_SAVE_FAILED", error.status ? error.message : "Korisnika nije moguće spremiti."); }
+    });
+    app.post("/api/admin/users/delete", requireJson, express.json({ limit: "4kb" }), (request, response) => {
+      try {
+        const username = request.body?.username;
+        users.remove(username);
+        revoke(username);
+        return response.sendStatus(204);
+      } catch (error) { return sendOperationError(response, error, "USER_DELETE_FAILED", error.status ? error.message : "Korisnika nije moguće izbrisati."); }
+    });
+  }
 
   // Hold configuration writes and reads that synchronize settings during an
   // import. Existing HTTP operations must finish before the import can start.
@@ -151,8 +237,29 @@ function createApp({
         if (!sendEvent(response, event, payload)) { settingsClients.delete(response); response.end(); }
       } catch { settingsClients.delete(response); response.end(); }
     }
+    let roomIndex;
+    const accessByRooms = new Map();
     for (const response of eventClients) {
       try {
+        const session = response.locals.dashboardSession;
+        if (session?.role === "user") {
+          if (!response.locals.isSessionActive()) continue;
+          if (["config", "removed", "visibility", "device-settings", "dashboard-imported"].includes(event)) {
+            if (!sendEvent(response, "dashboard-imported", {})) response.end();
+            continue;
+          }
+          if (!["update", "status", "sync"].includes(event) || payload.scope === "partial" && event !== "update") continue;
+          let data = payload;
+          if (event === "update") {
+            roomIndex ??= currentRoomIndex();
+            const key = JSON.stringify(session.roomIds);
+            if (!accessByRooms.has(key)) accessByRooms.set(key, scopeRooms(roomIndex, session.roomIds).points);
+            data = viewerReadings(payload, accessByRooms.get(key));
+            if (!data.widgets?.length) continue;
+          } else data = viewerReadings(payload, new Set());
+          if (!sendEvent(response, event, data)) response.end();
+          continue;
+        }
         if (!sendEvent(response, event, payload)) {
           eventClients.delete(response);
           response.end();
@@ -227,6 +334,13 @@ function createApp({
       return response.json(dashboardTransfer.export());
     } catch (error) { return sendOperationError(response, error, "TRANSFER_EXPORT_FAILED", "Izvoz postavki nije uspio."); }
   });
+  app.get("/api/dashboard-transfer/backups/:id", (request, response) => {
+    try {
+      const backup = dashboardTransfer.exportBackup(request.params.id);
+      response.set({ "Cache-Control": "no-store", "Content-Disposition": 'attachment; filename="dashboard-backup.json"' });
+      return response.json(backup);
+    } catch (error) { return sendOperationError(response, error, "TRANSFER_EXPORT_FAILED", "Sigurnosnu kopiju nije moguće preuzeti."); }
+  });
   app.post("/api/dashboard-transfer/preview", requireJson, express.json({ limit: "16mb" }), (request, response) => {
     try {
       const { summary, token } = dashboardTransfer.prepare(request.body?.document);
@@ -234,17 +348,17 @@ function createApp({
     } catch (error) { return sendOperationError(response, error, "TRANSFER_PREVIEW_FAILED", "Datoteku nije moguće pregledati."); }
   });
   app.post("/api/dashboard-transfer/import", requireJson, express.json({ limit: "16mb" }), async (request, response) => {
-    if (!dashboardTransfer.enabled || !widgetStore?.enabled) return response.status(409).json({ error: "Za uvoz postavi DEMO_MODE=false i trajnu datoteku WIDGETS_FILE.", code: "TRANSFER_UNAVAILABLE" });
+    if (!dashboardTransfer.enabled || !widgetStore?.enabled) return response.status(409).json({ error: "Za uvoz postavi DEMO_MODE=false i trajnu pohranu dashboarda.", code: "TRANSFER_UNAVAILABLE" });
     if (transferBusy) return response.status(409).json({ error: "Uvoz dashboarda je već u tijeku.", code: "TRANSFER_IN_PROGRESS" });
     if (activeConfigurationRequests || clearingWidgets || autoDiscovery.state === "running") return response.status(409).json({ error: "Pričekaj završetak trenutačne promjene ili automatske pretrage pa ponovi uvoz.", code: "WIDGET_OPERATION_IN_PROGRESS" });
     transferBusy = true;
     try {
       const result = await widgetStore.withExclusive(() => deviceWidgetStore.withExclusive(() => {
         const imported = dashboardTransfer.apply(request.body?.document, request.body?.token);
-        // This synchronous publication follows the completed file transaction.
+        // Publish the committed configuration together before serving any reads.
         // No observer can see a mixture of the previous and imported settings.
         config.widgets = imported.payload.widgets;
-        config.deviceMetadataFile = imported.metadataFile;
+        if (imported.metadataFile) config.deviceMetadataFile = imported.metadataFile;
         deviceWidgetStore.adoptDocument(imported.payload.deviceWidgets);
         deviceMetadata.replaceCatalog(imported.payload.metadata);
         dashboardSettings.values = imported.payload.dashboardSettings;
@@ -257,7 +371,10 @@ function createApp({
         return imported;
       }));
       broadcast("dashboard-imported", { summary: result.summary });
-      return response.json({ summary: result.summary, backupId: result.backupId });
+      return response.json({
+        summary: result.summary, backupId: result.backupId,
+        ...(dashboardTransfer.database && { backupUrl: `/api/dashboard-transfer/backups/${result.backupId}` }),
+      });
     } catch (error) { return sendOperationError(response, error, "TRANSFER_IMPORT_FAILED", "Uvoz dashboarda nije uspio."); }
     finally { transferBusy = false; }
   });
@@ -285,13 +402,23 @@ function createApp({
 
   app.get("/api/config", async (request, response) => {
     try {
+      const access = response.locals.roomAccess;
+      if (access) {
+        const { enabled, devices: deviceSettings, ...organization } = access.settings;
+        return response.json({
+          title: "IoT Electric · PLC pregled", isAdmin: false, readOnly: true, demoMode: config.demoMode,
+          intervalMs: config.intervalMs, deviceSettingsEnabled: enabled, deviceSettings, ...organization,
+          widgets: config.widgets.filter(widget => access.points.has(widget.id)).map(widget => ({ ...publicWidget(widget), writable: false })),
+        });
+      }
       const deviceSettings = await synchronizeDeviceSettings();
       return response.json({
         title: "IoT Electric · PLC pregled",
+        isAdmin: response.locals.dashboardSession?.role === "admin",
         demoMode: config.demoMode,
         intervalMs: config.intervalMs,
         dashboardSettings: dashboardSettings.values,
-        settingsPersisted: Boolean(dashboardSettings.filePath),
+        settingsPersisted: dashboardSettings.persisted,
         polling: poller.getPollingState?.() || { paused: false, active: false, scope: null },
         discoveryEnabled: !config.demoMode,
         widgetEditingEnabled:
@@ -310,14 +437,15 @@ function createApp({
 
   app.get("/api/dashboard/settings", (request, response) => {
     response.set("Cache-Control", "no-store");
-    return response.json({ settings: dashboardSettings.values, persisted: Boolean(dashboardSettings.filePath), polling: poller.getPollingState?.(), capabilities: {
+    return response.json({ settings: dashboardSettings.values, persisted: dashboardSettings.persisted, polling: poller.getPollingState?.(), capabilities: {
       deviceSettingsEnabled: Boolean(deviceWidgetStore.enabled), widgetEditingEnabled: !config.demoMode && Boolean(widgetStore?.enabled), discoveryEnabled: !config.demoMode,
     } });
   });
   app.get("/api/dashboard/events", (request, response) => {
+    trackDashboardStream(response);
     response.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
     response.flushHeaders?.();
-    sendEvent(response, "dashboard-settings", { settings: dashboardSettings.values, persisted: Boolean(dashboardSettings.filePath) });
+    sendEvent(response, "dashboard-settings", { settings: dashboardSettings.values, persisted: dashboardSettings.persisted });
     sendEvent(response, "polling", poller.getPollingState?.());
     settingsClients.add(response);
     const heartbeat = setInterval(() => sendHeartbeat(response), 25_000);
@@ -329,8 +457,8 @@ function createApp({
       Object.assign(config, settings);
       poller.configurePolling?.(settings);
       deviceMetadata.setTimeoutMs?.(settings.timeoutMs);
-      broadcast("dashboard-settings", { settings, persisted: Boolean(dashboardSettings.filePath) });
-      return response.json({ settings, persisted: Boolean(dashboardSettings.filePath) });
+      broadcast("dashboard-settings", { settings, persisted: dashboardSettings.persisted });
+      return response.json({ settings, persisted: dashboardSettings.persisted });
     } catch (error) { return sendOperationError(response, error, "DASHBOARD_SETTINGS_SAVE_FAILED", "Spremanje općih postavki nije uspjelo."); }
   });
   app.post("/api/dashboard/pause", requireJson, express.json({ limit: "1kb" }), (request, response) => {
@@ -353,6 +481,7 @@ function createApp({
 
   app.get("/api/devices/settings", async (request, response) => {
     response.set("Cache-Control", "no-store");
+    if (response.locals.roomAccess) return response.json(response.locals.roomAccess.settings);
     try {
       return response.json({ enabled: Boolean(deviceWidgetStore.enabled), devices: await synchronizeDeviceSettings(), rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
     } catch (error) {
@@ -438,13 +567,22 @@ function createApp({
   });
 
   app.get("/api/snapshot", (request, response) => {
-    response.json(poller.getSnapshot());
+    const snapshot = poller.getSnapshot();
+    const access = response.locals.roomAccess;
+    return response.json(access ? viewerReadings(snapshot, access.points) : snapshot);
   });
 
   app.get("/api/devices/metadata", async (request, response) => {
     response.set("Cache-Control", "no-store");
+    const access = response.locals.roomAccess;
+    if (access) {
+      const metadata = response.locals.viewerMetadata;
+      return response.json({
+        metadataById: Object.fromEntries(Object.entries(metadata?.metadataById || {}).filter(([id]) => access.points.has(id))),
+        ...(demo && { demoWidgets: demo.widgets.filter(widget => access.points.has(widget.id)) }),
+      });
+    }
     if (config.demoMode) {
-      const demo = createDeviceDemo();
       return response.json({ metadataById: demo.metadataById, roomByZone: demo.roomByZone, demoWidgets: demo.widgets, warnings: [] });
     }
     try {
@@ -858,6 +996,7 @@ function createApp({
   );
 
   app.get("/events", (request, response) => {
+    trackDashboardStream(response);
     response.status(200);
     response.set({
       "Cache-Control": "no-cache, no-transform",
@@ -867,11 +1006,18 @@ function createApp({
     });
     response.flushHeaders?.();
 
-    sendEvent(response, "snapshot", poller.getSnapshot());
-    sendEvent(response, "dashboard-settings", { settings: dashboardSettings.values, persisted: Boolean(dashboardSettings.filePath) });
-    sendEvent(response, "polling", poller.getPollingState?.() || { paused: false, active: false, scope: null });
-    sendEvent(response, "discovery", autoDiscovery);
-    sendEvent(response, "device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
+    const access = response.locals.roomAccess;
+    if (access) {
+      sendEvent(response, "snapshot", viewerReadings(poller.getSnapshot(), access.points));
+      sendEvent(response, "device-settings", access.settings);
+    } else {
+      sendEvent(response, "snapshot", poller.getSnapshot());
+      sendEvent(response, "dashboard-settings", { settings: dashboardSettings.values, persisted: dashboardSettings.persisted });
+      sendEvent(response, "polling", poller.getPollingState?.() || { paused: false, active: false, scope: null });
+      sendEvent(response, "discovery", autoDiscovery);
+      sendEvent(response, "device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
+    }
+
     eventClients.add(response);
     const heartbeat = setInterval(() => sendHeartbeat(response), 25_000);
 

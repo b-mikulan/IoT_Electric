@@ -15,15 +15,17 @@ class WidgetStoreError extends Error {
 
 class WidgetStore {
   #filePath;
+  #database;
 
   #enabled;
 
   #operation = Promise.resolve();
 
-  constructor(filePath) {
+  constructor(filePath, { database } = {}) {
     this.#filePath = String(filePath || "").trim();
-    this.#enabled = false;
-    if (this.#filePath) {
+    this.#database = database;
+    this.#enabled = Boolean(database);
+    if (!database && this.#filePath) {
       try {
         fsSync.accessSync(this.#filePath, fsSync.constants.W_OK);
         this.#enabled = true;
@@ -107,6 +109,7 @@ class WidgetStore {
 
   async #readWidgets() {
     try {
+      if (this.#database) return this.#database.readWidgets();
       const rawWidgets = JSON.parse(
         (await fs.readFile(this.#filePath, "utf8")).replace(/^\uFEFF/, "")
       );
@@ -129,9 +132,13 @@ class WidgetStore {
   }
 
   async #writeWidgets(widgets) {
-    const temporaryPath = `${this.#filePath}.${randomUUID()}.tmp`;
+    const temporaryPath = this.#database ? null : `${this.#filePath}.${randomUUID()}.tmp`;
     try {
       const normalized = parseWidgets(JSON.stringify(widgets), false);
+      if (this.#database) {
+        this.#database.saveWidgets(widgets);
+        return normalized;
+      }
       await fs.writeFile(
         temporaryPath,
         `${JSON.stringify(widgets, null, 2)}\n`,
@@ -146,7 +153,7 @@ class WidgetStore {
         "WIDGET_FILE_WRITE_FAILED"
       );
     } finally {
-      await fs.unlink(temporaryPath).catch(() => {});
+      if (temporaryPath) await fs.unlink(temporaryPath).catch(() => {});
     }
   }
 

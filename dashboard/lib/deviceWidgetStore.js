@@ -96,6 +96,7 @@ function parseDocument(raw) {
 
 class DeviceWidgetStore {
   #filePath;
+  #database;
   #fs;
   #operation = Promise.resolve();
   #devices = [];
@@ -104,15 +105,16 @@ class DeviceWidgetStore {
   #floors = [];
   #roomDetails = [];
 
-  constructor(filePath, { fsImpl = fs, protectedFilePath = "" } = {}) {
+  constructor(filePath, { fsImpl = fs, protectedFilePath = "", database } = {}) {
     this.#filePath = String(filePath || "").trim();
     this.#fs = fsImpl;
+    this.#database = database;
     if (this.#filePath && protectedFilePath && path.resolve(this.#filePath).toLowerCase() === path.resolve(protectedFilePath).toLowerCase()) {
       throw new Error("DEVICE_WIDGETS_FILE must be separate from WIDGETS_FILE.");
     }
   }
 
-  get enabled() { return Boolean(this.#filePath); }
+  get enabled() { return Boolean(this.#database || this.#filePath); }
 
   get devices() { return structuredClone(this.#devices); }
   get rooms() { return this.#rooms.slice(); }
@@ -334,6 +336,7 @@ class DeviceWidgetStore {
   }
 
   async #read() {
+    if (this.#database) return { document: this.#database.readDocument("devices"), missing: false };
     let raw;
     try {
       raw = await this.#fs.readFile(this.#filePath, "utf8");
@@ -345,16 +348,20 @@ class DeviceWidgetStore {
   }
 
   async #write(document) {
-    const temporaryPath = `${this.#filePath}.${process.pid}.${randomUUID()}.tmp`;
+    const temporaryPath = this.#database ? null : `${this.#filePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
       organization.migrateOrganization(document);
       organization.validateOrganization(document);
+      if (this.#database) {
+        this.#database.saveDocument("devices", document);
+        return;
+      }
       await this.#fs.writeFile(temporaryPath, `${JSON.stringify(document, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
       await this.#fs.rename(temporaryPath, this.#filePath);
     } catch {
       throw new DeviceWidgetStoreError("Unable to save device card configuration; previous settings were retained.", 500, "DEVICE_WIDGET_FILE_WRITE_FAILED");
     } finally {
-      await this.#fs.unlink(temporaryPath).catch(() => {});
+      if (temporaryPath) await this.#fs.unlink(temporaryPath).catch(() => {});
     }
   }
 }

@@ -1,6 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { readSavedSettings, settingsFile } = require("./dashboardSettings");
+const { readSavedSettings, settingsFile, settingsFromConfig, validateSettings } = require("./dashboardSettings");
 const { deriveWidgetGroup, widgetGroup } = require("../public/widgetGrouping");
 
 const DEFAULT_DEMO_WIDGETS = [
@@ -79,7 +79,7 @@ function readMiddlewarePassword(env) {
   }
 }
 
-function readWidgetConfiguration(env) {
+function readWidgetConfiguration(env, { allowMissing = false } = {}) {
   const inlineWidgets = String(env.WIDGETS_JSON || "").trim();
   if (inlineWidgets) return inlineWidgets;
 
@@ -92,6 +92,7 @@ function readWidgetConfiguration(env) {
       .replace(/^\uFEFF/, "")
       .trim();
   } catch (error) {
+    if (allowMissing && error.code === "ENOENT") return "";
     throw new Error(`Unable to read WIDGETS_FILE ${filePath}: ${error.message}`);
   }
 }
@@ -175,8 +176,7 @@ function parseWidgets(rawWidgets, demoMode) {
   return widgets;
 }
 
-function loadConfig(env = process.env) {
-  const rawWidgets = readWidgetConfiguration(env);
+function loadConfig(env = process.env, { rawWidgets = readWidgetConfiguration(env), storedSettings, allowEmptyWidgets = false } = {}) {
   const inlineWidgets = String(env.WIDGETS_JSON || "").trim();
   const widgetsFile = inlineWidgets
     ? ""
@@ -189,8 +189,9 @@ function loadConfig(env = process.env) {
   if (deviceWidgetsFile && widgetsFile && path.resolve(deviceWidgetsFile).toLowerCase() === path.resolve(widgetsFile).toLowerCase()) {
     throw new Error("DEVICE_WIDGETS_FILE must be separate from WIDGETS_FILE.");
   }
-  const demoMode = parseBoolean(env.DEMO_MODE, !rawWidgets);
-  const widgets = parseWidgets(rawWidgets, demoMode);
+  const demoMode = parseBoolean(env.DEMO_MODE, !rawWidgets && (!allowEmptyWidgets || !inlineWidgets && !widgetsFile));
+  const parsedWidgets = parseWidgets(rawWidgets || (allowEmptyWidgets && !demoMode ? "[]" : ""), demoMode);
+  const widgets = allowEmptyWidgets && demoMode && !parsedWidgets.length ? DEFAULT_DEMO_WIDGETS.map(normalizeWidget) : parsedWidgets;
   const password = readMiddlewarePassword(env);
   const port = Number(env.PORT || 3001);
 
@@ -225,7 +226,9 @@ function loadConfig(env = process.env) {
   if (config.dashboardSettingsFile && [widgetsFile, deviceWidgetsFile, deviceMetadataFile].some(file => file && path.resolve(file).toLowerCase() === path.resolve(config.dashboardSettingsFile).toLowerCase())) {
     throw new Error("dashboard-settings.json must be separate from point, device and metadata files.");
   }
-  Object.assign(config, readSavedSettings(config));
+  Object.assign(config, storedSettings === undefined
+    ? readSavedSettings(config)
+    : storedSettings === null ? settingsFromConfig(config) : validateSettings(storedSettings, settingsFromConfig(config)));
   return config;
 }
 

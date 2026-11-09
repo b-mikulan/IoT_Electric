@@ -12,7 +12,29 @@ npm install
 npm start
 ```
 
-Open `http://localhost:3001`. Demo mode is enabled by default and is visibly marked in the interface.
+Set your dashboard credentials in `.env`, then open `http://localhost:3001` and sign in. Demo mode is enabled by default and is visibly marked in the interface.
+
+## Dashboard accounts
+
+Set the following variables in the dashboard's local `.env`, the repository-root `.env` for Docker Compose, or the Portainer stack environment.
+
+| Account | Username variable | Password variable |
+| --- | --- | --- |
+| Administrator | `DASHBOARD_ADMIN_USER` | `DASHBOARD_ADMIN_PASSWORD` |
+
+Sign in as the administrator and open **Admin** to add, rename or delete dashboard users, change their passwords and choose which rooms each user can view. New users start with no rooms selected. **Sve prostorije i uređaji bez prostorije** also includes future rooms and devices without an assigned room. Regular accounts can view their permitted rooms and live readings. Device commands, configuration, discovery, trends, alarms and backup operations require the administrator. Updating or deleting an account ends its active sessions. Sessions also expire after 12 hours or when the dashboard process restarts.
+
+Regular accounts, room IDs and scrypt password hashes are stored in SQLite. Existing `DASHBOARD_LOGIN_USER` and `DASHBOARD_LOGIN_PASSWORD` can seed a regular account with read access to all rooms if there is no legacy users file. This happens once, when the database is initialized.
+
+For HTTPS deployments, set `DASHBOARD_SECURE_COOKIES=true` so browsers send the session cookie only over HTTPS.
+
+## Dashboard storage
+
+Docker Compose and Portainer use `/app/config/dashboard.sqlite` on the mounted configuration volume. Local runs use `dashboard.sqlite` beside the configured `WIDGETS_FILE`, or under `dashboard/config/` when no widget file is configured. Override the location with `DASHBOARD_DB_FILE`. The dashboard service must be able to write to that directory. Use a separate database file for each dashboard instance.
+
+On the first start the dashboard imports point definitions, device cards, rooms and floors, room permissions, users, saved polling settings and catalog metadata from the existing configuration. Keep the same volume and legacy file variables for the upgrade. `DASHBOARD_USERS_FILE` selects the old users file if it has a custom location. If present, an interrupted legacy import is recovered before migration. The database takes over after a successful migration, and subsequent edits to the legacy files have no effect.
+
+To move a complete instance including accounts, stop the dashboard and copy `dashboard.sqlite` to the destination volume. Supply the destination's middleware credentials and administrator account through its environment. For a configuration-only transfer, use **Prijenos postavki**.
 
 ## Move a dashboard to another server
 
@@ -22,7 +44,7 @@ Open **Prijenos postavki** on the dashboard, or `/transfer.html`.
 2. Deploy the updated dashboard image on the destination server with its own working EWS/middleware connection and a persistent writable configuration volume.
 3. Open **Prijenos postavki** on that server, select the downloaded file and review the point, card and room counts. Confirm **Želim primijeniti ovaj prikaz na dashboard**, then click **Uvezi postavke**.
 
-The single versioned JSON bundle contains widget definitions, visibility and write flags, card names, room assignments (including empty rooms and room renames), chosen readings/units, and the saved device metadata used to recognize controls. It excludes live values, credentials, EWS addresses and polling settings. All open dashboard views reload after import. A fresh complete read runs through the existing sequential poller; the building is not crawled again. Existing in-flight reads cannot publish old results over imported configuration.
+The versioned JSON bundle contains widget definitions, visibility and write flags, card names, room assignments, chosen readings and units, saved device metadata and polling settings. It excludes live values, accounts, credentials and EWS addresses. All open dashboard views reload after import. The poller discards results from any in-flight read of the old configuration and starts a fresh read.
 
 The page also accepts an older `widgets.json` array. That replaces the point list while retaining destination card preferences for matching owners and any available destination metadata. It cannot transfer source room assignments or descriptions; use the full bundle for this building. Imports replace the point set rather than merging it, so deliberately removed duplicate points stay removed. Maximum upload size: 16 MB. If a reverse proxy limits request bodies, allow at least 16 MB there as well.
 
@@ -30,16 +52,16 @@ For Docker Compose or Portainer, set these stack variables (middleware credentia
 
 ```dotenv
 DASHBOARD_DEMO_MODE=false
-DASHBOARD_WIDGETS_FILE=/app/config/widgets.json
+DASHBOARD_DB_FILE=/app/config/dashboard.sqlite
 DASHBOARD_POLL_INTERVAL_MS=180000
 DASHBOARD_READ_BATCH_SIZE=128
 DASHBOARD_READ_BATCH_DELAY_MS=1000
 DASHBOARD_MIDDLEWARE_TIMEOUT_MS=30000
 ```
 
-Both Compose definitions mount `/app/config` read/write. Keep that volume across redeploys. The dashboard now creates an empty `widgets.json` when the configured file does not yet exist, so a fresh live deployment can start and accept an upload. Leave `DASHBOARD_WIDGETS_JSON` unset for persistent imports. Card settings and metadata default to adjacent `device-widgets.json` and `catalog-metadata.json`; explicit file paths must point to separate writable files. The image initializes its config directory for the unprivileged application user; an existing host bind mount must also permit that user to write.
+Both Compose definitions mount `/app/config` read/write. Keep that volume across redeploys. A fresh live deployment can start with an empty database and accept an upload.
 
-Preview validates the entire document without changing files. Its confirmation token covers both the uploaded settings and destination files, so an intervening change requires another preview. Import waits for queued storage work and rejects concurrent edits/discovery. It stages all three files, saves the previous files under `/app/config/transfer-backups/<backup-id>/`, then publishes the new runtime state. Failed replacement restores the preceding files; an interrupted process is recovered from the local journal at startup before configuration is loaded. To restore a backup through the page, import its `widgets.json` for points only, or restore all three saved files while the service is stopped for the complete previous state.
+Preview validates the entire document. The confirmation token covers both the upload and the current configuration, so an intervening change requires another preview. Import waits for queued storage work and rejects concurrent edits or discovery. SQLite commits the previous configuration backup and the replacement together. To restore the previous configuration, download it using **Preuzmi prethodne postavke** after import, or open `/api/dashboard-transfer/backups/<backup-id>` as administrator, then import that JSON file.
 
 API: `GET /api/dashboard-transfer/status`, `GET /api/dashboard-transfer/export`, `POST /api/dashboard-transfer/preview` with `{document}`, and `POST /api/dashboard-transfer/import` with `{document, token}`.
 
@@ -68,7 +90,7 @@ When running the middleware directly on Windows, use the project CA just as the 
 
 ## Connect real PLC points with Docker Compose
 
-Widget definitions live in `dashboard/config/widgets.json`, not in the root `.env`. Create the local file once:
+To seed a new database from sample widget definitions, create a local file and set `WIDGETS_FILE` before the first start:
 
 ```powershell
 Copy-Item dashboard/config/widgets.example.json dashboard/config/widgets.json
@@ -76,7 +98,7 @@ Copy-Item dashboard/config/widgets.example.json dashboard/config/widgets.json
 
 For a previously mapped building, the [building catalog](../tools/building-catalog/README.md#populate-the-dashboard-with-native-points) can populate every native point with `npm run catalog -- widgets --apply` from the repository root. It backs up the current list, keeps settings for native points already present and saves `catalog-metadata.json` beside the widget file. Restart the dashboard after import. Saved descriptors cover the whole catalog without another EWS discovery pass; live value polling still uses the middleware.
 
-`catalog-metadata.json` is detected automatically beside `WIDGETS_FILE`. Set `DEVICE_METADATA_FILE` (Compose: `DASHBOARD_DEVICE_METADATA_FILE`) for a different file. When configured, device descriptions, capabilities and room labels come from this saved snapshot; no background metadata requests are sent to EWS. Unknown newly configured IDs have a missing-description warning until the catalog/export is refreshed. Commands still require fresh controller validation. Without a catalog descriptor file, the existing bounded live metadata lookup remains available.
+`catalog-metadata.json` is detected automatically beside `WIDGETS_FILE` when seeding the database. Set `DEVICE_METADATA_FILE` (Compose: `DASHBOARD_DEVICE_METADATA_FILE`) for a different source. To update an existing database from a new metadata export, export a dashboard backup, replace its `metadata` field with the contents of the catalog export and import the resulting bundle. Without saved catalog metadata, the existing bounded live metadata lookup remains available. Commands still require fresh controller validation.
 
 The device view includes a search field for names, full paths and room labels, a type selector, and expandable room filters. They combine and remain selected as readings update; they only filter the display.
 
@@ -105,19 +127,19 @@ DASHBOARD_MIDDLEWARE_PASSWORD=the_plaintext_middleware_password
 DASHBOARD_WIDGETS_FILE=/app/config/widgets.json
 ```
 
-Local Compose supplies `http://middleware:3000`, the shared `MIDDLEWARE_USER`, and mounts `dashboard/config/` read-write so the discovery dialog can append selected values to `widgets.json`. The dashboard needs the plaintext password because it is an API client; this is the same password entered through Swagger's **Authorize** button. Keep it in the ignored root `.env`, never in the JSON file or Git.
+Local Compose supplies `http://middleware:3000`, the shared `MIDDLEWARE_USER`, and a writable volume for SQLite. The dashboard needs the plaintext password because it is an API client. Keep it in the ignored root `.env` or a Docker secret.
 
 Widgets are read-only by default. A widget appears in the **Postavi vrijednost** dropdown only when it explicitly contains `"writable": true`. The first version accepts finite numeric values and sends them from the dashboard backend to the existing middleware `POST /api/values/write` endpoint, so middleware credentials are never exposed to browser JavaScript. The page asks for confirmation and does not update a card optimistically; the normal poll displays the value reported by the controller.
 
 The current dashboard has no separate user login. Before enabling any writable widget, restrict port `3001` to trusted source addresses or place it behind authenticated HTTPS access. Anyone who can open an unrestricted dashboard could otherwise use its write control.
 
-The round refresh button opens object discovery. An empty search starts at the EWS root, a container ID lists its immediate child containers and values, and a pasted full value ID is resolved through its parent container. Containers can be opened in the result list. **Dodaj** persists a selected value to `WIDGETS_FILE` and adds it to the running dashboard immediately. Discovered values are deliberately added as read-only widgets; enable writing in the widget settings when needed.
+The round refresh button opens object discovery. An empty search starts at the EWS root, a container ID lists its immediate child containers and values, and a pasted full value ID is resolved through its parent container. Containers can be opened in the result list. **Dodaj** saves a selected value to the database and adds it to the running dashboard immediately. Discovered values are deliberately added as read-only widgets. Enable writing in the widget settings when needed.
 
 **Automatski dodaj sve vrijednosti** recursively scans the whole EWS from the root and saves all discovered value items in one batch. Existing IDs are skipped and keep their labels, visibility, precision and write permissions. Progress is synchronized through SSE; the scan continues on the server if the dialog or browser closes. At completion the dialog displays a collapsible folder/value tree with controller IDs and dashboard membership. Repeat scans add only new values. If an individual branch fails or returns an incomplete response, discovery continues through the other branches, keeps any readable items from partial responses, and adds the values it found. The progress and completion summary count branches with warnings, and their tree entries display a warning and the error details. A root that cannot be read, a persistence failure or a size-limit error still stops the scan. The manual search's 500-result display limit does not apply; automatic discovery stops with an explicit error if it exceeds 10,000 containers or 50,000 values. Only one automatic scan runs at a time. Scan progress and the resulting tree stay available until the dashboard server restarts; saved widgets survive restart.
 
 To scan a specific folder, choose **Automatski dodaj iz ove mape** next to a container in the search results. This recursively adds values from that container and its descendants, using the same persistence, duplicate handling and progress reporting as the root scan. The progress and completion summary show the starting container ID. The original root-scan button remains available. `POST /api/discovery/auto` accepts an optional `containerId`; omitting it or passing an empty string starts at the EWS root. An unreadable starting container stops the scan without adding widgets.
 
-The hamburger button next to discovery controls which configured widgets are shown. Turning a widget off persists `"visible": false` in `widgets.json`; it does not delete the widget and it can be turned on again at any time. Hidden writable widgets are also removed from the write dropdown. Visibility changes are applied immediately and synchronized to other open dashboard pages through SSE.
+The hamburger button next to discovery controls which configured widgets are shown. Turning a widget off saves its visibility setting, and it can be turned on again at any time. Hidden writable widgets are removed from the write dropdown. Visibility changes are synchronized to other open dashboard pages through SSE.
 
 Widgets appear in collapsible groups based on their owning device's EWS path. For recognized EBO paths, `Values`, `Points` (including Modbus register subfolders), `External Bindings`, `Logs`, `Alarms`, and `Graphics` are organizational branches within one owner. For example, `.../B301/Values/BlndPos` and `.../B301/Points/BlndBtnUp` appear together, as do AC309's input/holding registers and direct device properties. The `01`/`11` prefix is excluded from the group identity only; exact point IDs are retained for controller reads. Group headings show the short device name plus server/controller/zone context, while membership, rename and deletion use the complete owner path. Equal names on different controllers stay separate, including external-binding copies. A `Zones/Z312/Values` aggregate appears as **Zona Z312**, rather than a physical device.
 
@@ -137,7 +159,7 @@ flowchart TD
     Warning["Record branch warning"]
     Stop["Stop scan without adding points"]
     More{"More containers?"}
-    Save["Save new IDs to widgets.json"]
+    Save["Save new IDs to SQLite"]
     Runtime["Add points to running poller"]
     Browser["Broadcast configuration and scan result"]
 
@@ -240,13 +262,13 @@ Room management uses `POST /api/rooms/rename` with `{ "name": "Office", "newName
 
 The version-1 `device-widgets.json` document now also supports an optional `rooms` array of names, preserving compatibility with older files. Creating a room uses `POST /api/rooms` with `{ "name": "Office" }`; a bulk move uses `POST /api/devices/rooms` with `{ "keys": ["full owner key"], "room": "Office" }`. `room: null` restores automatic assignment; `room: ""` means unassigned. Up to 1000 distinct current devices can be moved together. `DELETE /api/devices` accepts `{ "key": "full owner key" }` for whole-card removal and shares the bulk-widget-operation lock.
 
-Card configuration is saved in a separate `device-widgets.json` beside `WIDGETS_FILE`. Its versioned document contains one entry per discovered owner key and preserves manual choices across browser reloads, dashboard restarts and later rediscovery. The existing `widgets.json` remains an array of raw datapoints. An optional `DEVICE_WIDGETS_FILE` selects another path; with Compose use `DASHBOARD_DEVICE_WIDGETS_FILE`. The default `/app/config/device-widgets.json` shares the existing persistent config directory mount. Inline `WIDGETS_JSON` needs an explicit settings file to enable card editing; the default demo has no persistent card editing.
+SQLite stores card configuration separately from point definitions. The versioned card document contains one entry per discovered owner key and preserves manual choices across browser reloads, dashboard restarts and later rediscovery. Set `DEVICE_WIDGETS_FILE` (Compose: `DASHBOARD_DEVICE_WIDGETS_FILE`) if the legacy card file is outside the widget directory.
 
 The schema is `{ "version": 1, "devices": [...] }`; entries contain `key`, `label`, `room`, `primaryPointId`, `primaryUnit`, and `secondaryPointIds`. A `null` field uses the inferred/default value, `room: ""` explicitly removes room assignment, and `secondaryPointIds: []` hides all secondary readings. Keys and point IDs retain their full controller paths. Writes are serialized and atomically replace the file; failures retain the saved configuration and are shown to the user. A malformed file is reported and retained. See [the example document](config/device-widgets.example.json). Current values and controller capabilities continue to come from live polling and metadata, rather than being saved in this file.
 
 The primary reading's display unit can be automatic, omitted, or a literal custom suffix (up to 40 trimmed characters). `primaryUnit: null` or an omitted field keeps automatic behavior; `primaryUnit: ""` explicitly displays no unit. This setting only labels the primary display: it does not convert numeric values, change source metadata, affect secondary units or control ranges, or alter controller writes. In automatic mode, blind height may use the dashboard's `%` fallback when EWS reports no unit, and group brightness may use `%` from its known 0–100 command range.
 
-**Postavke funkcija uređaja** opens the existing point settings dialog with a **Funkcija uređaja** selector, listing commands first. Choose a function to edit its raw point settings or enable **Dozvoli upis vrijednosti**, then save. Those settings still persist in `widgets.json`; readings cannot be enabled as commands from this dialog. The technical view's individual widget gears remain available too. If card persistence is unavailable but raw editing is enabled, the gear retains this function-settings behavior.
+**Postavke funkcija uređaja** opens the point settings dialog with a **Funkcija uređaja** selector, listing commands first. Choose a function to edit its raw point settings or enable **Dozvoli upis vrijednosti**, then save. The technical view's individual widget gears remain available too.
 
 In real mode these cards send **actual commands** through `POST /api/devices/write`. A point must have `writable:true` in the widget configuration, a recognized native command role and a supported value range. Before each write, the backend bypasses the display cache and reads the exact point's current EWS Writeable, value, state and enum options. Forced and other non-Good points, aliases, hidden points, ambiguous bindings and unsupported value ranges are rejected. The same guard applies to recognized device commands through the legacy `/api/write` form. Demo mode still provides four synthetic examples with local simulation only; **Vrati simulaciju** never sends a command.
 
@@ -306,21 +328,21 @@ The 8 October 2026 saved apartment tree groups 152 exposed value/property IDs in
 
 Click **Preimenuj** in a group header to rename the entire group in one operation, including hidden widgets. The hamburger dialog offers the same action through **Grupa za uređivanje**, so hidden-only groups can be renamed too. The change preserves all other widget settings and live readings, persists across restart, and updates other open dashboards while preserving whether the group is expanded or collapsed. An existing group name is rejected to prevent accidental merging; entering the current name leaves it unchanged.
 
-Each visible card has a cog button for editing its `label`, `description`, `unit`, optional `precision` (0–6), `group`, `writable`, and `visible` settings. Leave **Grupa** empty to use automatic EWS device grouping (or parent-folder fallback for unknown paths). Saving updates `widgets.json`, the running poller, the card, write controls, and other open dashboard pages immediately. The controller `id` is shown read-only because changing it would select a different datapoint; use discovery to add a different ID.
+Each visible card has a cog button for editing its `label`, `description`, `unit`, optional `precision` (0–6), `group`, `writable`, and `visible` settings. Leave **Grupa** empty to use automatic EWS device grouping (or parent-folder fallback for unknown paths). Saving updates the database and refreshes open dashboard pages immediately. The controller `id` is read-only. Use discovery to add a different ID.
 
-The same settings dialog has **Obriši widget**, followed by an explicit confirmation. Deletion removes the widget from `widgets.json`, polling, the visibility list, and write controls, and immediately updates other open dashboard pages. It only changes the dashboard configuration; the controller point remains available through discovery. The last widget can be removed too: `[]` is a valid saved configuration and survives a restart. An empty dashboard waits for new widgets without sending empty value-read requests; `/ready` remains `503` until configured points are successfully polled.
+The same settings dialog has **Obriši widget**, followed by a confirmation. Deletion removes the widget from dashboard configuration and immediately updates other open dashboard pages. The controller point remains available through discovery. An empty widget list survives restart, and `/ready` returns `503` until configured points are successfully polled.
 
 The hamburger dialog also provides **Obriši sve widgete** and a group selector with **Obriši grupu**, so groups containing only hidden widgets can still be removed. Each visible group has its own **Obriši grupu** button. Confirmation shows the number of widgets to remove, including hidden widgets. Removing a group deletes all of its widgets and its dashboard heading while preserving other groups. Bulk deletion saves the configuration before updating the running dashboard and other open pages; a save failure keeps the widgets. Automatic discovery and bulk deletion cannot run simultaneously. Removed values can be added again through discovery.
 
-The unit controls the card symbol and colour. Supported units include `°C`, `%`, `W`/`kW`, `V`, and `A`; unknown units use a generic indicator. Widgets added through discovery appear immediately. Manual edits to `widgets.json` still require recreating the dashboard with `docker compose up -d --force-recreate dashboard` because existing configuration is loaded at startup.
+The unit controls the card symbol and colour. Supported units include `°C`, `%`, `W`/`kW`, `V`, and `A`. Unknown units use a generic indicator.
 
 `Zadnja uspješna provjera` advances after every successful poll. The `Promjena` time on an individual card advances only when the dashboard observes a different value, state, or point error; it therefore remains unchanged when a poll succeeds but the value stays the same. Card change times survive a browser refresh, but reset when the dashboard container is restarted because they are kept in memory.
 
-`WIDGETS_JSON` remains supported and takes precedence over `WIDGETS_FILE`, primarily for deployments where mounting a file is inconvenient. Because inline environment variables cannot be edited safely at runtime, discovery is browse-only when `WIDGETS_JSON` is used.
+`WIDGETS_JSON` takes precedence over `WIDGETS_FILE` when seeding a new database. Use **Prijenos postavki** to replace points in an existing database.
 
-## Portainer file configuration
+## Portainer storage configuration
 
-Place `widgets.json` in a directory on the Docker server, for example `/opt/iot-electric/dashboard-config/`, and set these stack variables:
+To use an existing directory on the Docker server and migrate its `widgets.json`, set these stack variables:
 
 ```env
 DASHBOARD_CONFIG_SOURCE=/opt/iot-electric/dashboard-config
@@ -328,7 +350,7 @@ DASHBOARD_WIDGETS_FILE=/app/config/widgets.json
 DASHBOARD_DEMO_MODE=false
 ```
 
-The source path belongs to the Docker server, not the computer running the browser. The directory and `widgets.json` must be writable by the dashboard container user (UID `1000`) if the **Dodaj** action should persist changes. Set suitable ownership on the host directory before deploying the stack. A read-only Docker Config can be used for browsing, but the modal will show **Samo pregled** instead of allowing additions. A mounted password secret can still be read with `MIDDLEWARE_PASSWORD_FILE=/run/secrets/middleware_password`.
+The dashboard container user (UID `1000`) must be able to write to the directory for SQLite. The legacy JSON files only need to be readable. A mounted password secret can still be read with `MIDDLEWARE_PASSWORD_FILE=/run/secrets/middleware_password`.
 
 `/health` is a container liveness check. `/ready` returns `503` until a middleware poll succeeds and can be used when controller connectivity must be part of readiness.
 
@@ -342,4 +364,4 @@ docker compose up --build
 
 The middleware is available on port `3000` and this dashboard on port `3001`.
 
-The current test stack publishes port `3001` without dashboard login. Restrict it to a trusted network or add reverse-proxy authentication before production use.
+The test stack serves HTTP on port `3001`. Use an HTTPS reverse proxy for production deployments.

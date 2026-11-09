@@ -6,13 +6,11 @@ of the read after a command, manual refresh, and advanced read batch size, batch
 delay and response timeout. It also links to rooms/floors, point visibility,
 discovery, transfer, trends and the technical view.
 
-Settings are saved atomically in `dashboard-settings.json` alongside
-`widgets.json`, in the existing persistent configuration volume. Saved settings
-take precedence over their environment defaults on subsequent starts. With no
-persistent `WIDGETS_FILE`, settings apply in memory until restart. The file never
-contains credentials. Portable version-2 backups include these settings; older
-backups and plain `widgets.json` retain the destination's general settings.
-Import recovery supports both previous three-file and new four-file journals.
+Settings are saved in `dashboard.sqlite` on the persistent configuration volume.
+Saved settings take precedence over environment defaults on subsequent starts.
+The first start migrates any existing `dashboard-settings.json`. Portable
+version-2 backups include polling settings. Older backups and plain
+`widgets.json` retain the destination's general settings.
 
 ## Pausing
 

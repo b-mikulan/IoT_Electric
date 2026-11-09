@@ -31,6 +31,16 @@ async function inGroups(values, concurrency, callback) {
   }
 }
 
+function readCatalog(file) {
+  try {
+    const saved = JSON.parse(fs.readFileSync(file, "utf8").replace(/^\uFEFF/, ""));
+    if (saved !== null && (saved?.schemaVersion !== 1 || !saved.metadataById || Array.isArray(saved.metadataById) || typeof saved.metadataById !== "object"
+      || !saved.roomByZone || Array.isArray(saved.roomByZone) || typeof saved.roomByZone !== "object")) throw new Error("Invalid catalog metadata format");
+    if (saved?.historyItems !== undefined) saved.historyItems = normalizeHistoryItems(saved.historyItems);
+    return saved;
+  } catch { throw new Error("Unable to load DEVICE_METADATA_FILE. Re-export the catalog descriptions or check its path."); }
+}
+
 class DeviceMetadataClient {
   #middlewareUrl;
   #authorization;
@@ -41,16 +51,11 @@ class DeviceMetadataClient {
   #cache = new Map();
   #inFlight = new Map();
 
-  constructor(config, { fetchImpl = globalThis.fetch } = {}) {
+  constructor(config, { fetchImpl = globalThis.fetch, catalog } = {}) {
     this.#demoMode = config.demoMode === true;
-    if (!this.#demoMode && config.deviceMetadataFile) {
-      try {
-        const saved = JSON.parse(fs.readFileSync(config.deviceMetadataFile, "utf8").replace(/^\uFEFF/, ""));
-        if (saved !== null && (saved?.schemaVersion !== 1 || !saved.metadataById || Array.isArray(saved.metadataById) || typeof saved.metadataById !== "object"
-          || !saved.roomByZone || Array.isArray(saved.roomByZone) || typeof saved.roomByZone !== "object")) throw new Error("Invalid catalog metadata format");
-        if (saved?.historyItems !== undefined) saved.historyItems = normalizeHistoryItems(saved.historyItems);
-        this.#catalog = saved;
-      } catch { throw new Error("Unable to load DEVICE_METADATA_FILE. Re-export the catalog descriptions or check its path."); }
+    if (!this.#demoMode) {
+      if (catalog !== undefined) this.#catalog = catalog;
+      else if (config.deviceMetadataFile) this.#catalog = readCatalog(config.deviceMetadataFile);
     }
     if (!this.#demoMode && typeof fetchImpl !== "function") throw new TypeError("fetchImpl must be a function");
     this.#fetch = fetchImpl;
@@ -108,12 +113,13 @@ class DeviceMetadataClient {
     this.#inFlight.set(key, operation);
     try {
       const result = await operation;
+      if (this.#inFlight.get(key) !== operation) return structuredClone(result);
       this.#cache.delete(key);
       this.#cache.set(key, { result, expiresAt: Date.now() + CACHE_TTL_MS });
       while (this.#cache.size > 4) this.#cache.delete(this.#cache.keys().next().value);
       return structuredClone(result);
     } finally {
-      this.#inFlight.delete(key);
+      if (this.#inFlight.get(key) === operation) this.#inFlight.delete(key);
     }
   }
 
@@ -248,4 +254,4 @@ class DeviceMetadataClient {
   }
 }
 
-module.exports = { DeviceMetadataClient };
+module.exports = { DeviceMetadataClient, readCatalog };

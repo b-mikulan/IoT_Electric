@@ -32,7 +32,7 @@ flowchart TD
     Metadata -->|Descriptions and room labels| Dashboard
 ```
 
-Live values are cached in dashboard memory. Point definitions and card preferences persist as JSON files in the mounted configuration directory. The separate SQLite building catalog supports offline inventory and export; the dashboard uses exported metadata without opening the catalog database. History and alarms are requested from the controller through the middleware.
+Live values are cached in dashboard memory. The dashboard stores configuration, user accounts and room permissions in `dashboard.sqlite` on the mounted configuration volume. The separate SQLite building catalog supports offline inventory and export. History and alarms are requested from the controller through the middleware.
 
 See the dashboard diagrams for [live refresh](dashboard/README.md#live-refresh), [device-card grouping](dashboard/README.md#experimental-device-cards), [command validation](dashboard/README.md#device-command-flow), and [automatic discovery](dashboard/README.md#automatic-discovery-flow).
 
@@ -114,18 +114,19 @@ For new Linux/Portainer instances, use [tools/stack-setup/README.md](tools/stack
    EWS_PASSWORD=controller_password
    ```
 
-5. Start both services:
+5. Add your [dashboard account credentials](dashboard/README.md#dashboard-accounts) to `.env`, then start both services:
 
    ```sh
    docker compose up --build
    ```
 
-Open `http://localhost:3000/api-docs` for the API or `http://localhost:3001` for the dashboard. Dashboard demo mode is enabled by default. Real widget definitions can be kept as readable JSON in `dashboard/config/widgets.json`; see [dashboard/README.md](dashboard/README.md) for setup.
+Open `http://localhost:3000/api-docs` for the API or `http://localhost:3001` for the dashboard. Demo mode is enabled by default. See the [dashboard storage and migration instructions](dashboard/README.md#dashboard-storage) to carry over existing settings.
 
-There are two separate sets of credentials:
+Each service uses its own credentials:
 
 - `EWS_USER` and `EWS_PASSWORD` let the middleware connect to a DDC controller.
 - `MIDDLEWARE_USER` and its generated password let Swagger, Postman, or the dashboard call the REST API.
+- The dashboard administrator signs in from a browser and manages regular accounts and room access on **Admin**.
 
 The dashboard needs the middleware's plaintext password because it is an API client. Keep it only in the untracked `.env`, a Portainer secret, or a Docker secret. Compose injects credentials at container start; they are not baked into either image.
 
@@ -164,6 +165,6 @@ In Portainer, deploy `docker-compose.portainer.yml` and set `IMAGE_TAG=1.0.0`. P
 
 ## Security status
 
-The current Compose configuration is intended for an isolated test server. Basic authentication must be placed behind HTTPS in production. Port `3001` currently has no separate dashboard login, so anyone who can reach it can view telemetry. Restrict that port or put the dashboard behind an authenticated HTTPS reverse proxy before production use.
+The current Compose configuration is intended for an isolated test server. Use HTTPS for both services in production and set `DASHBOARD_SECURE_COOKIES=true` for the dashboard.
 
 The middleware image installs the project CA certificate from `middleware/root_certificate_iotelectric.crt`. Replace it when the target controller uses a different CA. If no private CA is needed, remove the certificate `COPY`, `update-ca-certificates`, and `NODE_EXTRA_CA_CERTS` lines from the Dockerfile together.

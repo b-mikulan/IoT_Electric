@@ -1,5 +1,5 @@
 "use strict";
-const transferUi = Object.fromEntries(["file", "availability", "status", "preview", "counts", "warnings", "confirm", "import", "cancel", "filename", "success", "success-message"].map(name => [name, document.querySelector(`#transfer-${name}`)]));
+const transferUi = Object.fromEntries(["file", "availability", "status", "preview", "counts", "warnings", "confirm", "import", "cancel", "filename", "success", "success-message", "backup"].map(name => [name, document.querySelector(`#transfer-${name}`)]));
 let selectedDocument = null, previewToken = null, enabled = false, busy = false, selection = 0;
 function message(text, error = false) { transferUi.status.textContent = text; transferUi.status.classList.toggle("is-error", error); }
 function controls() { transferUi.import.disabled = !enabled || busy || !previewToken || !transferUi.confirm.checked; transferUi.file.disabled = !enabled || busy; transferUi.cancel.disabled = busy; transferUi.confirm.disabled = busy; }
@@ -47,6 +47,8 @@ transferUi.import.addEventListener("click", async () => {
     const result = await request("/api/dashboard-transfer/import", { document: selectedDocument, token: previewToken });
     reset(); transferUi.success.hidden = false;
     transferUi["success-message"].textContent = `Uvezeno je ${result.summary.points.toLocaleString("hr-HR")} pointova i ${result.summary.devices.toLocaleString("hr-HR")} kartica uređaja. Sigurnosna kopija: ${result.backupId}.`;
+    transferUi.backup.hidden = !result.backupUrl;
+    if (result.backupUrl) transferUi.backup.href = result.backupUrl;
     message(""); transferUi.file.value = "";
   } catch (error) { reset(); message(`${error.message} Ponovno odaberi datoteku za novi pregled.`, true); }
   finally { busy = false; controls(); }
@@ -57,7 +59,7 @@ async function initialize() {
     const response = await fetch("/api/dashboard-transfer/status", { cache: "no-store" });
     if (!response.ok) throw new Error();
     const status = await response.json(); enabled = status.enabled === true;
-    if (!enabled) { transferUi.availability.textContent = "Uvoz zahtijeva stvarni način rada (DEMO_MODE=false) i trajnu datoteku WIDGETS_FILE. Izvoz je i dalje dostupan."; transferUi.availability.hidden = false; }
+    if (!enabled) { transferUi.availability.textContent = "Uvoz zahtijeva stvarni način rada (DEMO_MODE=false) i trajnu pohranu dashboarda. Izvoz je i dalje dostupan."; transferUi.availability.hidden = false; }
   } catch { message("Ne mogu provjeriti je li uvoz dostupan. Osvježi stranicu.", true); }
   controls();
 }

@@ -11,6 +11,7 @@ const { PointPoller } = require("../lib/pointPoller");
 const { WidgetStore } = require("../lib/widgetStore");
 const { DeviceWidgetStore } = require("../lib/deviceWidgetStore");
 const { DeviceMetadataClient } = require("../lib/deviceMetadata");
+const { DashboardUsers } = require("../lib/dashboardUsers");
 
 const point = "01/ES/Zones/Z1/AC1/Values/RmTmp";
 const owner = "ES/Zones/Z1/AC1";
@@ -36,6 +37,88 @@ function bundle() {
     deviceWidgets: { version: 1, devices: [{ key: owner, label: "Kitchen AC", room: "Kitchen", primaryPointId: point, primaryUnit: "°C", secondaryPointIds: [] }], rooms: ["Empty room"], roomRules: [{ from: "Old Kitchen", to: "Kitchen" }] },
     metadata: { schemaVersion: 1, metadataById: { [point]: { id: point, name: "RmTmp", type: "double", unit: "°C", writeable: true, forceable: false } }, roomByZone: { "ES/Zones/Z1": "Old Kitchen" } } };
 }
+
+test("SQLite migrates existing configuration and accounts once and commits imports with a restorable backup", async t => {
+  const { directory, config } = fixture(t);
+  const data = bundle();
+  write(config.widgetsFile, data.widgets);
+  write(config.deviceWidgetsFile, data.deviceWidgets);
+  write(config.deviceMetadataFile, data.metadata);
+  const settingsFile = path.join(directory, "dashboard-settings.json");
+  write(settingsFile, { version: 1, settings: { intervalMs: 45_000 } });
+  const usersFile = path.join(directory, "dashboard-users.json");
+  const legacyUsers = new DashboardUsers(usersFile, {});
+  legacyUsers.save(null, { username: "viewer", password: "migration-password", roomIds: ["Kitchen"] }, new Set(["Kitchen"]));
+  const legacyFiles = [config.widgetsFile, config.deviceWidgetsFile, config.deviceMetadataFile, settingsFile, usersFile];
+  const originals = legacyFiles.map(file => fs.readFileSync(file, "utf8"));
+  const env = {
+    DEMO_MODE: "false", WIDGETS_FILE: config.widgetsFile, DEVICE_METADATA_FILE: config.deviceMetadataFile,
+    MIDDLEWARE_USER: "middleware", MIDDLEWARE_PASSWORD: "test-middleware",
+    DASHBOARD_ADMIN_USER: "admin", DASHBOARD_ADMIN_PASSWORD: "test-admin",
+    DASHBOARD_DB_FILE: path.join(directory, "dashboard.sqlite"),
+  };
+  const runtime = createRuntime(env);
+  const { database } = runtime;
+  try {
+    assert.equal(runtime.config.intervalMs, 45_000);
+    assert.equal(runtime.config.widgets[0].id, point);
+    assert.equal(database.readUsers()[0].passwordHash, read(usersFile).users[0].passwordHash);
+    assert.deepEqual(database.readUsers()[0].roomIds, ["Kitchen"]);
+    assert.deepEqual(database.readDocument("metadata"), data.metadata);
+    await runtime.deviceWidgetStore.synchronize([owner], { roomNames: ["Kitchen"] });
+    assert.equal(runtime.deviceWidgetStore.devices[0].room, "Kitchen");
+
+    const transfer = new DashboardTransfer(runtime.config, { database });
+    const replacement = [{ id: "replacement" }];
+    const stale = transfer.prepare(replacement).token;
+    await runtime.widgetStore.setVisibility(point, false);
+    assert.throws(() => transfer.apply(replacement, stale), { code: "TRANSFER_PREVIEW_CHANGED" });
+    assert.equal(database.readWidgets()[0].visible, false);
+
+    const prepared = transfer.prepare(replacement);
+    const result = transfer.apply(replacement, prepared.token);
+    assert.deepEqual(database.readWidgets().map(widget => widget.id), ["replacement"]);
+    assert.deepEqual(database.readUsers()[0].roomIds, ["Kitchen"]);
+    const backup = transfer.exportBackup(result.backupId);
+    assert.equal(backup.widgets[0].visible, false);
+    assert.equal(backup.deviceWidgets.devices[0].room, "Kitchen");
+    assert.equal(backup.dashboardSettings.intervalMs, 45_000);
+    assert.doesNotMatch(JSON.stringify(backup), /password|scrypt|12345/);
+    assert.deepEqual(legacyFiles.map(file => fs.readFileSync(file, "utf8")), originals);
+  } finally {
+    database.close();
+  }
+
+  for (const file of legacyFiles) fs.writeFileSync(file, "invalid legacy file");
+  const restarted = createRuntime(env);
+  try {
+    assert.deepEqual(restarted.config.widgets.map(widget => widget.id), ["replacement"]);
+    assert.equal(restarted.config.intervalMs, 45_000);
+    assert.deepEqual(restarted.database.readUsers()[0].roomIds, ["Kitchen"]);
+  } finally {
+    restarted.database.close();
+  }
+});
+
+test("a failed SQLite migration can retry from intact JSON and a new live database needs no widget file", t => {
+  const { directory, config } = fixture(t);
+  const env = {
+    DEMO_MODE: "false", MIDDLEWARE_USER: "middleware", MIDDLEWARE_PASSWORD: "test-middleware",
+    DASHBOARD_DB_FILE: path.join(directory, "dashboard.sqlite"),
+  };
+  fs.writeFileSync(config.deviceWidgetsFile, "invalid device document");
+  assert.throws(() => createRuntime({ ...env, WIDGETS_FILE: config.widgetsFile }), /configuration is invalid/);
+  assert.equal(read(config.widgetsFile)[0].id, "old-point");
+  write(config.deviceWidgetsFile, { version: 1, devices: [] });
+  const migrated = createRuntime({ ...env, WIDGETS_FILE: config.widgetsFile });
+  assert.equal(migrated.config.widgets[0].id, "old-point");
+  migrated.database.close();
+
+  const fresh = createRuntime({ ...env, DASHBOARD_DB_FILE: path.join(directory, "fresh.sqlite") });
+  assert.deepEqual(fresh.config.widgets, []);
+  assert.equal(fresh.widgetStore.enabled, true);
+  fresh.database.close();
+});
 
 test("portable export/import retains room assignments, empty rooms, units, write flags and metadata without runtime values or credentials", t => {
   const { config, transfer } = fixture(t);
