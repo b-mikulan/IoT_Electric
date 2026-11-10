@@ -33,6 +33,10 @@ Sign in as the administrator and open **Admin** to add, rename or delete dashboa
 
 Regular accounts, room IDs and scrypt password hashes are stored in SQLite. Existing `DASHBOARD_LOGIN_USER` and `DASHBOARD_LOGIN_PASSWORD` can seed a regular account with read access to all rooms if there is no legacy users file. This happens once, when the database is initialized.
 
+Set a temporary password when creating a user or resetting their password. The user signs in with it and must choose a different password before accessing the dashboard. The temporary password stops working once setup is complete. Existing passwords remain valid when the database upgrades.
+
+The admin page includes user search, room search and floor filters, a selected-rooms view and bulk selection of the displayed rooms. Filtering never clears existing room selections. The session count shows currently valid sign-ins (including administrator sessions), rather than the number of open tabs; **Odjavi sve sesije** signs a regular user out everywhere without changing the account or password. Counts refresh every 30 seconds while the page is visible. The system section shows connection and polling status, opens the shared polling settings, and links to room organization, point visibility, discovery, configuration transfer and diagnostics where available. Configuration exports do not include user accounts.
+
 For HTTPS deployments, set `DASHBOARD_SECURE_COOKIES=true` so browsers send the session cookie only over HTTPS.
 
 ## Dashboard storage

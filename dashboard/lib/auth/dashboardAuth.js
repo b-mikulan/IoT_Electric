@@ -1,10 +1,13 @@
 const { randomBytes } = require("node:crypto");
 const express = require("express");
-const { normalizeUsername, verifyPassword } = require("./dashboardUsers");
+const { normalizeUsername, validPassword, verifyPassword } = require("./dashboardUsers");
 const { sendEvent } = require("../http/eventStream");
+const { sendAdminPage } = require("../http/adminPage");
 
 const cookieName = "iot_dashboard_session";
 const sessionDuration = 12 * 60 * 60 * 1000;
+const setupDuration = 15 * 60 * 1000;
+const setupPath = "/setup-password";
 const loginWindow = 60_000;
 const maxFailures = 20;
 
@@ -41,6 +44,22 @@ function sendLogin(response, message = "", status = 200) {
     </form>`, status);
 }
 
+function sendPasswordSetup(response, message = "", status = 200) {
+  return sendPage(response, "Postavi lozinku", `
+    <p class="eyebrow">IoT Electric</p>
+    <h1>Postavi svoju lozinku</h1>
+    <p>Za pristup dashboardu zamijeni privremenu lozinku svojom. Upiši najmanje 8 znakova.</p>
+    ${message ? `<p class="dashboard-auth-error" role="alert">${message}</p>` : ""}
+    <form method="post" action="${setupPath}">
+      <label for="password">Nova lozinka</label>
+      <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="1024" required>
+      <label for="confirmation">Ponovi novu lozinku</label>
+      <input id="confirmation" name="confirmation" type="password" autocomplete="new-password" minlength="8" maxlength="1024" required>
+      <button type="submit">Spremi lozinku i nastavi</button>
+    </form>
+    <form method="post" action="/logout"><button type="submit">Odjava</button></form>`, status);
+}
+
 function createDashboardAuth(env, users) {
   const router = express.Router();
   const sessions = new Map();
@@ -64,6 +83,22 @@ function createDashboardAuth(env, users) {
     }
   }
 
+  function beginSession(response, account) {
+    endSession(response.locals.dashboardSessionId);
+    const id = randomBytes(32).toString("hex");
+    const mustChangePassword = account.mustChangePassword === true;
+    const duration = mustChangePassword ? setupDuration : sessionDuration;
+    const timer = setTimeout(() => endSession(id), duration).unref();
+    sessions.set(id, {
+      username: account.username, role: account.role, roomIds: account.roomIds,
+      mustChangePassword, timer, streams: new Set(),
+    });
+    response.cookie(cookieName, id, { ...cookieOptions, maxAge: duration });
+    return response.redirect(303, mustChangePassword ? setupPath : "/");
+  }
+
+  const isDataRequest = request => /^\/(?:api|events)(?:\/|$)/i.test(request.path);
+
   router.get(["/health", "/ready", "/styles.css", "/favicon.svg"], (request, response, next) => next("router"));
 
   router.use((request, response, next) => {
@@ -82,11 +117,12 @@ function createDashboardAuth(env, users) {
   });
 
   router.get("/login", (request, response) => {
-    if (response.locals.dashboardSession) return response.redirect("/");
+    const session = response.locals.dashboardSession;
+    if (session) return response.redirect(session.mustChangePassword ? setupPath : "/");
     return sendLogin(response, users.hasAccounts ? "" : "Računi za prijavu još nisu postavljeni.");
   });
 
-  router.post("/login", express.urlencoded({ extended: false, limit: "8kb" }), async (request, response) => {
+  router.post("/login", express.urlencoded({ extended: false, limit: "16kb" }), async (request, response) => {
     if (!users.hasAccounts) return sendLogin(response, "Računi za prijavu još nisu postavljeni.", 503);
     const ip = request.ip;
     if ((failuresByIp.get(ip) ?? 0) >= maxFailures || pendingVerifications >= 4) {
@@ -110,12 +146,7 @@ function createDashboardAuth(env, users) {
       return sendLogin(response, "Korisničko ime ili lozinka nisu ispravni.", 401);
     }
 
-    endSession(response.locals.dashboardSessionId);
-    const id = randomBytes(32).toString("hex");
-    const timer = setTimeout(() => endSession(id), sessionDuration).unref();
-    sessions.set(id, { username: account.username, role: account.role, roomIds: account.roomIds, timer, streams: new Set() });
-    response.cookie(cookieName, id, { ...cookieOptions, maxAge: sessionDuration });
-    return response.redirect(303, "/");
+    return beginSession(response, account);
   });
 
   router.post("/logout", (request, response) => {
@@ -126,39 +157,56 @@ function createDashboardAuth(env, users) {
 
   router.use((request, response, next) => {
     if (response.locals.dashboardSession) return next();
-    if (/^\/(?:api|events)(?:\/|$)/i.test(request.path)) {
+    if (isDataRequest(request)) {
       return response.status(401).json({ error: "Potrebna je prijava.", code: "LOGIN_REQUIRED" });
     }
     return response.redirect(303, "/login");
+  });
+
+  router.get(setupPath, (request, response) => {
+    return response.locals.dashboardSession.mustChangePassword ? sendPasswordSetup(response) : response.redirect("/");
+  });
+
+  router.post(setupPath, express.urlencoded({ extended: false, limit: "32kb" }), async (request, response) => {
+    const { dashboardSession: session, isSessionActive } = response.locals;
+    if (!session.mustChangePassword) return response.redirect(303, "/");
+    const account = users.find(session.username);
+    if (!account?.mustChangePassword) return response.redirect(303, "/login");
+    const { password, confirmation } = request.body || {};
+    if (!validPassword(password)) return sendPasswordSetup(response, "Nova lozinka mora imati od 8 do 1024 znakova.", 400);
+    if (password !== confirmation) return sendPasswordSetup(response, "Lozinke se ne podudaraju.", 400);
+    if (pendingVerifications >= 4) {
+      response.set("Retry-After", "1");
+      return sendPasswordSetup(response, "Pokušaj ponovno za nekoliko trenutaka.", 429);
+    }
+
+    let matchesTemporaryPassword;
+    pendingVerifications += 1;
+    try { matchesTemporaryPassword = await verifyPassword(password, account.passwordHash); }
+    finally { pendingVerifications -= 1; }
+    if (!isSessionActive() || users.find(account.username) !== account) return response.redirect(303, "/login");
+    if (matchesTemporaryPassword) return sendPasswordSetup(response, "Odaberi lozinku različitu od privremene.", 400);
+
+    let updated;
+    try { updated = users.completePasswordSetup(account, password); }
+    catch { return sendPasswordSetup(response, "Lozinku nije moguće spremiti. Pokušaj ponovno.", 500); }
+    revoke(account.username);
+    return beginSession(response, updated);
+  });
+
+  router.use((request, response, next) => {
+    if (!response.locals.dashboardSession.mustChangePassword) return next();
+    if (isDataRequest(request)) {
+      return response.status(403).json({ error: "Prvo postavi svoju lozinku.", code: "PASSWORD_SETUP_REQUIRED" });
+    }
+    return response.redirect(303, setupPath);
   });
 
   router.get(["/admin", "/admin.html"], (request, response) => {
     if (response.locals.dashboardSession.role !== "admin") {
       return sendPage(response, "Pristup odbijen", "<h1>Pristup odbijen</h1><p><a href=\"/\">Natrag na dashboard</a></p>", 403);
     }
-    return sendPage(response, "Admin", `
-      <p><a href="/">Natrag na dashboard</a></p>
-      <h1>Korisnici</h1>
-      <p>Odaberi koje prostorije korisnik može pregledavati.</p>
-      <label for="admin-users">Korisnik</label>
-      <select id="admin-users" disabled><option value="">Novi korisnik</option></select>
-      <form id="admin-user-form" hidden>
-        <label for="admin-username">Korisničko ime</label>
-        <input id="admin-username" autocomplete="off" maxlength="128" required>
-        <label for="admin-password">Lozinka</label>
-        <input id="admin-password" type="password" autocomplete="new-password" maxlength="1024">
-        <label><input id="admin-all-rooms" type="checkbox"> Sve prostorije i uređaji bez prostorije</label>
-        <fieldset id="admin-room-field">
-          <legend>Dozvoljene prostorije</legend>
-          <label for="admin-room-search">Pretraži prostorije</label>
-          <input id="admin-room-search" type="search" placeholder="Naziv prostorije ili kat" autocomplete="off">
-          <div id="admin-rooms" class="dashboard-admin-rooms"></div>
-          <p id="admin-rooms-empty" role="status" hidden></p>
-        </fieldset>
-        <button type="submit">Spremi korisnika</button>
-        <button id="admin-delete" type="button" hidden>Izbriši korisnika</button>
-      </form>
-      <p id="admin-status" role="status" aria-live="polite"></p>`, 200, '<script defer src="/adminUsers.js"></script>');
+    return sendAdminPage(response);
   });
 
   router.use((request, response, next) => {
@@ -170,12 +218,34 @@ function createDashboardAuth(env, users) {
   });
 
   function revoke(username) {
+    let revoked = 0;
     for (const [id, session] of sessions) {
-      if (session.role === "user" && session.username === username) endSession(id);
+      if (session.role === "user" && session.username === username) {
+        endSession(id);
+        revoked += 1;
+      }
     }
+    return revoked;
   }
 
-  return { router, users, revoke };
+  function listSessions(currentSessionId) {
+    const accounts = new Map();
+    for (const [id, session] of sessions) {
+      const account = accounts.get(session.username) || {
+        username: session.username, role: session.role, count: 0, current: false,
+      };
+      account.count += 1;
+      account.current ||= id === currentSessionId;
+      accounts.set(session.username, account);
+    }
+    return {
+      currentUsername: sessions.get(currentSessionId)?.username ?? null,
+      total: sessions.size,
+      sessions: [...accounts.values()].sort((a, b) => a.username.localeCompare(b.username, "hr")),
+    };
+  }
+
+  return { router, users, revoke, listSessions };
 }
 
 function trackDashboardStream(response) {

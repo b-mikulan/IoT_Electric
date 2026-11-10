@@ -25,6 +25,10 @@ function normalizeUsername(value) {
   return typeof value === "string" ? value.trim().normalize("NFC") : "";
 }
 
+function validPassword(password) {
+  return typeof password === "string" && password.length <= 1024 && password.trim().length >= 8;
+}
+
 function validRoomIds(roomIds) {
   return roomIds === null || Array.isArray(roomIds) && roomIds.length <= 50_000
     && roomIds.every(id => typeof id === "string" && id.trim() && id.length <= 4096);
@@ -40,8 +44,8 @@ function loadBootstrapAccount(env, prefix, role) {
   return { username, passwordHash: hashPassword(password), role, roomIds: null };
 }
 
-function publicAccount({ username, roomIds }) {
-  return { username, roomIds };
+function publicAccount({ username, roomIds, mustChangePassword }) {
+  return { username, roomIds, mustChangePassword };
 }
 
 class DashboardUsers {
@@ -57,13 +61,14 @@ class DashboardUsers {
     const stored = database?.readUsers();
     const users = stored ?? this.#readLegacyUsers(env);
     this.#users = new Map();
-    for (const { username, passwordHash, roomIds } of users) {
+    for (const { username, passwordHash, roomIds, mustChangePassword = false } of users) {
       if (!username || username !== normalizeUsername(username) || username.length > 128
         || this.#users.has(username) || username === this.#admin?.username
-        || typeof passwordHash !== "string" || !hashPattern.test(passwordHash) || !validRoomIds(roomIds)) {
+        || typeof passwordHash !== "string" || !hashPattern.test(passwordHash) || !validRoomIds(roomIds)
+        || typeof mustChangePassword !== "boolean") {
         throw new Error("Neispravni računi ili korisničko ime administratora već postoji među običnim korisnicima.");
       }
-      this.#users.set(username, { username, passwordHash, roomIds, role: "user" });
+      this.#users.set(username, { username, passwordHash, roomIds, mustChangePassword, role: "user" });
     }
     if (database && stored === undefined) database.saveUsers(this.#users.values());
   }
@@ -110,13 +115,14 @@ class DashboardUsers {
     if (username === this.#admin?.username || username !== previousUsername && this.#users.has(username)) {
       throw accountError("Korisničko ime je već zauzeto.", 409);
     }
-    if (typeof password !== "string" || (password || !previous) && (password.trim().length < 8 || password.length > 1024)) {
+    if ((password !== "" || !previous) && !validPassword(password)) {
       throw accountError("Nova lozinka mora imati od 8 do 1024 znakova.");
     }
     const user = {
       username,
       passwordHash: password ? hashPassword(password) : previous.passwordHash,
       roomIds: roomIds === null ? null : [...new Set(roomIds)],
+      mustChangePassword: Boolean(password) || previous?.mustChangePassword === true,
       role: "user",
     };
     const users = new Map(this.#users);
@@ -124,6 +130,14 @@ class DashboardUsers {
     users.set(username, user);
     this.#write(users);
     return publicAccount(user);
+  }
+
+  completePasswordSetup(account, password) {
+    const user = { ...account, passwordHash: hashPassword(password), mustChangePassword: false };
+    const users = new Map(this.#users);
+    users.set(user.username, user);
+    this.#write(users);
+    return user;
   }
 
   remove(username) {
@@ -139,7 +153,9 @@ class DashboardUsers {
       if (this.#database) this.#database.saveUsers(users.values());
       else {
         fs.mkdirSync(path.dirname(this.#file), { recursive: true });
-        const document = { version: 1, users: [...users.values()].map(({ username, passwordHash, roomIds }) => ({ username, passwordHash, roomIds })) };
+        const document = { version: 1, users: [...users.values()].map(({ username, passwordHash, roomIds, mustChangePassword }) => ({
+          username, passwordHash, roomIds, mustChangePassword,
+        })) };
         fs.writeFileSync(temporary, `${JSON.stringify(document, null, 2)}\n`, { flag: "wx", mode: 0o600 });
         fs.renameSync(temporary, this.#file);
       }
@@ -152,4 +168,4 @@ class DashboardUsers {
   }
 }
 
-module.exports = { DashboardUsers, normalizeUsername, verifyPassword };
+module.exports = { DashboardUsers, normalizeUsername, validPassword, verifyPassword };

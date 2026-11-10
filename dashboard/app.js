@@ -177,7 +177,7 @@ function createApp({
   });
 
   if (dashboardAuth) {
-    const { users, revoke } = dashboardAuth;
+    const { users, revoke, listSessions } = dashboardAuth;
     app.use("/api/admin", (request, response, next) => {
       if (response.locals.dashboardSession?.role === "admin") return next();
       return response.status(403).json({ code: "ADMIN_REQUIRED" });
@@ -189,6 +189,19 @@ function createApp({
       return response.json({ users: users.list(), rooms: [...rooms.values()].map(room => ({
         id: room.id, name: room.name, floor: floorNames.get(room.floorId) || null,
       })) });
+    });
+    app.get("/api/admin/sessions", (request, response) => {
+      return response.json(listSessions(response.locals.dashboardSessionId));
+    });
+    app.post("/api/admin/users/revoke", requireJson, express.json({ limit: "4kb" }), (request, response) => {
+      const username = request.body?.username;
+      if (typeof username !== "string" || !username.trim() || username.length > 128) {
+        return response.status(400).json({ error: "Odaberi korisnika." });
+      }
+      const user = users.find(username);
+      if (!user) return response.status(404).json({ error: "Korisnik više ne postoji." });
+      if (user.role !== "user") return response.status(403).json({ error: "Ovdje se mogu odjaviti samo obični korisnici." });
+      return response.json({ revoked: revoke(username) });
     });
     app.post("/api/admin/users", requireJson, express.json({ limit: "512kb" }), async (request, response) => {
       const previous = request.body?.previousUsername;

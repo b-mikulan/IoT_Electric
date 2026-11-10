@@ -91,7 +91,14 @@ test("dashboard sign-in protects pages, API, live streams and the admin role", a
   const adminSession = { headers: { cookie: admin.headers.get("set-cookie").split(";")[0] } };
   const adminPage = await request("/admin", adminSession);
   assert.equal(adminPage.status, 200);
-  assert.match(await adminPage.text(), /<h1>Korisnici<\/h1>/);
+  const adminHtml = await adminPage.text();
+  assert.match(adminHtml, /<h1>Administracija<\/h1>/);
+  for (const asset of ["admin.css", "adminApi.js", "adminUsers.js", "adminSystem.js", "dashboardSettings.js"]) {
+    assert.ok(adminHtml.includes(`/${asset}`));
+    const response = await request(`/${asset}`, adminSession);
+    assert.equal(response.status, 200, asset);
+    assert.match(response.headers.get("content-type"), asset.endsWith(".css") ? /text\/css/ : /javascript/, asset);
+  }
   assert.equal((await (await request("/api/config", adminSession)).json()).isAdmin, true);
 });
 
@@ -107,6 +114,83 @@ function session(response) {
   return { headers: { cookie: response.headers.get("set-cookie").split(";")[0] } };
 }
 
+function setupPassword(request, auth, password, confirmation = password) {
+  return request("/setup-password", {
+    ...auth, method: "POST", body: new URLSearchParams({ password, confirmation }),
+  });
+}
+
+async function activateUser(request, username, temporary, password) {
+  const signedIn = await login(request, username, temporary);
+  assert.equal(signedIn.headers.get("location"), "/setup-password");
+  const setup = await setupPassword(request, session(signedIn), password);
+  assert.equal(setup.headers.get("location"), "/");
+  return session(setup);
+}
+
+test("first login requires password setup before granting access and persists completion in SQLite", async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "dashboard-password-setup-"));
+  try {
+    const databaseFile = path.join(directory, "dashboard.sqlite");
+    const env = {
+      DASHBOARD_ADMIN_USER: "admin", DASHBOARD_ADMIN_PASSWORD: "test-admin", DASHBOARD_DB_FILE: databaseFile,
+    };
+    const { DashboardDatabase } = require("../lib/storage/dashboardDatabase");
+    const { DashboardUsers } = require("../lib/auth/dashboardUsers");
+    const { DatabaseSync } = require("node:sqlite");
+    const oldDatabase = new DashboardDatabase(databaseFile);
+    new DashboardUsers(path.join(directory, "users.json"), {
+      ...env, DASHBOARD_LOGIN_USER: "existing", DASHBOARD_LOGIN_PASSWORD: "existing-password",
+    }, { database: oldDatabase });
+    oldDatabase.close();
+    const oldSchema = new DatabaseSync(databaseFile);
+    oldSchema.exec("ALTER TABLE dashboard_users DROP COLUMN must_change_password; PRAGMA user_version = 1;");
+    oldSchema.close();
+
+    const { request } = await startDashboard(t, env);
+    assert.equal((await login(request, "existing", "existing-password")).headers.get("location"), "/");
+    const admin = session(await login(request, "admin", "test-admin"));
+    const create = await request("/api/admin/users", {
+      method: "POST", headers: { ...admin.headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ previousUsername: null, username: "new-user", password: "temporary-password", roomIds: [] }),
+    });
+    assert.equal(create.status, 201);
+    assert.equal((await create.json()).user.mustChangePassword, true);
+    assert.equal((await setupPassword(request, {}, "personal-password")).headers.get("location"), "/login");
+
+    const signedIn = await login(request, "new-user", "temporary-password");
+    assert.equal(signedIn.headers.get("location"), "/setup-password");
+    const pending = session(signedIn);
+    const secondPending = session(await login(request, "new-user", "temporary-password"));
+    assert.match(await (await request("/setup-password", pending)).text(), /Postavi svoju lozinku/);
+    for (const url of ["/", "/technical.html", "/admin", "/login"]) {
+      assert.equal((await request(url, pending)).headers.get("location"), "/setup-password");
+    }
+    for (const url of ["/api/config", "/api/snapshot", "/events"]) {
+      const blocked = await request(url, pending);
+      assert.equal(blocked.status, 403);
+      assert.equal((await blocked.json()).code, "PASSWORD_SETUP_REQUIRED");
+    }
+    assert.equal((await setupPassword(request, pending, "kratko")).status, 400);
+    assert.equal((await setupPassword(request, pending, "personal-password", "different-password")).status, 400);
+    assert.equal((await setupPassword(request, pending, "temporary-password")).status, 400);
+    const completed = await setupPassword(request, pending, "personal-password");
+    assert.equal(completed.headers.get("location"), "/");
+    assert.equal((await request("/api/config", session(completed))).status, 200);
+    for (const auth of [pending, secondPending]) {
+      assert.equal((await request("/api/config", auth)).status, 401);
+    }
+    const { request: restarted } = await startDashboard(t, env);
+    assert.equal((await login(restarted, "new-user", "temporary-password")).status, 401);
+    assert.equal((await login(restarted, "new-user", "personal-password")).headers.get("location"), "/");
+  } finally {
+    t.after(() => {
+      assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir()));
+      return fs.rm(directory, { recursive: true, force: true });
+    });
+  }
+});
+
 test("SQLite configuration backups are downloadable by the administrator and exclude accounts", async t => {
   const { request, database } = await startDashboard(t, {
     DEMO_MODE: "false", MIDDLEWARE_URL: "http://127.0.0.1:1",
@@ -120,7 +204,7 @@ test("SQLite configuration backups are downloadable by the administrator and exc
   const create = await post("/api/admin/users", { previousUsername: null, username: "viewer", password: "test-viewer", roomIds: [] });
   assert.equal(create.status, 201);
   assert.deepEqual(database.readUsers().map(user => user.username), ["viewer"]);
-  const viewer = session(await login(request, "viewer", "test-viewer"));
+  const viewer = await activateUser(request, "viewer", "test-viewer", "viewer-personal");
   const document = [{ id: "new-widget" }];
   const { token } = await (await post("/api/dashboard-transfer/preview", { document })).json();
   const imported = await post("/api/dashboard-transfer/import", { document, token });
@@ -172,8 +256,8 @@ test("admin manages persistent users and room permissions apply to all dashboard
   assert.equal((await createUser("second", [rooms[1].id])).status, 201);
   assert.equal((await createUser("admin", null)).status, 409);
 
-  const viewer = session(await login(request, "viewer", "viewer-pass"));
-  const second = session(await login(request, "second", "viewer-pass"));
+  const viewer = await activateUser(request, "viewer", "viewer-pass", "viewer-personal");
+  const second = await activateUser(request, "second", "viewer-pass", "second-personal");
   assert.equal((await request("/api/admin/users", viewer)).status, 403);
   for (const url of ["/api/dashboard-transfer/export", "/api/history/catalog", "/api/discovery/auto", "/api/dashboard/events"]) {
     assert.equal((await request(url, viewer)).status, 403, url);
@@ -227,7 +311,7 @@ test("admin manages persistent users and room permissions apply to all dashboard
 
   const { request: restarted } = await startDashboard(t, env);
   assert.equal((await login(restarted, "renamed", "viewer-pass")).status, 401);
-  const restored = session(await login(restarted, "renamed", "updated-pass"));
+  const restored = await activateUser(restarted, "renamed", "updated-pass", "updated-personal");
   const savedConfig = await (await restarted("/api/config", restored)).json();
   assert.deepEqual(savedConfig.widgets.map(widget => widget.id), [widgets[1].id]);
   const adminAfterRestart = session(await login(restarted, "admin", "test-admin"));
@@ -236,5 +320,5 @@ test("admin manages persistent users and room permissions apply to all dashboard
   });
   assert.equal(deleted.status, 204);
   assert.equal((await restarted("/api/config", restored)).status, 401);
-  assert.equal((await login(restarted, "renamed", "updated-pass")).status, 401);
+  assert.equal((await login(restarted, "renamed", "updated-personal")).status, 401);
 });

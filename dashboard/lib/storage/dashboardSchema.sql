@@ -1,5 +1,5 @@
 PRAGMA application_id = 1229935684;
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 
 CREATE TABLE dashboard_widgets (
   id TEXT PRIMARY KEY,
@@ -15,7 +15,8 @@ CREATE TABLE dashboard_documents (
 CREATE TABLE dashboard_users (
   username TEXT PRIMARY KEY,
   password_hash TEXT NOT NULL,
-  all_rooms INTEGER NOT NULL CHECK (all_rooms IN (0, 1))
+  all_rooms INTEGER NOT NULL CHECK (all_rooms IN (0, 1)),
+  must_change_password INTEGER NOT NULL DEFAULT 0 CHECK (must_change_password IN (0, 1))
 ) STRICT;
 
 CREATE TABLE dashboard_room_grants (
