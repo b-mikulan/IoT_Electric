@@ -100,7 +100,7 @@
         if (!$("history-id").value.trim() || !Number.isFinite(+from) || !Number.isFinite(+to) || from >= to) {
           status("history-status", "Odaberi trend i ispravan vremenski raspon (Od prije Do).", true); return;
         }
-        current.query = { historyItemId: $("history-id").value.trim(), timeFrom: from.toISOString(), timeTo: to.toISOString() };
+        current.query = { historyItemId: $("history-id").value, timeFrom: from.toISOString(), timeTo: to.toISOString() };
       }
       current.rows = []; current.cursor = null; current.seen.clear(); current.table.clear().draw();
       if (kind === "history") drawChart([], "");

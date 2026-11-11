@@ -28,14 +28,14 @@ function portainerEnv(file) {
   }));
 }
 
-test("prepares usable live configuration, matching credentials and independent instances", (t) => {
+test("prepares usable live configuration, matching credentials and independent instances", async (t) => {
   const options = fixture(t);
   const first = prepareInstance(options, connection);
   const env = dotenv.parse(fs.readFileSync(path.join(first.instanceDir, ".env")));
   const imported = portainerEnv(path.join(first.instanceDir, "portainer.env"));
   assert.equal(imported.EWS_PASSWORD, connection.password);
   assert.deepEqual(imported, env);
-  assert.equal(verifyPassword(env.DASHBOARD_MIDDLEWARE_PASSWORD, env.MIDDLEWARE_PASSWORD_HASH), true);
+  assert.equal(await verifyPassword(env.DASHBOARD_MIDDLEWARE_PASSWORD, env.MIDDLEWARE_PASSWORD_HASH), true);
   const config = loadConfig({ DEMO_MODE: env.DASHBOARD_DEMO_MODE,
     MIDDLEWARE_USER: env.MIDDLEWARE_USER, MIDDLEWARE_PASSWORD: env.DASHBOARD_MIDDLEWARE_PASSWORD,
     WIDGETS_FILE: path.join(first.instanceDir, "dashboard-config/widgets.json") });

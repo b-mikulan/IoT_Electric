@@ -68,6 +68,41 @@ const containerParser = new XMLParser({
 });
 const MAX_CONTAINER_PAGES = 100;
 const MAX_CONTAINER_ITEMS = 50_000;
+const telemetryResponses = new Set([
+  "GetHistoryResponse", "GetAlarmEventsResponse", "GetUpdatedAlarmEventsResponse", "GetAlarmHistoryResponse",
+]);
+
+// Telemetry IDs and cursors are opaque strings. Convert only fields whose EWS
+// meaning is numeric/boolean, never identifiers, timestamps or paging tokens.
+function telemetryScalar(value) {
+  if (typeof value !== "string") return value;
+  const text = value.trim();
+  if (text === "true") return true;
+  if (text === "false") return false;
+  if (/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(text)) {
+    const number = Number(text);
+    if (Number.isFinite(number) && (!Number.isInteger(number) || Number.isSafeInteger(number))) return number;
+  }
+  return value;
+}
+
+function normalizeTelemetryFields(node) {
+  if (!node || typeof node !== "object") return;
+  for (const [key, value] of Object.entries(node)) {
+    if (["HistoryRecord", "AlarmEvent"].includes(key)) {
+      for (const record of Array.isArray(value) ? value : [value]) {
+        if (!record || typeof record !== "object") continue;
+        for (const field of key === "HistoryRecord" ? ["Value", "State"] : ["Priority", "State"]) {
+          if (Object.hasOwn(record, field)) record[field] = telemetryScalar(record[field]);
+        }
+      }
+    } else if (["MoreDataAvailable", "NeedsRefresh"].includes(key) && typeof value === "string") {
+      const flag = value.trim();
+      if (["true", "1"].includes(flag)) node[key] = true;
+      else if (["false", "0"].includes(flag)) node[key] = false;
+    } else normalizeTelemetryFields(value);
+  }
+}
 
 function assertCredentials(username, password) {
   if (!username || !password) {
@@ -878,8 +913,8 @@ function parseGetWebServiceInformationResponse(xmlText) {
   };
 }
 
-function getSoapBody(xmlText) {
-  const parsed = parseXml(xmlText);
+function getSoapBody(xmlText, xmlParser = parser) {
+  const parsed = xmlParser.parse(xmlText);
   const body = parsed.Envelope?.Body;
 
   if (!body) {
@@ -911,7 +946,8 @@ function extractSoapFault(xmlText) {
 }
 
 function parseOperationResponse(xmlText, responseElementName) {
-  const body = getSoapBody(xmlText);
+  const telemetry = telemetryResponses.has(responseElementName);
+  const body = getSoapBody(xmlText, telemetry ? containerParser : parser);
 
   if (body.Fault) {
     const fault = extractSoapFault(xmlText);
@@ -934,6 +970,7 @@ function parseOperationResponse(xmlText, responseElementName) {
     );
   }
 
+  if (telemetry) normalizeTelemetryFields(response);
   return response;
 }
 

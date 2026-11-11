@@ -90,7 +90,7 @@ const cardSettings = Object.fromEntries([
   "remove", "remove-confirmation", "remove-message", "remove-confirm", "remove-cancel",
 ].map((name) => [name, document.querySelector(`#device-settings-${name}`)]));
 
-const roomsUi = Object.fromEntries(["dialog", "close", "form", "name", "floor", "edit-floor", "create", "list", "status", "count", "editor", "selected", "summary", "rename-form", "rename-name", "rename", "delete", "delete-confirmation", "delete-message", "delete-cancel", "delete-confirm"].map((name) => [name, document.querySelector(`#rooms-${name}`)]));
+const roomsUi = Object.fromEntries(["dialog", "close", "form", "name", "floor", "edit-floor", "search", "filter-floor", "create", "list", "status", "count", "editor", "selected", "summary", "rename-form", "rename-name", "rename", "delete", "delete-confirmation", "delete-message", "delete-cancel", "delete-confirm"].map((name) => [name, document.querySelector(`#rooms-${name}`)]));
 const floorsUi = Object.fromEntries(["management", "form", "name", "create", "list", "status", "editor", "selected", "rename-form", "rename-name", "rename", "delete", "delete-confirmation", "delete-message", "delete-cancel", "delete-confirm"].map(name => [name, document.querySelector(`#floors-${name}`)]));
 const moveUi = Object.fromEntries(["dialog", "close", "form", "floor", "target", "hint", "new-field", "new", "cancel", "save", "summary", "status"].map((name) => [name, document.querySelector(`#device-room-${name}`)]));
 const elementsById = new Map();
@@ -1432,11 +1432,26 @@ function renderRoomsList() {
   renderFloors();
   roomsUi.list.replaceChildren();
   const names = knownRoomNames();
-  roomsUi.count.textContent = `Ukupno: ${names.length}`;
+  const previousFloor = roomsUi["filter-floor"].value;
+  roomsUi["filter-floor"].replaceChildren();
+  appendSettingsOption(roomsUi["filter-floor"], "all", "Svi katovi i grupe");
+  for (const floor of storedFloors) appendSettingsOption(roomsUi["filter-floor"], floor.id, floor.name);
+  appendSettingsOption(roomsUi["filter-floor"], "unknown", "Kat nije određen");
+  const floor = previousFloor === "unknown" || storedFloors.some(item => item.id === previousFloor) ? previousFloor : "all";
+  roomsUi["filter-floor"].value = floor;
+  const searchable = value => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("hr");
+  const terms = searchable(roomsUi.search.value.trim()).split(/\s+/).filter(Boolean);
+  const filtered = names.filter(id => {
+    const detail = roomDefinition(id);
+    const matchesFloor = floor === "all" || (floor === "unknown" ? !detail?.floorId : detail?.floorId === floor);
+    const text = searchable(`${roomDisplayName(id)} ${id}`);
+    return matchesFloor && terms.every(term => text.includes(term));
+  });
+  roomsUi.count.textContent = terms.length || floor !== "all" ? `Prikazano: ${filtered.length} od ${names.length}` : `Ukupno: ${names.length}`;
   const counts = new Map();
   for (const device of cardSettingsDevices()) if (device.room?.label) { const id = device.room.id || device.room.label; counts.set(id, (counts.get(id) || 0) + 1); }
   if (selectedRoomName && !names.includes(selectedRoomName)) selectedRoomName = null;
-  for (const name of names) {
+  for (const name of filtered) {
     const row = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
@@ -1463,6 +1478,12 @@ function renderRoomsList() {
     row.append(button);
     roomsUi.list.appendChild(row);
   }
+  if (!filtered.length) {
+    const empty = document.createElement("li");
+    empty.className = "room-registry-empty";
+    empty.textContent = names.length ? "Nema prostorija za odabrane filtre. Promijeni pretragu ili kat." : "Još nema prostorija. Stvori prvu prostoriju iznad.";
+    roomsUi.list.appendChild(empty);
+  }
   roomsUi.editor.hidden = !selectedRoomName;
   roomsUi.dialog.classList.toggle("has-room-selection", Boolean(selectedRoomName));
   if (selectedRoomName) {
@@ -1476,6 +1497,8 @@ function renderRoomsList() {
 function openRoomsDialog() {
   if (!deviceSettingsEnabled || roomsBusy) return;
   selectedRoomName = null;
+  roomsUi.search.value = "";
+  roomsUi["filter-floor"].value = "all";
   roomsUi["delete-confirmation"].hidden = true;
   renderRoomsList();
   roomsUi.name.value = "";
@@ -1483,6 +1506,9 @@ function openRoomsDialog() {
   roomsUi.dialog.showModal();
   requestAnimationFrame(() => roomsUi.name.focus());
 }
+
+roomsUi.search.addEventListener("input", renderRoomsList);
+roomsUi["filter-floor"].addEventListener("change", renderRoomsList);
 
 async function persistRoomChange(endpoint, body) {
   const request = ++deviceSettingsRequest;

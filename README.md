@@ -165,6 +165,10 @@ In Portainer, deploy `docker-compose.portainer.yml` and set `IMAGE_TAG=1.0.0`. P
 
 ## Security status
 
+Middleware password verification uses asynchronous scrypt. Each middleware process permits at most two concurrent password checks and 60 new checks per minute across clients. A client address can make up to 20 failed or pending attempts per minute; an incorrect username counts too. Limits return HTTP 429 with `Retry-After`, and the client-tracking map is bounded to 1,000 addresses. Requests without Basic credentials receive the usual HTTP 401 challenge.
+
+Successfully verified credentials are remembered for five minutes as a keyed fingerprint, so routine dashboard polling avoids repeated password derivation and can continue during throttling. No plaintext password is stored in this cache. The configured account/hash stays fixed for the process lifetime; restart the middleware after rotating credentials. The limits and cache are process-local, so multiple replicas have separate budgets. Health and Swagger pages remain outside authentication limits. Behind a reverse proxy, clients share its socket address unless trusted-proxy handling is explicitly configured; do not blindly trust incoming `X-Forwarded-For` headers.
+
 The current Compose configuration is intended for an isolated test server. Use HTTPS for both services in production and set `DASHBOARD_SECURE_COOKIES=true` for the dashboard.
 
 The middleware image installs the project CA certificate from `middleware/root_certificate_iotelectric.crt`. Replace it when the target controller uses a different CA. If no private CA is needed, remove the certificate `COPY`, `update-ca-certificates`, and `NODE_EXTRA_CA_CERTS` lines from the Dockerfile together.

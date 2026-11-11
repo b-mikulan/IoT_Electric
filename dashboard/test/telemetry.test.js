@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
-const { TelemetryClient, normalizeResponse } = require("../lib/telemetry/telemetry");
+const { TelemetryClient, normalizeResponse, queryOptions } = require("../lib/telemetry/telemetry");
 const { createApp } = require("../app");
 
 const options = { historyItemId: "03/trend", timeFrom: "2026-09-21T02:00:00+02:00", timeTo: "2026-09-22T02:00:00+02:00" };
@@ -89,4 +89,116 @@ test("demo works without contacting the controller", async () => {
   const client = new TelemetryClient({ demoMode: true }, () => { throw new Error("must not fetch"); });
   assert.equal((await client.query("history", options)).rows.length, 49);
   assert.equal((await client.query("alarms", {})).rows[0].type, "Demo");
+});
+
+test("XML paging flags accept exactly true/false/1/0 and malformed flags never imply completion", () => {
+  for (const flag of [true, 1, "true", "1", " 1 "]) {
+    for (const kind of ["history", "alarms"]) {
+      const prefix = kind === "history" ? "GetHistory" : "GetAlarmEvents";
+      const result = normalizeResponse(kind, { [`${prefix}ResponseStatus`]: { MoreDataAvailable: flag, MoreDataRef: "000123", NeedsRefresh: flag } });
+      assert.equal(result.moreDataAvailable, true);
+      assert.equal(result.moreDataRef, "000123");
+      if (kind === "alarms") assert.equal(result.needsRefresh, true);
+    }
+  }
+  for (const flag of [false, 0, "false", "0", " 0 "]) {
+    const result = normalizeResponse("alarms", {GetAlarmEventsResponseStatus:{MoreDataAvailable:flag,MoreDataRef:"stale",NeedsRefresh:flag}});
+    assert.equal(result.moreDataAvailable,false);
+    assert.equal(result.moreDataRef,null);
+    assert.equal(result.needsRefresh,false);
+  }
+  for (const flag of [undefined, null, "", "yes", "FALSE", 2, {}, []]) {
+    assert.throws(()=>normalizeResponse("history",{GetHistoryResponseStatus:{MoreDataAvailable:flag}}),/neispravnu XML/);
+  }
+  assert.throws(()=>normalizeResponse("alarms",{GetAlarmEventsResponseStatus:{MoreDataAvailable:false,NeedsRefresh:"invalid"}}),/neispravnu XML/);
+  for (const token of [undefined, "", 123, {}, true]) {
+    assert.throws(()=>normalizeResponse("history",{GetHistoryResponseStatus:{MoreDataAvailable:true,MoreDataRef:token}}),/nastavak/);
+  }
+  assert.equal(queryOptions("history",{...options,historyItemId:" 0007 ",moreDataRef:"  "}).moreDataRef,"  ");
+  assert.equal(queryOptions("history",{...options,historyItemId:" 0007 "}).historyItemId," 0007 ");
+});
+
+test("SOAP XML passes through middleware and dashboard HTTP with exact cursors and IDs", async t => {
+  const http = require("node:http");
+  const {createApp: middlewareApp} = require("../../middleware/app");
+  const {createEwsClient, escapeXml} = require("../../middleware/ewsClient");
+  const {createMiddlewareAuth, createPasswordHash} = require("../../middleware/middlewareAuth");
+  const requests=[];
+  let token, kind, page;
+  const controller=http.createServer((req,res)=>{
+    let body='';
+    req.setEncoding('utf8');req.on('data',chunk=>{body+=chunk;});
+    req.on('end',()=>{
+      requests.push(body);
+      const prefix=kind==='history'?'GetHistory':'GetAlarmEvents';
+      const more=page++===0;
+      const records=kind==='history'
+        ? `<GetHistoryHistoryRecords><Unit>°C</Unit><ValueItemId> 00042 </ValueItemId><List><HistoryRecord><TimeStamp>2026-11-11T00:00:00Z</TimeStamp><Value>${more?'0':'23.50'}</Value><State>0</State></HistoryRecord></List></GetHistoryHistoryRecords>`
+        : `<GetAlarmEventsAlarmEvents><AlarmEvent><ID>000012</ID><SourceID> 00042 </SourceID><SourceName>Source</SourceName><Message>Message</Message><Priority>0</Priority><State>2</State><Type>0005</Type></AlarmEvent></GetAlarmEventsAlarmEvents>`;
+      res.writeHead(200,{'Content-Type':'application/soap+xml'});
+      res.end(`<Envelope><Body><${prefix}Response><${prefix}ResponseStatus><MoreDataAvailable>${more?'1':'0'}</MoreDataAvailable><MoreDataRef>${escapeXml(token)}</MoreDataRef><NeedsRefresh>0</NeedsRefresh></${prefix}ResponseStatus>${records}</${prefix}Response></Body></Envelope>`);
+    });
+  });
+  async function listen(server){
+    await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+    t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
+    return `http://127.0.0.1:${server.address().port}`;
+  }
+  const controllerUrl=await listen(controller);
+  const ews=createEwsClient({serviceUrl:controllerUrl,username:'ews-test',password:'ews-test'});
+  const middlewareUrl=await listen(http.createServer(middlewareApp({ews,middlewareAuth:createMiddlewareAuth({username:'test',passwordHash:createPasswordHash('test-password')})})));
+  const config={middlewareUrl,username:'test',password:'test-password',demoMode:false,widgets:[]};
+  const poller=new EventEmitter();poller.getSnapshot=()=>({widgets:[]});
+  const dashboardUrl=await listen(http.createServer(createApp({poller,config})));
+  for (kind of ['history','alarms']) {
+    for(token of ['000123',' 0000 / &+ ž <tag> ','0','  ']) {
+      page=0;requests.length=0;
+      const query=kind==='history'?{...options,historyItemId:' 0007 '}:{};
+      const post=async body=>{
+        const r=await fetch(`${dashboardUrl}/api/${kind}/query`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        assert.equal(r.status,200);return r.json();
+      };
+      const first=await post(query);
+      assert.equal(first.moreDataAvailable,true);
+      assert.equal(first.moreDataRef,token);
+      const last=await post({...query,moreDataRef:first.moreDataRef});
+      assert.equal(last.moreDataAvailable,false);
+      assert.equal(last.moreDataRef,null);
+      assert.equal(page,2);
+      assert.ok(requests[1].includes(`<MoreDataRef>${escapeXml(token)}</MoreDataRef>`));
+      if(kind==='history') {
+        assert.ok(requests[0].includes('<Id> 0007 </Id>'));
+        assert.equal(first.valueItemId,' 00042 ');
+        assert.deepEqual(first.rows.map(r=>[r.value,r.state]),[[0,0]]);
+        assert.equal(last.rows[0].value,23.5);
+      } else {
+        assert.equal(first.rows[0].id,'000012');
+        assert.equal(first.rows[0].sourceId,' 00042 ');
+        assert.equal(first.rows[0].type,'0005');
+        assert.equal(first.rows[0].priority,0);
+        assert.equal(first.rows[0].state,2);
+        assert.equal(first.needsRefresh,false);
+      }
+    }
+  }
+  const client=new TelemetryClient(config,async url=>{
+    assert.equal(new URL(url).searchParams.get('id'),' 00042 ');
+    return {ok:true,json:async()=>({containers:[],errors:[]})};
+  });
+  await client.browse(' 00042 ');
+});
+
+test("all telemetry SOAP responses retain opaque strings and type only measurement/status fields", () => {
+  const {parseOperationResponse}=require('../../middleware/ewsClient');
+  for(const prefix of ['GetHistory','GetAlarmEvents','GetUpdatedAlarmEvents','GetAlarmHistory']) {
+    const responseName=prefix+'Response';
+    const result=parseOperationResponse(`<Envelope><Body><${responseName}><${prefix}ResponseStatus><MoreDataAvailable>false</MoreDataAvailable><MoreDataRef> 000123 </MoreDataRef></${prefix}ResponseStatus><Records><HistoryRecord><Value>-1.25e2</Value><State>0</State></HistoryRecord><HistoryRecord><Value>off</Value><State>2</State></HistoryRecord><HistoryRecord><Value></Value><State>0</State></HistoryRecord><AlarmEvent><ID>000012</ID><SourceID>000034</SourceID><Priority>0</Priority></AlarmEvent></Records></${responseName}></Body></Envelope>`,responseName);
+    assert.equal(result[prefix+'ResponseStatus'].MoreDataRef,' 000123 ');
+    assert.equal(result[prefix+'ResponseStatus'].MoreDataAvailable,false);
+    assert.deepEqual(result.Records.HistoryRecord.map(r=>r.Value),[-125,'off','']);
+    assert.deepEqual(result.Records.HistoryRecord.map(r=>r.State),[0,2,0]);
+    assert.equal(result.Records.AlarmEvent.ID,'000012');
+    assert.equal(result.Records.AlarmEvent.SourceID,'000034');
+    assert.equal(result.Records.AlarmEvent.Priority,0);
+  }
 });

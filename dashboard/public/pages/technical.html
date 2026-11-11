@@ -379,7 +379,11 @@
           </div>
         </form>
         <p id="rooms-status" class="discovery-status" role="status" aria-live="polite"></p>
-        <div class="room-registry-heading"><h3>Postojeće prostorije</h3><span id="rooms-count"></span></div>
+        <div class="room-registry-heading"><h3>Postojeće prostorije</h3><span id="rooms-count" role="status" aria-live="polite"></span></div>
+        <div class="room-registry-filters">
+          <div><label class="room-field-label" for="rooms-search">Pretraži prostorije</label><input id="rooms-search" type="search" placeholder="Naziv prostorije ili oznaka zone…" aria-controls="rooms-list" autocomplete="off" /></div>
+          <div><label class="room-field-label" for="rooms-filter-floor">Filtriraj po katu / grupi</label><select id="rooms-filter-floor" class="browser-default" aria-controls="rooms-list"><option value="all">Svi katovi i grupe</option></select></div>
+        </div>
         <ul id="rooms-list" class="room-registry-list" aria-label="Postojeće prostorije"></ul>
         <section id="rooms-editor" class="room-editor" aria-labelledby="rooms-selected" hidden>
           <h3 id="rooms-selected"></h3>

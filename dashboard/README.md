@@ -88,6 +88,8 @@ Both views expose **Učitaj još** when EWS returns `MoreDataAvailable`. Each cl
 
 The backend calls the existing middleware `/api/history/query`, `/api/alarms/query`, and `/api/containers` endpoints with the configured middleware credentials; credentials remain on the server. Demo mode supplies clearly labelled synthetic history and one demo alarm without contacting EWS.
 
+History and alarm paging tokens and identifiers retain their exact strings, including leading zeros and surrounding whitespace. XML paging/refresh flags accept `true`, `false`, `1` and `0`; a missing or invalid paging flag, or a missing/non-string continuation token when more data is advertised, is reported as an error rather than completed history. Numeric record values, states and priorities are converted explicitly while identifiers remain strings. Deploy the updated middleware and dashboard together for this behavior.
+
 ### Live verification, 22 September 2026
 
 Read-only checks against the configured EWS controller succeeded through the dashboard and authenticated middleware:

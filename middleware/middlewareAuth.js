@@ -1,9 +1,13 @@
 const {
   createHash,
+  createHmac,
   randomBytes,
+  scrypt,
   scryptSync,
   timingSafeEqual,
 } = require("node:crypto");
+const { promisify } = require("node:util");
+const deriveKey = promisify(scrypt);
 
 const HASH_SCHEME = "scrypt";
 const SALT_BYTES = 16;
@@ -22,7 +26,11 @@ function createPasswordHash(password, salt = randomBytes(SALT_BYTES).toString("h
   return `${HASH_SCHEME}:${salt}:${derivedKey.toString("hex")}`;
 }
 
-function verifyPassword(password, encodedHash) {
+function validHash(encodedHash) {
+  return typeof encodedHash === "string" && /^scrypt:[a-f0-9]{32,128}:[a-f0-9]{128}$/i.test(encodedHash);
+}
+
+async function verifyPassword(password, encodedHash) {
   if (typeof password !== "string" || typeof encodedHash !== "string") {
     return false;
   }
@@ -42,7 +50,7 @@ function verifyPassword(password, encodedHash) {
   }
 
   const expectedKey = Buffer.from(hashHex, "hex");
-  const actualKey = scryptSync(password, salt, expectedKey.length);
+  const actualKey = await deriveKey(password, salt, expectedKey.length);
   return timingSafeEqual(actualKey, expectedKey);
 }
 
@@ -80,7 +88,7 @@ function safeStringEqual(left, right) {
   return timingSafeEqual(leftDigest, rightDigest);
 }
 
-function createMiddlewareAuth(config = {}) {
+function createMiddlewareAuth(config = {}, { verify = verifyPassword, now = Date.now } = {}) {
   const username = config.username || process.env.MIDDLEWARE_USER;
   const passwordHash = config.passwordHash || process.env.MIDDLEWARE_PASSWORD_HASH;
 
@@ -88,28 +96,84 @@ function createMiddlewareAuth(config = {}) {
     throw new Error("Missing MIDDLEWARE_USER.");
   }
 
-  if (typeof passwordHash !== "string" || !passwordHash.startsWith(`${HASH_SCHEME}:`)) {
+  if (!validHash(passwordHash)) {
     throw new Error(
       "Missing or invalid MIDDLEWARE_PASSWORD_HASH. Generate credentials with npm run auth:generate."
     );
   }
 
-  return function requireMiddlewareAuthentication(req, res, next) {
-    const credentials = parseBasicAuthorization(req.get("authorization"));
-    const authenticated =
-      credentials &&
-      safeStringEqual(credentials.username, username) &&
-      verifyPassword(credentials.password, passwordHash);
+  const limits = { windowMs: 60_000, maxFailures: 20, maxConcurrent: 2,
+    maxVerifications: 60, maxClients: 1000, cacheMs: 300_000, ...config.limits };
+  for (const [name, value] of Object.entries(limits)) {
+    if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`Invalid authentication limit: ${name}.`);
+  }
+  const clients = new Map();
+  const cacheKey = randomBytes(32);
+  let cachedCredential, cacheExpires = 0, pending = 0;
+  let globalWindow = 0, verifications = 0;
 
-    if (!authenticated) {
-      res.set(
-        "WWW-Authenticate",
-        'Basic realm="IoT Electric Middleware", charset="UTF-8"'
-      );
-      return res.status(401).json({
-        error: "Authentication required.",
-      });
+  function reject(res) {
+    res.set("WWW-Authenticate", 'Basic realm="IoT Electric Middleware", charset="UTF-8"');
+    return res.status(401).json({ error: "Authentication required." });
+  }
+
+  function limited(res, retryMs) {
+    res.set("Retry-After", String(Math.max(1, Math.ceil(retryMs / 1000))));
+    return res.status(429).json({ error: "Too many authentication attempts. Try again later." });
+  }
+
+  return async function requireMiddlewareAuthentication(req, res, next) {
+    const credentials = parseBasicAuthorization(req.get("authorization"));
+    if (!credentials) return reject(res);
+    const time = now();
+    // Cache only a keyed fingerprint of the one successfully verified account.
+    // Polling clients can keep working while invalid credentials are throttled.
+    const fingerprint = createHmac("sha256", cacheKey)
+      .update(`${credentials.username}:${credentials.password}`).digest();
+    if (cachedCredential && time < cacheExpires && timingSafeEqual(fingerprint, cachedCredential)) return next();
+
+    // req.ip uses the socket address unless Express explicitly trusts a proxy.
+    // Never read X-Forwarded-For directly for this security boundary.
+    const ip = req.ip || req.socket?.remoteAddress || "unknown";
+    let client = clients.get(ip);
+    if (!client) {
+      for (const [address, entry] of clients) {
+        if (entry.pending === 0 && entry.expires <= time) clients.delete(address);
+      }
+      if (clients.size >= limits.maxClients) return limited(res, limits.windowMs);
+      client = { failures: 0, pending: 0, expires: time + limits.windowMs };
+      clients.set(ip, client);
     }
+    if (client.expires <= time) {
+      client.failures = 0;
+      client.expires = time + limits.windowMs;
+    }
+    // Reserve attempts before awaiting, so parallel failures cannot evade the limit.
+    if (client.failures + client.pending >= limits.maxFailures) return limited(res, client.expires - time);
+    if (!safeStringEqual(credentials.username, username)) {
+      client.failures += 1;
+      return reject(res);
+    }
+    if (time >= globalWindow) { globalWindow = time + limits.windowMs; verifications = 0; }
+    if (verifications >= limits.maxVerifications) return limited(res, globalWindow - time);
+    if (pending >= limits.maxConcurrent) return limited(res, 1000);
+
+    verifications += 1;
+    pending += 1;
+    client.pending += 1;
+    let authenticated;
+    try { authenticated = await verify(credentials.password, passwordHash); }
+    catch {
+      res.set("Retry-After", "1");
+      return res.status(503).json({ error: "Authentication temporarily unavailable." });
+    } finally {
+      pending -= 1;
+      client.pending -= 1;
+    }
+    if (!authenticated) { client.failures += 1; return reject(res); }
+    cachedCredential = fingerprint;
+    cacheExpires = now() + limits.cacheMs;
+    if (client.failures === 0 && client.pending === 0) clients.delete(ip);
 
     return next();
   };

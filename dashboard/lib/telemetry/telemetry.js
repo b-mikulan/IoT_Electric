@@ -11,10 +11,10 @@ function queryOptions(kind, body = {}) {
     if (typeof body[key] !== "string" || body[key].length > 4096) {
       throw failure(`Neispravno polje: ${key}.`, 400, "INVALID_QUERY");
     }
-    options[key] = body[key].trim();
+    options[key] = ["timeFrom", "timeTo"].includes(key) ? body[key].trim() : body[key];
   }
   if (kind === "history") {
-    if (!options.historyItemId || !options.timeFrom || !options.timeTo) {
+    if (!options.historyItemId?.trim() || !options.timeFrom || !options.timeTo) {
       throw failure("Odaberi trend i vremenski raspon.", 400, "INVALID_QUERY");
     }
     for (const key of ["timeFrom", "timeTo"]) {
@@ -34,6 +34,14 @@ function queryOptions(kind, body = {}) {
   return options;
 }
 
+function xmlBoolean(value, optional = false) {
+  if (optional && value === undefined) return false;
+  if (typeof value === "string") value = value.trim();
+  if ([true, 1, "true", "1"].includes(value)) return true;
+  if ([false, 0, "false", "0"].includes(value)) return false;
+  throw failure("Middleware je vratio neispravnu XML oznaku nastavka ili osvježavanja.");
+}
+
 function normalizeResponse(kind, payload) {
   const prefix = kind === "history" ? "GetHistory" : "GetAlarmEvents";
   const status = payload?.[`${prefix}ResponseStatus`];
@@ -44,9 +52,9 @@ function normalizeResponse(kind, payload) {
   if (!status || typeof status !== "object") {
     throw failure("Middleware je vratio neprepoznatljiv odgovor.");
   }
-  const moreDataAvailable = status.MoreDataAvailable === true || status.MoreDataAvailable === "true";
-  const moreDataRef = String(status.MoreDataRef ?? "");
-  if (moreDataAvailable && !moreDataRef) throw failure("Nedostaje oznaka za nastavak dohvata.");
+  const moreDataAvailable = xmlBoolean(status.MoreDataAvailable);
+  const moreDataRef = status.MoreDataRef;
+  if (moreDataAvailable && (typeof moreDataRef !== "string" || moreDataRef.length === 0)) throw failure("Nedostaje valjana tekstualna oznaka za nastavak dohvata.");
   const common = { moreDataAvailable, moreDataRef: moreDataAvailable ? moreDataRef : null };
   if (kind === "history") {
     const records = payload.GetHistoryHistoryRecords || {};
@@ -61,7 +69,7 @@ function normalizeResponse(kind, payload) {
   }
   return {
     ...common,
-    needsRefresh: status.NeedsRefresh === true || status.NeedsRefresh === "true",
+    needsRefresh: xmlBoolean(status.NeedsRefresh, true),
     rows: asArray(payload.GetAlarmEventsAlarmEvents?.AlarmEvent).map((row) => ({
       id: String(row.ID ?? ""), sourceId: String(row.SourceID ?? ""),
       source: String(row.SourceName ?? ""), message: String(row.Message ?? ""),
@@ -112,7 +120,7 @@ class TelemetryClient {
       throw failure("Neispravan ID mape.", 400, "INVALID_QUERY");
     }
     if (this.config.demoMode) return { items: [{ id: "demo-history", name: "Demo temperatura", kind: "history", unit: "°C" }], errors: [] };
-    const payload = await this.request(`/api/containers?id=${encodeURIComponent(containerId.trim())}`);
+    const payload = await this.request(`/api/containers?id=${encodeURIComponent(containerId)}`);
     const items = [];
     for (const container of asArray(payload.containers)) {
       for (const child of asArray(container.containerItems)) {

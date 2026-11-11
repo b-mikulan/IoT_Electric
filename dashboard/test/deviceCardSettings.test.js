@@ -768,7 +768,9 @@ test("room deletion requires confirmation and suppresses automatic reassignment 
   assert.equal(f.models().length, 2);
   assert.equal(f.models()[0].room, null);
   assert.equal(f.node("#rooms-editor").hidden, true);
-  assert.equal(f.node("#rooms-list").children.length, 0);
+  assert.equal(f.node("#rooms-list").children.length, 1);
+  assert.equal(f.node("#rooms-list").children[0].className, "room-registry-empty");
+  assert.match(f.node("#rooms-list").children[0].textContent, /Još nema prostorija/);
 });
 
 test("failed room changes retain the selected room and editable draft", async () => {
