@@ -71,10 +71,11 @@
 .admin-text-button:hover { color: var(--brand); }
 .admin-text-button.danger { margin-top: 18px; color: #b42323; }
 .admin-rooms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 6px; max-height: 290px; overflow-y: auto; padding: 3px; }
-.admin-room-option { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 9px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: .8rem; }
+.admin-room-option { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 9px; min-width: 0; padding: 9px; border: 1px solid var(--border); border-radius: 8px; font-size: .8rem; }
 .admin-room-option:hover { background: #f4f9f7; }
 .admin-room-option:has(input:checked) { border-color: #a4d1c6; background: #eef7f3; }
-.admin-room-option > span { min-width: 0; overflow-wrap: anywhere; }
+.admin-room-option > label { min-width: 0; overflow-wrap: anywhere; cursor: pointer; }
+.admin-room-option > select { grid-column: 1 / -1; }
 .admin-room-option small { display: block; margin-top: 2px; color: var(--muted); font-size: .7rem; }
 .admin-permission-summary { margin: 12px 0; color: var(--brand-dark); font-size: .8rem; font-weight: 650; }
 .admin-warning { margin: 12px 0; padding: 11px 14px; border: 1px solid #e9d5aa; border-radius: 8px; color: #855111; background: #fff8e8; font-size: .8rem; }

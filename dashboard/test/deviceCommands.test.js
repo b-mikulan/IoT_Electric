@@ -1,8 +1,14 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { DeviceCommandService } = require("../lib/devices/deviceCommands");
 const { DeviceMetadataClient } = require("../lib/devices/deviceMetadata");
+const { createDashboardAuth } = require("../lib/auth/dashboardAuth");
+const { DashboardUsers } = require("../lib/auth/dashboardUsers");
+const { DashboardDatabase } = require("../lib/storage/dashboardDatabase");
 const { createApp } = require("../app");
 
 const light = "01/ES/Network/RP31/Application/Items/L1/Values/LtPct";
@@ -187,7 +193,7 @@ test("controller and metadata failures return sanitized errors without leaking i
 });
 
 async function serve(t, f) {
-  const app = createApp({ poller: f.poller, config: f.config, deviceMetadata: f.deviceMetadata });
+  const app = createApp({ poller: f.poller, config: f.config, deviceMetadata: f.deviceMetadata, dashboardAuth: f.dashboardAuth });
   const server = await new Promise((resolve) => { const instance = app.listen(0, "127.0.0.1", () => resolve(instance)); });
   t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
   return `http://127.0.0.1:${server.address().port}`;
@@ -212,4 +218,87 @@ test("both write endpoints enforce fresh device validation; unrelated legacy wid
   assert.equal((await send("/api/devices/write", "legacy-point", 10)).status, 403);
   assert.equal((await fetch(`${base}/api/devices/write`, { method: "POST", body: "bad" })).status, 415);
   assert.equal((await fetch(`${base}/api/devices/write`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })).status, 400);
+});
+
+test("room grants allow only scoped device commands and are rechecked before dispatch", async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-room-command-"));
+  const database = new DashboardDatabase(path.join(directory, "dashboard.sqlite"));
+  t.after(() => {
+    database.close();
+    assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir()));
+    fs.rmSync(directory, { recursive: true, force: true });
+  });
+  const env = {
+    DASHBOARD_ADMIN_USER: "admin", DASHBOARD_ADMIN_PASSWORD: "admin-test",
+    DASHBOARD_LOGIN_USER: "operator", DASHBOARD_LOGIN_PASSWORD: "operator-test",
+  };
+  const zones = ["ES/Zones/Z101", "ES/Zones/Z201", "ES/Zones/Z301"];
+  const [commandId, readOnlyId, otherId] = zones.map(zone => `01/${zone}/L1/Values/LtPct`);
+  const f = fixture({ id: commandId });
+  f.config.widgets.push(...[readOnlyId, otherId].map(id => ({ id, writable: true, visible: true })));
+  const roomByZone = Object.fromEntries(zones.map((zone, index) => [zone, `Ured ${index + 1} · 1. kat`]));
+  f.deviceMetadata.groupingMetadata = () => ({ roomByZone });
+  f.dashboardAuth = createDashboardAuth(env, new DashboardUsers(path.join(directory, "users.json"), env, { database }));
+  const base = await serve(t, f);
+  const login = async (username, password) => {
+    const response = await fetch(base + "/login", {
+      method: "POST", redirect: "manual", body: new URLSearchParams({ username, password }),
+    });
+    assert.equal(response.headers.get("location"), "/");
+    return response.headers.get("set-cookie").split(";")[0];
+  };
+  const admin = await login("admin", "admin-test");
+  const post = (url, cookie, body) => fetch(base + url, {
+    method: "POST", headers: { cookie, "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const { rooms } = await (await fetch(base + "/api/admin/users", { headers: { cookie: admin } })).json();
+  const [first, second, third] = rooms.sort((a, b) => a.name.localeCompare(b.name)).map(room => room.id);
+  const grant = (roomIds, writeRoomIds) => post("/api/admin/users", admin, {
+    previousUsername: "operator", username: "operator", roomIds, writeRoomIds,
+  });
+  assert.equal((await grant([first], [second])).status, 400);
+  assert.equal((await grant([first, second], [first])).status, 200);
+  assert.deepEqual(database.readUsers()[0].writeRoomIds, [first]);
+  const cookie = await login("operator", "operator-test");
+  for (const route of ["/api/config", "/api/snapshot"]) {
+    const { widgets } = await (await fetch(base + route, { headers: { cookie } })).json();
+    assert.deepEqual(widgets.map(point => [point.id, point.writable, point.deviceWritable]), [
+      [commandId, false, true], [readOnlyId, false, false],
+    ]);
+  }
+  const command = (widgetId, route = "/api/devices/write") => post(route, cookie, { widgetId, value: 65 });
+  for (const id of [readOnlyId, otherId]) {
+    const denied = await command(id);
+    assert.equal(denied.status, 403);
+    assert.equal((await denied.json()).code, "ROOM_CONTROL_REQUIRED");
+  }
+  assert.equal((await command(commandId, "/api/write")).status, 403);
+  assert.equal((await command(commandId)).status, 200);
+  assert.deepEqual(f.writes, [{ id: commandId, value: 65 }]);
+
+  async function changeDuringCommand(change) {
+    let startRead, finishRead;
+    const started = new Promise(resolve => { startRead = resolve; });
+    const gate = new Promise(resolve => { finishRead = resolve; });
+    f.deviceMetadata.readFreshPoint = async () => {
+      startRead();
+      await gate;
+      return f.fresh;
+    };
+    const inFlight = command(commandId);
+    await Promise.race([started, inFlight.then(() => { throw new Error("Expected a fresh read before dispatch."); })]);
+    try { await change(); } finally { finishRead(); }
+    return inFlight;
+  }
+  const previousRoom = roomByZone[zones[0]];
+  const moved = await changeDuringCommand(() => { roomByZone[zones[0]] = roomByZone[zones[1]]; });
+  assert.equal(moved.status, 403);
+  roomByZone[zones[0]] = previousRoom;
+  const revoked = await changeDuringCommand(async () => {
+    assert.equal((await grant(null, [third])).status, 200);
+  });
+  assert.equal(revoked.status, 401);
+  assert.equal(f.writes.length, 1);
+  assert.equal(database.readUsers()[0].roomIds, null);
+  assert.deepEqual(database.readUsers()[0].writeRoomIds, [third]);
 });

@@ -51,7 +51,8 @@ function setup(t, initialDevices, onWrite, demo = false, initialReadAt, options 
   globalThis.document = { createElement: (tag) => new Element(tag), createElementNS: (_, tag) => new Element(tag), activeElement: null };
   globalThis.IoTDeviceModel = options.model || { buildDevices: () => devices };
   const container = new Element("section");
-  const view = create({ container, onWrite, onSettings: options.onSettings, onRooms: options.onRooms, onMove: options.onMove, onRefresh: options.onRefresh });
+  const view = create({ container, onWrite, onSettings: options.onSettings, onRooms: options.onRooms, onMove: options.onMove, onRefresh: options.onRefresh,
+    readOnly: options.readOnly, controlDeviceKeys: options.controlDeviceKeys });
   const update = (next = devices, nextReadAt = readAt, overrides = {}) => { devices = next; readAt = nextReadAt; view.update({ status: "connected", demo, readAt, settingsEnabled: options.settingsEnabled, floors: options.floors, roomDetails: options.roomDetails, ...overrides }); };
   update();
   t.after(() => { view.destroy(); globalThis.document = previousDocument; globalThis.IoTDeviceModel = previousModel; });
@@ -69,6 +70,24 @@ function point(role, value, options = {}) {
 function device(type, roles) {
   return { key: `ES/${type}`, label: "Test device", type, roles, primary: Object.values(roles), diagnostics: [], other: [], support: [] };
 }
+
+test("a scoped user sees device controls only on the assigned control cards", async t => {
+  const command = point("brightnessSet", 40);
+  const controlled = device("light", { brightnessSet: command });
+  const readOnly = { ...device("light", { brightnessSet: point("brightnessSet", 30) }), key: "ES/other-light" };
+  const calls = [];
+  const { container } = setup(t, [controlled, readOnly], async body => { calls.push(body); }, false, undefined, {
+    readOnly: true, controlDeviceKeys: new Set([controlled.key]),
+  });
+  assert.equal(byClass(container, "dc-metric-value").length, 2);
+  const [slider] = byClass(container, "dc-range");
+  assert.equal(byClass(container, "dc-range").length, 1);
+  assert.equal(slider.disabled, false);
+  slider.value = "65";
+  slider.dispatch("change");
+  await flush();
+  assert.deepEqual(calls, [{ widgetId: command.id, value: 65 }]);
+});
 
 test("live slider previews without a write, sends once on change, and separates accepted target from actual feedback", async (t) => {
   let finish;

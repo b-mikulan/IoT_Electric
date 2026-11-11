@@ -74,10 +74,12 @@ function sendAdminPage(response) {
                   <p id="admin-password-hint" class="admin-hint">Najmanje 8 znakova.</p>
                 </div>
               </div>
-              <div class="admin-access-heading"><h4>Dozvoljene prostorije</h4><p class="admin-hint">Pravo pristupa vrijedi za pregled podataka, bez upravljanja uređajima.</p></div>
+              <div class="admin-access-heading"><h4>Dozvoljene prostorije</h4><p class="admin-hint">Označi prostoriju za pregled i osvježavanje. Zatim odaberi može li korisnik i upravljati njezinim uređajima.</p></div>
+              <label class="admin-checkbox"><input id="admin-edit-device-settings" type="checkbox"><span>Dopusti uređivanje postavki kartica</span></label>
+              <p class="admin-hint">Za dodijeljene uređaje dopušta promjenu naziva, očitanja i prikazane jedinice.</p>
               <div class="admin-full-access">
-                <label class="admin-checkbox"><input id="admin-all-rooms" type="checkbox"><span>Sve prostorije i uređaji bez prostorije</span></label>
-                <p class="admin-hint">Uključuje i prostorije koje se naknadno dodaju.</p>
+                <label class="admin-checkbox"><input id="admin-all-rooms" type="checkbox"><span>Pregled svih prostorija i uređaja bez prostorije</span></label>
+                <p class="admin-hint">Pregled uključuje i buduće prostorije. Upravljanje dodijeli zasebno za svaku prostoriju.</p>
               </div>
               <fieldset id="admin-room-field">
                 <legend>Odabir prostorija</legend>

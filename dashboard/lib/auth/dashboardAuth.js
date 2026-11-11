@@ -11,7 +11,8 @@ const setupPath = "/setup-password";
 const loginWindow = 60_000;
 const maxFailures = 20;
 
-const viewerEndpoints = new Set(["/api/config", "/api/devices/settings", "/api/devices/metadata", "/api/snapshot"]);
+const viewerEndpoints = new Set(["/api/config", "/api/devices/settings", "/api/devices/metadata", "/api/snapshot", "/api/history/catalog"]);
+const userPostEndpoints = new Set(["/api/devices/write", "/api/dashboard/refresh-scope", "/api/history/query", "/api/history/browse", "/api/alarms/query"]);
 
 function sendPage(response, title, content, status = 200, script = "") {
   return response.status(status).set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'; form-action 'self'").send(`<!doctype html>
@@ -91,6 +92,7 @@ function createDashboardAuth(env, users) {
     const timer = setTimeout(() => endSession(id), duration).unref();
     sessions.set(id, {
       username: account.username, role: account.role, roomIds: account.roomIds,
+      writeRoomIds: account.writeRoomIds, canEditDeviceSettings: account.canEditDeviceSettings,
       mustChangePassword, timer, streams: new Set(),
     });
     response.cookie(cookieName, id, { ...cookieOptions, maxAge: duration });
@@ -213,6 +215,8 @@ function createDashboardAuth(env, users) {
     if (response.locals.dashboardSession.role === "admin") return next();
     const pathname = request.path.toLowerCase().replace(/\/$/, "");
     const read = request.method === "GET" || request.method === "HEAD";
+    if (request.method === "POST" && (userPostEndpoints.has(pathname)
+      || pathname === "/api/devices/settings" && response.locals.dashboardSession.canEditDeviceSettings === true)) return next();
     if (read && (!/^\/api(?:\/|$)/.test(pathname) || viewerEndpoints.has(pathname))) return next();
     return response.status(403).json({ error: "Ova radnja zahtijeva administratorski pristup.", code: "ADMIN_REQUIRED" });
   });

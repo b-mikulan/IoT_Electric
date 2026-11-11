@@ -21,7 +21,7 @@ function scopeError(message, status, code) {
 
 // Manual reads use the same local device model as the cards. Labels and search
 // filters never determine membership, so identically named rooms stay separate.
-function resolveManualRefreshScope(widgets, options, target) {
+function resolveManualRefreshScope(widgets, options, target, access) {
   if (!target || typeof target !== "object" || Array.isArray(target)
     || Object.keys(target).some(key => !["scope", "id"].includes(key))
     || !["device", "room", "floor"].includes(target.scope)
@@ -32,17 +32,21 @@ function resolveManualRefreshScope(widgets, options, target) {
   }
   const devices = buildDevices(widgets, options);
   const roomIdentity = device => device.room?.id || device.room?.label || null;
-  const matches = devices.filter(device => target.scope === "device" ? device.key === target.id
+  const candidates = access ? devices.filter(device => access.devices.has(device.key)) : devices;
+  const matches = candidates.filter(device => target.scope === "device" ? device.key === target.id
     : target.scope === "room" ? roomIdentity(device) === target.id
       : device.room && (device.room.floorId || null) === target.id);
   if (!matches.length) {
-    const exists = target.scope === "floor" && options.floors?.some(floor => floor.id === target.id)
-      || target.scope === "room" && options.roomDetails?.some(room => room.id === target.id);
+    const organization = access?.settings ?? options;
+    const exists = target.scope === "floor" && organization.floors?.some(floor => floor.id === target.id)
+      || target.scope === "room" && organization.roomDetails?.some(room => room.id === target.id);
     throw scopeError(exists ? "U odabranom prostoru nema uređaja za osvježavanje." : "Odabrani uređaj ili prostor više nije dostupan.", exists ? 409 : 404, exists ? "EMPTY_REFRESH_SCOPE" : "REFRESH_SCOPE_NOT_FOUND");
   }
   const owners = new Set(matches.map(device => device.key));
-  const ids = widgets.filter(widget => owners.has(deriveWidgetGrouping(widget.id).key)).map(widget => widget.id);
-  return { ids, deviceCount: owners.size };
+  const ids = widgets.filter(widget => owners.has(deriveWidgetGrouping(widget.id).key)
+    && (!access || access.points.has(widget.id))).map(widget => widget.id);
+  if (!ids.length) throw scopeError("U odabranom prostoru nema uređaja za osvježavanje.", 409, "EMPTY_REFRESH_SCOPE");
+  return { ids, deviceCount: new Set(ids.map(id => deriveWidgetGrouping(id).key)).size };
 }
 
 module.exports = { resolveRefreshScope, resolveManualRefreshScope };

@@ -139,7 +139,7 @@ function setup({ saved = [], enabled = true, editable = true, technical = true }
 }
 
 test("manual refresh callback checks the server receipt and reports HTTP failures without changing full freshness", async () => {
-  const f = setup({ technical: false }); f.boot(); await flush();
+  const f = setup({ technical: false }); f.boot({ readOnly: true, deviceSettingsEnabled: false, widgetEditingEnabled: false }); await flush();
   f.setHandler((url, options) => {
     assert.equal(url, "/api/dashboard/refresh-scope");
     return response({ ...JSON.parse(options.body), readAt: "2026-11-06T12:00:00Z", pointCount: 3, errorCount: 0 });
@@ -154,6 +154,24 @@ test("manual refresh callback checks the server receipt and reports HTTP failure
   assert.equal(f.logs.at(-1).args[1].source, "manual-refresh");
   f.setHandler(() => response({ readAt: "bad", pointCount: 3 }));
   await assert.rejects(f.run(`fixtureView.callbacks.onRefresh({ scope: "floor", id: "floor-1" })`), /valjana potvrda/);
+});
+
+test("the scoped card editor saves display settings without submitting a room change", async () => {
+  const f = setup({ technical: false, editable: false, enabled: false });
+  f.boot({ readOnly: true, cardSettingsEnabled: true });
+  await flush();
+  f.open();
+  assert.equal(f.cardNode("dialog").open, true);
+  assert.equal(f.cardNode("room-field").hidden, true);
+  assert.equal(f.cardNode("functions").hidden, true);
+  f.cardNode("label").value = "Novi naziv";
+  await f.cardNode("form").dispatch("submit");
+  const request = f.posts().at(-1);
+  assert.equal(request.url, "/api/devices/settings");
+  const settings = JSON.parse(request.options.body);
+  assert.equal(settings.label, "Novi naziv");
+  assert.equal(Object.hasOwn(settings, "room"), false);
+  assert.equal(Object.hasOwn(settings, "newRoom"), false);
 });
 
 test("refresh diagnostics retain failure context, suppress repeated status redraws and report recovery once", async () => {

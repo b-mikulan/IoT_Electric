@@ -5,8 +5,8 @@ const { widgetGroup } = require("./lib/config");
 const { deriveWidgetGrouping } = require("./public/devices/widgetGrouping");
 const { DeviceMetadataClient } = require("./lib/devices/deviceMetadata");
 const { createDeviceDemo } = require("./lib/devices/deviceDemo");
-const { DeviceCommandService } = require("./lib/devices/deviceCommands");
-const { DeviceWidgetStore } = require("./lib/storage/deviceWidgetStore");
+const { DeviceCommandService, DeviceCommandError } = require("./lib/devices/deviceCommands");
+const { DeviceWidgetStore, DeviceWidgetStoreError } = require("./lib/storage/deviceWidgetStore");
 const { buildDevices } = require("./public/devices/deviceModel");
 const { DashboardTransfer } = require("./lib/storage/dashboardTransfer");
 const { DashboardSettingsStore } = require("./lib/storage/dashboardSettings");
@@ -31,13 +31,17 @@ function publicWidget(widget) {
   };
 }
 
-function viewerReadings(payload, points) {
+function scopedWidget(widget, access) {
+  return { ...publicWidget(widget), writable: false, deviceWritable: widget.writable === true && access.controlPoints.has(widget.id) };
+}
+
+function viewerReadings(payload, access) {
   const { status, syncedAt, readAt, scope, widgets, error } = payload;
   return {
     status, syncedAt, readAt, scope,
     error: error ? "Očitanja trenutačno nisu dostupna." : error,
-    ...(widgets && { widgets: widgets.filter(widget => points.has(widget.id)).map(widget => ({
-      ...publicWidget(widget), writable: false, value: widget.value, state: widget.state,
+    ...(widgets && access && { widgets: widgets.filter(widget => access.points.has(widget.id)).map(widget => ({
+      ...scopedWidget(widget, access), value: widget.value, state: widget.state,
       updatedAt: widget.updatedAt, readAt: widget.readAt,
       error: widget.error ? "Očitanje trenutačno nije dostupno." : widget.error,
     })) }),
@@ -171,7 +175,7 @@ function createApp({
     if (session?.role !== "user") return next();
     const metadata = await prepareRoomState();
     if (!response.locals.isSessionActive()) return response.status(401).json({ code: "LOGIN_REQUIRED" });
-    response.locals.roomAccess = scopeRooms(currentRoomIndex(metadata), session.roomIds);
+    response.locals.roomAccess = scopeRooms(currentRoomIndex(metadata), session.roomIds, session.writeRoomIds);
     response.locals.viewerMetadata = metadata;
     return next();
   });
@@ -240,7 +244,7 @@ function createApp({
     return next();
   });
 
-  function broadcast(event, payload) {
+  function broadcast(event, payload, { cardOnly = false } = {}) {
     if (["dashboard-settings", "polling", "refresh-error", "dashboard-imported"].includes(event)) for (const response of settingsClients) {
       try {
         if (!sendEvent(response, event, payload)) { settingsClients.delete(response); response.end(); }
@@ -253,6 +257,12 @@ function createApp({
         const session = response.locals.dashboardSession;
         if (session?.role === "user") {
           if (!response.locals.isSessionActive()) continue;
+          if (event === "device-settings" && cardOnly) {
+            roomIndex ??= currentRoomIndex();
+            const { settings } = scopeRooms(roomIndex, session.roomIds);
+            if (!sendEvent(response, "device-settings", settings)) response.end();
+            continue;
+          }
           if (["config", "removed", "visibility", "device-settings", "dashboard-imported"].includes(event)) {
             if (!sendEvent(response, "dashboard-imported", {})) response.end();
             continue;
@@ -261,11 +271,11 @@ function createApp({
           let data = payload;
           if (event === "update") {
             roomIndex ??= currentRoomIndex();
-            const key = JSON.stringify(session.roomIds);
-            if (!accessByRooms.has(key)) accessByRooms.set(key, scopeRooms(roomIndex, session.roomIds).points);
+            const key = JSON.stringify([session.roomIds, session.writeRoomIds]);
+            if (!accessByRooms.has(key)) accessByRooms.set(key, scopeRooms(roomIndex, session.roomIds, session.writeRoomIds));
             data = viewerReadings(payload, accessByRooms.get(key));
             if (!data.widgets?.length) continue;
-          } else data = viewerReadings(payload, new Set());
+          } else data = viewerReadings(payload);
           if (!sendEvent(response, event, data)) response.end();
           continue;
         }
@@ -417,7 +427,9 @@ function createApp({
         return response.json({
           title: "IoT Electric · PLC pregled", isAdmin: false, readOnly: true, demoMode: config.demoMode,
           intervalMs: config.intervalMs, deviceSettingsEnabled: enabled, deviceSettings, ...organization,
-          widgets: config.widgets.filter(widget => access.points.has(widget.id)).map(widget => ({ ...publicWidget(widget), writable: false })),
+          cardSettingsEnabled: deviceWidgetStore.enabled && response.locals.dashboardSession.canEditDeviceSettings === true,
+          controlDeviceKeys: [...access.controlDevices],
+          widgets: config.widgets.filter(widget => access.points.has(widget.id)).map(widget => scopedWidget(widget, access)),
         });
       }
       const deviceSettings = await synchronizeDeviceSettings();
@@ -482,8 +494,14 @@ function createApp({
   app.post("/api/dashboard/refresh-scope", requireJson, express.json({ limit: "8kb" }), async (request, response) => {
     response.set("Cache-Control", "no-store");
     try {
-      const { ids, deviceCount } = resolveManualRefreshScope(config.widgets, refreshModelOptions(), request.body);
+      const { dashboardSession, isSessionActive } = response.locals;
+      const scoped = dashboardSession?.role === "user";
+      const metadata = scoped ? demo || deviceMetadata.groupingMetadata?.() : undefined;
+      if (scoped && !isSessionActive()) return response.status(401).json({ code: "LOGIN_REQUIRED" });
+      const access = scoped ? scopeRooms(currentRoomIndex(metadata), dashboardSession.roomIds) : undefined;
+      const { ids, deviceCount } = resolveManualRefreshScope(config.widgets, { ...refreshModelOptions(), ...metadata }, request.body, access);
       const result = await poller.refreshScope(ids);
+      if (scoped && !isSessionActive()) return response.status(401).json({ code: "LOGIN_REQUIRED" });
       return response.json({ ...request.body, deviceCount, ...result });
     } catch (error) { return sendOperationError(response, error, "SCOPED_REFRESH_FAILED", "Osvježavanje odabranih uređaja nije uspjelo."); }
   });
@@ -501,8 +519,32 @@ function createApp({
   app.post("/api/devices/settings", requireJson, express.json({ limit: "64kb" }), async (request, response) => {
     response.set("Cache-Control", "no-store");
     try {
-      const device = await deviceWidgetStore.save(request.body, deviceSettingsContext());
-      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
+      const { dashboardSession, isSessionActive } = response.locals;
+      const scoped = dashboardSession?.role === "user";
+      const context = deviceSettingsContext();
+      if (scoped) {
+        if (["room", "newRoom"].some(field => Object.hasOwn(request.body || {}, field))) {
+          throw new DeviceWidgetStoreError("Premještanje uređaja zahtijeva administratorski pristup.", 403, "ADMIN_REQUIRED");
+        }
+        context.authorizeCardEdit = key => {
+          if (!isSessionActive()) throw new DeviceWidgetStoreError("Potrebna je prijava.", 401, "LOGIN_REQUIRED");
+          const index = currentRoomIndex();
+          const room = index.devices.get(key);
+          if (!dashboardSession.canEditDeviceSettings || !index.devices.has(key)
+            || dashboardSession.roomIds !== null && !dashboardSession.roomIds.includes(room)) {
+            throw new DeviceWidgetStoreError("Nemaš pravo uređivanja ove kartice.", 403, "DEVICE_SETTINGS_FORBIDDEN");
+          }
+        };
+      }
+      const device = await deviceWidgetStore.save(request.body, context);
+      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() }, { cardOnly: scoped });
+      if (scoped) {
+        const { settings } = scopeRooms(currentRoomIndex(), dashboardSession.roomIds);
+        const saved = settings.devices.find(entry => entry.key === device.key);
+        if (!isSessionActive()) return response.status(401).json({ code: "LOGIN_REQUIRED" });
+        if (!saved) return response.status(403).json({ code: "DEVICE_SETTINGS_FORBIDDEN" });
+        return response.json({ device: saved, ...settings });
+      }
       return response.json({ device, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
     } catch (error) {
       return sendOperationError(response, error, "DEVICE_SETTINGS_UPDATE_FAILED", "Device card settings could not be saved.");
@@ -578,7 +620,7 @@ function createApp({
   app.get("/api/snapshot", (request, response) => {
     const snapshot = poller.getSnapshot();
     const access = response.locals.roomAccess;
-    return response.json(access ? viewerReadings(snapshot, access.points) : snapshot);
+    return response.json(access ? viewerReadings(snapshot, access) : snapshot);
   });
 
   app.get("/api/devices/metadata", async (request, response) => {
@@ -610,7 +652,20 @@ function createApp({
       return response.status(400).json({ error: "Body must contain widgetId and value.", code: "INVALID_WRITE_BODY" });
     }
     try {
-      return response.json(await deviceCommands.write(body.widgetId, body.value));
+      const { roomAccess, dashboardSession, isSessionActive } = response.locals;
+      const pointId = body.widgetId.trim();
+      const requireControl = access => {
+        if (!access.controlPoints.has(pointId)) {
+          throw new DeviceCommandError("Nemaš pravo upravljanja ovim uređajem.", 403, "ROOM_CONTROL_REQUIRED");
+        }
+      };
+      if (roomAccess) requireControl(roomAccess);
+      const authorize = roomAccess ? () => {
+        if (!isSessionActive()) throw new DeviceCommandError("Potrebna je prijava.", 401, "LOGIN_REQUIRED");
+        // The room assignment can change while the controller checks the point.
+        requireControl(scopeRooms(currentRoomIndex(), dashboardSession.roomIds, dashboardSession.writeRoomIds));
+      } : undefined;
+      return response.json(await deviceCommands.write(pointId, body.value, authorize));
     } catch (error) {
       return sendOperationError(response, error, "DEVICE_COMMAND_WRITE_FAILED", "Slanje naredbe nije uspjelo.");
     }
@@ -1017,7 +1072,7 @@ function createApp({
 
     const access = response.locals.roomAccess;
     if (access) {
-      sendEvent(response, "snapshot", viewerReadings(poller.getSnapshot(), access.points));
+      sendEvent(response, "snapshot", viewerReadings(poller.getSnapshot(), access));
       sendEvent(response, "device-settings", access.settings);
     } else {
       sendEvent(response, "snapshot", poller.getSnapshot());

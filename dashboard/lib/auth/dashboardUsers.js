@@ -44,8 +44,15 @@ function loadBootstrapAccount(env, prefix, role) {
   return { username, passwordHash: hashPassword(password), role, roomIds: null };
 }
 
-function publicAccount({ username, roomIds, mustChangePassword }) {
-  return { username, roomIds, mustChangePassword };
+function validWriteRooms(roomIds, writeRoomIds) {
+  if (!Array.isArray(writeRoomIds) || !validRoomIds(writeRoomIds)) return false;
+  if (roomIds === null) return true;
+  const readable = new Set(roomIds);
+  return writeRoomIds.every(id => readable.has(id));
+}
+
+function publicAccount({ username, roomIds, writeRoomIds, mustChangePassword, canEditDeviceSettings }) {
+  return { username, roomIds, writeRoomIds, mustChangePassword, canEditDeviceSettings };
 }
 
 class DashboardUsers {
@@ -61,14 +68,14 @@ class DashboardUsers {
     const stored = database?.readUsers();
     const users = stored ?? this.#readLegacyUsers(env);
     this.#users = new Map();
-    for (const { username, passwordHash, roomIds, mustChangePassword = false } of users) {
+    for (const { username, passwordHash, roomIds, writeRoomIds = [], mustChangePassword = false, canEditDeviceSettings = false } of users) {
       if (!username || username !== normalizeUsername(username) || username.length > 128
         || this.#users.has(username) || username === this.#admin?.username
         || typeof passwordHash !== "string" || !hashPattern.test(passwordHash) || !validRoomIds(roomIds)
-        || typeof mustChangePassword !== "boolean") {
+        || !validWriteRooms(roomIds, writeRoomIds) || typeof mustChangePassword !== "boolean" || typeof canEditDeviceSettings !== "boolean") {
         throw new Error("Neispravni računi ili korisničko ime administratora već postoji među običnim korisnicima.");
       }
-      this.#users.set(username, { username, passwordHash, roomIds, mustChangePassword, role: "user" });
+      this.#users.set(username, { username, passwordHash, roomIds, writeRoomIds, mustChangePassword, canEditDeviceSettings, role: "user" });
     }
     if (database && stored === undefined) database.saveUsers(this.#users.values());
   }
@@ -108,10 +115,16 @@ class DashboardUsers {
     const username = normalizeUsername(body?.username);
     const password = body?.password ?? "";
     const roomIds = body?.roomIds;
+    const writeRoomIds = body?.writeRoomIds === undefined ? [] : body.writeRoomIds;
     if (!username || username.length > 128 || /[\x00-\x1f\x7f]/.test(username)) throw accountError("Upiši valjano korisničko ime do 128 znakova.");
     if (!validRoomIds(roomIds) || roomIds?.some(id => !availableRooms.has(id))) throw accountError("Odaberi postojeće prostorije.");
+    if (!validWriteRooms(roomIds, writeRoomIds) || writeRoomIds.some(id => !availableRooms.has(id))) {
+      throw accountError("Upravljanje možeš dodijeliti samo za postojeće prostorije koje korisnik može pregledavati.");
+    }
     const previous = previousUsername === null ? null : this.#users.get(previousUsername);
     if (previousUsername !== null && !previous) throw accountError("Korisnik više ne postoji.", 404);
+    const canEditDeviceSettings = body.canEditDeviceSettings === undefined ? previous?.canEditDeviceSettings ?? false : body.canEditDeviceSettings;
+    if (typeof canEditDeviceSettings !== "boolean") throw accountError("Dozvola za postavke uređaja mora biti uključena ili isključena.");
     if (username === this.#admin?.username || username !== previousUsername && this.#users.has(username)) {
       throw accountError("Korisničko ime je već zauzeto.", 409);
     }
@@ -122,6 +135,8 @@ class DashboardUsers {
       username,
       passwordHash: password ? hashPassword(password) : previous.passwordHash,
       roomIds: roomIds === null ? null : [...new Set(roomIds)],
+      writeRoomIds: [...new Set(writeRoomIds)],
+      canEditDeviceSettings,
       mustChangePassword: Boolean(password) || previous?.mustChangePassword === true,
       role: "user",
     };
@@ -153,9 +168,7 @@ class DashboardUsers {
       if (this.#database) this.#database.saveUsers(users.values());
       else {
         fs.mkdirSync(path.dirname(this.#file), { recursive: true });
-        const document = { version: 1, users: [...users.values()].map(({ username, passwordHash, roomIds, mustChangePassword }) => ({
-          username, passwordHash, roomIds, mustChangePassword,
-        })) };
+        const document = { version: 1, users: [...users.values()].map(({ role, ...account }) => account) };
         fs.writeFileSync(temporary, `${JSON.stringify(document, null, 2)}\n`, { flag: "wx", mode: 0o600 });
         fs.renameSync(temporary, this.#file);
       }

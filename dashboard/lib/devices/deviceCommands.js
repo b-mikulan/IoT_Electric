@@ -54,7 +54,7 @@ class DeviceCommandService {
     return widget;
   }
 
-  async write(id, value) {
+  async write(id, value, authorize) {
     if (this.#config.demoMode) throw new DeviceCommandError("Stvarno upravljanje nije dostupno u demo prikazu.", 409, "DEMO_MODE");
     const pointId = typeof id === "string" ? id.trim() : "";
     this.#configured(pointId);
@@ -81,6 +81,7 @@ class DeviceCommandService {
       if (!validation.allowed) {
         throw new DeviceCommandError(validation.reason || "Naredba nije dopuštena.", 422, validation.code || "DEVICE_COMMAND_INVALID");
       }
+      authorize?.(pointId);
       try {
         const result = await this.#poller.writeValue(pointId, validation.value);
         if (result?.success !== true) throw new Error("Missing write acknowledgement");

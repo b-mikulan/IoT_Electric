@@ -103,7 +103,8 @@
     return ({ 0: "U redu", 1: "Nesigurno očitanje", 2: "Forsirano", 3: "Izvan mreže", 4: "Greška" })[String(point?.state)] || "Stanje nije poznato";
   }
 
-  function create({ container, onWrite, onSettings, onRooms, onMove, onRefresh, readOnly = false }) {
+  function create({ container, onWrite, onSettings, onRooms, onMove, onRefresh, readOnly = false, controlDeviceKeys = new Set() }) {
+    const canControl = device => !readOnly || controlDeviceKeys.has(device.key);
     if (!container || typeof container.append !== "function") throw new TypeError("Device cards need a DOM container.");
     const cards = new Map();
     const drafts = new Map();
@@ -567,7 +568,7 @@
       const actionLabel = () => demoMode ? "simulacija" : "šalje naredbu kontroleru";
       const allowed = (role) => {
         const point = pointFor(role);
-        return connection === "connected" && !pending() && point?.controlAvailable === true && !point?.error && Number(point?.state) === 0
+        return canControl(card.device) && connection === "connected" && !pending() && point?.controlAvailable === true && !point?.error && Number(point?.state) === 0
           && (demoMode || point.writeAllowed === true && point.liveControlAvailable === true && typeof onWrite === "function");
       };
       const disabledReason = (role) => pending() ? "Naredba se šalje. Pričekaj odgovor kontrolera."
@@ -833,7 +834,7 @@
           metric("humidity");
           metric("co2");
         }
-        if (!readOnly) {
+        if (canControl(card.device)) {
           if (card.device.type === "light" || card.device.type === "lightGroup") {
             lightToggle();
             range("brightnessSet", demoMode ? "Svjetlina · simulacija" : "Svjetlina");
@@ -863,7 +864,7 @@
             });
           }
           if (!readings.length) list.append(el("p", "dc-muted", "Očitanja i svojstva dostupni su u detaljima."));
-          if (!readOnly) body.append(el("p", "dc-muted", "Funkcije za upravljanje još nisu prepoznate."));
+          if (canControl(card.device)) body.append(el("p", "dc-muted", "Funkcije za upravljanje još nisu prepoznate."));
         }
       }
 
@@ -955,9 +956,10 @@
       readClockAvailable = readAt !== undefined || syncedAt !== undefined;
       latestReadAt = readAt !== undefined ? readAt : syncedAt;
       connection = typeof status === "string" ? status : status?.status || status?.state || "idle";
-      simulationBadge.textContent = readOnly ? "Samo pregled" : demoMode ? "Simulacija upravljanja" : "Stvarno upravljanje";
-      simulationBadge.classList.toggle("dc-live-badge", !readOnly && !demoMode);
-      simulationBadge.title = readOnly ? "" : demoMode ? "Kontrole mijenjaju samo lokalnu simulaciju." : "Aktivne kontrole mijenjaju stvarne uređaje u stanu.";
+      const hasControl = !readOnly || controlDeviceKeys.size > 0;
+      simulationBadge.textContent = !hasControl ? "Samo pregled" : demoMode ? "Simulacija upravljanja" : "Stvarno upravljanje";
+      simulationBadge.classList.toggle("dc-live-badge", hasControl && !demoMode);
+      simulationBadge.title = !hasControl ? "" : demoMode ? "Kontrole mijenjaju samo lokalnu simulaciju." : "Aktivne kontrole mijenjaju stvarne uređaje u zgradi.";
       const warningTexts = (Array.isArray(warnings) ? warnings : []).filter((warning) => typeof warning === "string" && warning.trim());
       readWarning.hidden = warningTexts.length === 0;
       readWarning.textContent = warningTexts[0] || "";

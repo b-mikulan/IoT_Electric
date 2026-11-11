@@ -15,12 +15,15 @@ function createRoomIndex(widgets, options, roomNames = []) {
   return { rooms, devices, points, floors: options.floors, deviceSettings: options.deviceSettings };
 }
 
-function scopeRooms(index, roomIds) {
+function scopeRooms(index, roomIds, writeRoomIds = []) {
   const allowed = new Set(roomIds);
   const seesRoom = id => roomIds === null || allowed.has(id);
   const rooms = [...index.rooms.values()].filter(room => seesRoom(room.id));
   const devices = new Map([...index.devices].filter(([, room]) => seesRoom(room)));
   const points = new Set([...index.points].filter(([, owner]) => devices.has(owner)).map(([id]) => id));
+  const writable = new Set(writeRoomIds);
+  const controlDevices = new Set([...devices].filter(([, room]) => writable.has(room)).map(([key]) => key));
+  const controlPoints = new Set([...points].filter(id => controlDevices.has(index.points.get(id))));
   const floorIds = new Set(rooms.map(room => room.floorId));
   const saved = new Map(index.deviceSettings.map(device => [device.key, device]));
   const settings = [...devices].map(([key, room]) => {
@@ -34,7 +37,10 @@ function scopeRooms(index, roomIds) {
     };
   });
   return {
+    devices,
     points,
+    controlDevices,
+    controlPoints,
     settings: { enabled: false, devices: settings, rooms: rooms.map(room => room.id), roomRules: [],
       roomDetails: rooms, floors: index.floors.filter(floor => floorIds.has(floor.id)) },
   };

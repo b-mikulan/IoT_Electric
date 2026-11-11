@@ -173,15 +173,22 @@
 
   globalThis.IoTDashboardSettings = { create };
   if (document.currentScript?.hasAttribute("data-standalone")) {
-    const view = create();
     fetch("/api/dashboard/settings", { cache: "no-store" }).then(response => {
+      if (response.status === 403 || response.status === 401) return null;
       if (!response.ok) throw new Error("Postavke nisu dostupne.");
       return response.json();
-    }).then(payload => { view.setSettings(payload); view.setPolling(payload.polling); view.setCapabilities(payload.capabilities); }).catch(error => view.showError(error.message));
-    // Settings-only pages do not subscribe to the building's full value stream.
-    const events = new EventSource("/api/dashboard/events");
-    events.addEventListener("dashboard-settings", event => view.setSettings(JSON.parse(event.data)));
-    events.addEventListener("polling", event => view.setPolling(JSON.parse(event.data)));
-    events.addEventListener("dashboard-imported", () => window.location.reload());
+    }).then(payload => {
+      if (!payload) return;
+      const view = create();
+      view.setSettings(payload);
+      view.setPolling(payload.polling);
+      view.setCapabilities(payload.capabilities);
+      for (const control of document.querySelectorAll("#general-settings-open, #refresh-pause")) control.hidden = false;
+      const events = new EventSource("/api/dashboard/events");
+      events.addEventListener("dashboard-settings", event => view.setSettings(JSON.parse(event.data)));
+      events.addEventListener("polling", event => view.setPolling(JSON.parse(event.data)));
+      events.addEventListener("dashboard-imported", () => window.location.reload());
+      events.addEventListener("session-ended", () => { events.close(); window.location.replace("/login"); });
+    }).catch(() => { /* Settings controls stay hidden when settings are unavailable. */ });
   }
 })();

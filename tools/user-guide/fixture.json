@@ -1,0 +1,978 @@
+{
+  "widgets": [
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Points/BlndBtnDn",
+      "label": "BlndBtnDn",
+      "description": "Points",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Points/BlndBtnUp",
+      "label": "BlndBtnUp",
+      "description": "Points",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndAng",
+      "label": "BlndAng",
+      "description": "Values",
+      "unit": "%",
+      "value": 50,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndPos",
+      "label": "BlndPos",
+      "description": "Blind height position set",
+      "unit": "",
+      "value": 36,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndSlt",
+      "label": "BlndSlt",
+      "description": "Blind slats position set",
+      "unit": "",
+      "value": 50,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndSts",
+      "label": "BlndSts",
+      "description": "Values",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndVal",
+      "label": "BlndVal",
+      "description": "Values",
+      "unit": "",
+      "value": 36,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Points/DevSta",
+      "label": "DevSta",
+      "description": "Points",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/DevCol",
+      "label": "DevCol",
+      "description": "Values",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/DevErr",
+      "label": "DevErr",
+      "description": "Values",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/LtLvl",
+      "label": "LtLvl",
+      "description": "Values",
+      "unit": "lx",
+      "value": 222,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/OccSts",
+      "label": "OccSts",
+      "description": "Values",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Coils/FilAlm",
+      "label": "FilAlm",
+      "description": "Filter alarm: 0=Off, 1=On",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/EffSpt",
+      "label": "EffSpt",
+      "description": "Effective setpoint",
+      "unit": "°C",
+      "value": 23,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/FanSpd",
+      "label": "FanSpd",
+      "description": "Fan speed: 0=Auto, 1=High, 2=Med, 3=Low",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/OnOffMd",
+      "label": "OnOffMd",
+      "description": "On/Off mode: 0=Off, 1=On",
+      "unit": "none",
+      "value": 1,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/SysMdCtrl",
+      "label": "SysMdCtrl",
+      "description": "System mode control: 0=Heat, 1=Cool, 2=Fan, 3=Dry, 4=Auto",
+      "unit": "none",
+      "value": 4,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/SysMdSts",
+      "label": "SysMdSts",
+      "description": "System mode status: 0=Heat, 1=Cool, 2=Fan, 3=Dry, 4=Auto(Heat), 5=Auto(Cool)",
+      "unit": "none",
+      "value": 1,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/IduAlm",
+      "label": "IduAlm",
+      "description": "Indoor unit A alarm",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/IduSts",
+      "label": "IduSts",
+      "description": "Indoor unit status: 0=Offline, 1=Online",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/RmCO2",
+      "label": "RmCO2",
+      "description": "CO2 level",
+      "unit": "ppm",
+      "value": 640,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/RmRh",
+      "label": "RmRh",
+      "description": "Relative humidity",
+      "unit": "%RH",
+      "value": 46,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/RmTmp",
+      "label": "RmTmp",
+      "description": "Room temperature",
+      "unit": "°C",
+      "value": 22.4,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Values/ScrnCol",
+      "label": "ScrnCol",
+      "description": "Values",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/G3308/Points/GrpPct",
+      "label": "GrpPct",
+      "description": "Points",
+      "unit": "",
+      "value": 65,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/G3308/Values/OccSts",
+      "label": "OccSts",
+      "description": "Values",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Points/DevSta",
+      "label": "DevSta",
+      "description": "Points",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/EcgFlt",
+      "label": "EcgFlt",
+      "description": "Values",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtCol",
+      "label": "LtCol",
+      "description": "Values",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtFlt",
+      "label": "LtFlt",
+      "description": "Values",
+      "unit": "none",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtPct",
+      "label": "LtPct",
+      "description": "Light percent set",
+      "unit": "",
+      "value": 65,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtVal",
+      "label": "LtVal",
+      "description": "Values",
+      "unit": "",
+      "value": 65,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Coils/FilAlm",
+      "label": "FilAlm",
+      "description": "Filter alarm: 0=Off, 1=On",
+      "unit": "",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/EffSpt",
+      "label": "EffSpt",
+      "description": "Effective setpoint",
+      "unit": "°C",
+      "value": 23,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/FanSpd",
+      "label": "FanSpd",
+      "description": "Fan speed: 0=Auto, 1=High, 2=Med, 3=Low",
+      "unit": "",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/OnOffMd",
+      "label": "OnOffMd",
+      "description": "On/Off mode: 0=Off, 1=On",
+      "unit": "",
+      "value": 1,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/SysMdCtrl",
+      "label": "SysMdCtrl",
+      "description": "System mode control: 0=Heat, 1=Cool, 2=Fan, 3=Dry, 4=Auto",
+      "unit": "",
+      "value": 4,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/SysMdSts",
+      "label": "SysMdSts",
+      "description": "System mode status: 0=Heat, 1=Cool, 2=Fan, 3=Dry, 4=Auto(Heat), 5=Auto(Cool)",
+      "unit": "",
+      "value": 1,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/IduAlm",
+      "label": "IduAlm",
+      "description": "Indoor unit A alarm",
+      "unit": "",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/IduSts",
+      "label": "IduSts",
+      "description": "Indoor unit status: 0=Offline, 1=Online",
+      "unit": "",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/RmCO2",
+      "label": "RmCO2",
+      "description": "CO2 level",
+      "unit": "ppm",
+      "value": 640,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/RmRh",
+      "label": "RmRh",
+      "description": "Relative humidity",
+      "unit": "%RH",
+      "value": 46,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/RmTmp",
+      "label": "RmTmp",
+      "description": "Room temperature",
+      "unit": "°C",
+      "value": 22.4,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    },
+    {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Values/ScrnCol",
+      "label": "ScrnCol",
+      "description": "PLC vrijednost",
+      "unit": "",
+      "value": 0,
+      "state": 0,
+      "error": null,
+      "visible": true,
+      "writable": false
+    }
+  ],
+  "metadataById": {
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Points/BlndBtnDn": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Points/BlndBtnDn",
+      "name": "BlndBtnDn",
+      "description": "",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/bacnet.pt.BACnetBinaryPV",
+      "writeable": false
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Points/BlndBtnUp": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Points/BlndBtnUp",
+      "name": "BlndBtnUp",
+      "description": "",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/bacnet.pt.BACnetBinaryPV",
+      "writeable": false
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndAng": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndAng",
+      "name": "BlndAng",
+      "description": "",
+      "type": "double",
+      "unit": "",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndPos": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndPos",
+      "name": "BlndPos",
+      "description": "Blind height position set",
+      "type": "double",
+      "unit": "",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndSlt": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndSlt",
+      "name": "BlndSlt",
+      "description": "Blind slats position set",
+      "type": "double",
+      "unit": "",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndSts": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndSts",
+      "name": "BlndSts",
+      "description": "",
+      "type": "long",
+      "unit": "none",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndVal": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndVal",
+      "name": "BlndVal",
+      "description": "",
+      "type": "double",
+      "unit": "",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Points/DevSta": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Points/DevSta",
+      "name": "DevSta",
+      "description": "",
+      "type": "long",
+      "unit": "none",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/DevCol": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/DevCol",
+      "name": "DevCol",
+      "description": "",
+      "type": "string",
+      "unit": "none",
+      "enumId": "",
+      "writeable": false
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/DevErr": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/DevErr",
+      "name": "DevErr",
+      "description": "",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/bacnet.pt.BACnetBinaryPV",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/LtLvl": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/LtLvl",
+      "name": "LtLvl",
+      "description": "",
+      "type": "double",
+      "unit": "lx",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/OccSts": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201/Values/OccSts",
+      "name": "OccSts",
+      "description": "",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/bacnet.pt.BACnetBinaryPV",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Coils/FilAlm": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Coils/FilAlm",
+      "name": "FilAlm",
+      "description": "Filter alarm: 0=Off, 1=On",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/bacnet.pt.BACnetBinaryPV",
+      "writeable": false
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/EffSpt": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/EffSpt",
+      "name": "EffSpt",
+      "description": "Effective setpoint",
+      "type": "double",
+      "unit": "°C",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/FanSpd": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/FanSpd",
+      "name": "FanSpd",
+      "description": "Fan speed: 0=Auto, 1=High, 2=Med, 3=Low",
+      "type": "long",
+      "unit": "none",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/OnOffMd": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/OnOffMd",
+      "name": "OnOffMd",
+      "description": "On/Off mode: 0=Off, 1=On",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/bacnet.pt.BACnetBinaryPV",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/SysMdCtrl": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/SysMdCtrl",
+      "name": "SysMdCtrl",
+      "description": "System mode control: 0=Heat, 1=Cool, 2=Fan, 3=Dry, 4=Auto",
+      "type": "long",
+      "unit": "none",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/SysMdSts": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Holding Registers/SysMdSts",
+      "name": "SysMdSts",
+      "description": "System mode status: 0=Heat, 1=Cool, 2=Fan, 3=Dry, 4=Auto(Heat), 5=Auto(Cool)",
+      "type": "long",
+      "unit": "none",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/IduAlm": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/IduAlm",
+      "name": "IduAlm",
+      "description": "Indoor unit A alarm",
+      "type": "long",
+      "unit": "none",
+      "enumId": "",
+      "writeable": false
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/IduSts": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/IduSts",
+      "name": "IduSts",
+      "description": "Indoor unit status: 0=Offline, 1=Online",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/bacnet.pt.BACnetBinaryPV",
+      "writeable": false
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/RmCO2": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/RmCO2",
+      "name": "RmCO2",
+      "description": "CO2 level",
+      "type": "double",
+      "unit": "ppm",
+      "enumId": "",
+      "writeable": false
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/RmRh": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/RmRh",
+      "name": "RmRh",
+      "description": "Relative humidity",
+      "type": "double",
+      "unit": "%RH",
+      "enumId": "",
+      "writeable": false
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/RmTmp": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Points/Input Registers/RmTmp",
+      "name": "RmTmp",
+      "description": "Room temperature",
+      "type": "double",
+      "unit": "°C",
+      "enumId": "",
+      "writeable": false
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Values/ScrnCol": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309/Values/ScrnCol",
+      "name": "ScrnCol",
+      "description": "",
+      "type": "string",
+      "unit": "none",
+      "enumId": "",
+      "writeable": false
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/G3308/Points/GrpPct": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/G3308/Points/GrpPct",
+      "name": "GrpPct",
+      "description": "",
+      "type": "double",
+      "unit": "",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/G3308/Values/OccSts": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/G3308/Values/OccSts",
+      "name": "OccSts",
+      "description": "",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/bacnet.pt.BACnetBinaryPV",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Points/DevSta": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Points/DevSta",
+      "name": "DevSta",
+      "description": "",
+      "type": "long",
+      "unit": "none",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/EcgFlt": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/EcgFlt",
+      "name": "EcgFlt",
+      "description": "",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/bacnet.pt.BACnetBinaryPV",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtCol": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtCol",
+      "name": "LtCol",
+      "description": "",
+      "type": "string",
+      "unit": "none",
+      "enumId": "",
+      "writeable": false
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtFlt": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtFlt",
+      "name": "LtFlt",
+      "description": "",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/bacnet.pt.BACnetBinaryPV",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtPct": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtPct",
+      "name": "LtPct",
+      "description": "Light percent set",
+      "type": "double",
+      "unit": "",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtVal": {
+      "id": "01/03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307/Values/LtVal",
+      "name": "LtVal",
+      "description": "",
+      "type": "double",
+      "unit": "",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Coils/FilAlm": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Coils/FilAlm",
+      "name": "FilAlm",
+      "description": "Filter alarm: 0=Off, 1=On",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/system.pt.Boolean",
+      "writeable": false
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/EffSpt": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/EffSpt",
+      "name": "EffSpt",
+      "description": "Effective setpoint",
+      "type": "double",
+      "unit": "°C",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/FanSpd": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/FanSpd",
+      "name": "FanSpd",
+      "description": "Fan speed: 0=Auto, 1=High, 2=Med, 3=Low",
+      "type": "long",
+      "unit": "none",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/OnOffMd": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/OnOffMd",
+      "name": "OnOffMd",
+      "description": "On/Off mode: 0=Off, 1=On",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/system.pt.Boolean",
+      "writeable": true
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/SysMdCtrl": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/SysMdCtrl",
+      "name": "SysMdCtrl",
+      "description": "System mode control: 0=Heat, 1=Cool, 2=Fan, 3=Dry, 4=Auto",
+      "type": "long",
+      "unit": "none",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/SysMdSts": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Holding Registers/SysMdSts",
+      "name": "SysMdSts",
+      "description": "System mode status: 0=Heat, 1=Cool, 2=Fan, 3=Dry, 4=Auto(Heat), 5=Auto(Cool)",
+      "type": "long",
+      "unit": "none",
+      "enumId": "",
+      "writeable": true
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/IduAlm": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/IduAlm",
+      "name": "IduAlm",
+      "description": "Indoor unit A alarm",
+      "type": "long",
+      "unit": "none",
+      "enumId": "",
+      "writeable": false
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/IduSts": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/IduSts",
+      "name": "IduSts",
+      "description": "Indoor unit status: 0=Offline, 1=Online",
+      "type": "boolean",
+      "unit": "none",
+      "enumId": "~/system.pt.Boolean",
+      "writeable": false
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/RmCO2": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/RmCO2",
+      "name": "RmCO2",
+      "description": "CO2 level",
+      "type": "double",
+      "unit": "ppm",
+      "enumId": "",
+      "writeable": false
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/RmRh": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/RmRh",
+      "name": "RmRh",
+      "description": "Relative humidity",
+      "type": "double",
+      "unit": "%RH",
+      "enumId": "",
+      "writeable": false
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/RmTmp": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Points/Input Registers/RmTmp",
+      "name": "RmTmp",
+      "description": "Room temperature",
+      "type": "double",
+      "unit": "°C",
+      "enumId": "",
+      "writeable": false
+    },
+    "01/03AS001/[Modbus Serial Client A]/ACX01/Values/ScrnCol": {
+      "id": "01/03AS001/[Modbus Serial Client A]/ACX01/Values/ScrnCol",
+      "name": "ScrnCol",
+      "description": "",
+      "type": "string",
+      "unit": "none",
+      "enumId": "",
+      "writeable": false
+    }
+  },
+  "roomByZone": {
+    "03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312": "Kitchen · 3. kat",
+    "03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312": "Kitchen · 3. kat"
+  },
+  "deviceSettings": [
+    {
+      "key": "03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/G3308",
+      "label": null,
+      "room": null,
+      "primaryPointId": null,
+      "primaryUnit": null,
+      "secondaryPointIds": null
+    },
+    {
+      "key": "03AS001/[BACnet Interface]/IP Network/RP32/Application/Zones/Z312/L3307",
+      "label": null,
+      "room": null,
+      "primaryPointId": null,
+      "primaryUnit": null,
+      "secondaryPointIds": null
+    },
+    {
+      "key": "03AS001/[BACnet Interface]/IP Network/RP31/Application/Zones/Z312/S3201",
+      "label": null,
+      "room": null,
+      "primaryPointId": null,
+      "primaryUnit": null,
+      "secondaryPointIds": null
+    },
+    {
+      "key": "03AS001/[BACnet Interface]/IP Network/RP31/IO Resources/Modbus/AC309",
+      "label": null,
+      "room": "Kitchen · 3. kat",
+      "primaryPointId": null,
+      "primaryUnit": null,
+      "secondaryPointIds": null
+    },
+    {
+      "key": "03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301",
+      "label": null,
+      "room": "Kitchen · 3. kat",
+      "primaryPointId": null,
+      "primaryUnit": null,
+      "secondaryPointIds": [
+        "01/03AS001/[BACnet Interface]/IP Network/RP31/Application/Items/B301/Values/BlndAng"
+      ]
+    },
+    {
+      "key": "03AS001/[Modbus Serial Client A]/ACX01",
+      "label": null,
+      "room": null,
+      "primaryPointId": null,
+      "primaryUnit": null,
+      "secondaryPointIds": null
+    }
+  ],
+  "floors": [
+    {
+      "id": "floor:0",
+      "name": "Etaža 0"
+    },
+    {
+      "id": "floor:2",
+      "name": "2. kat"
+    },
+    {
+      "id": "floor:3",
+      "name": "3. kat"
+    }
+  ],
+  "roomDetails": [
+    {
+      "id": "Kitchen · 3. kat",
+      "name": "Kitchen",
+      "floorId": "floor:3"
+    },
+    {
+      "id": "Guard room · etaža 0",
+      "name": "Guard room",
+      "floorId": "floor:0"
+    },
+    {
+      "id": "Kitchen · 2. kat",
+      "name": "Kitchen",
+      "floorId": "floor:2"
+    }
+  ],
+  "rooms": [
+    "Kitchen · 3. kat",
+    "Guard room · etaža 0",
+    "Kitchen · 2. kat"
+  ]
+}

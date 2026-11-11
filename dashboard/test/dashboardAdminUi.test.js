@@ -59,7 +59,7 @@ function adminUi() {
     requests.push({ url, body: JSON.parse(JSON.stringify(body)) });
     if (url.endsWith("/revoke")) return { revoked: 1 };
     if (failSave) throw new Error("Spremanje nije uspjelo.");
-    return { user: { username: body.username, roomIds: body.roomIds } };
+    return { user: { username: body.username, roomIds: body.roomIds, writeRoomIds: body.writeRoomIds } };
   };
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../public/admin/adminUsers.js"), "utf8"), context);
   return { el, document, window, requests, failSave: () => { failSave = true; } };
@@ -72,14 +72,27 @@ test("room search and floor bulk selection preserve grants hidden by filters", a
   el("room-search").emit("input");
   assert.equal(el("rooms").children.length, 1);
   assert.equal(el("rooms").children[0].children[0].checked, true);
+  const firstPermission = el("rooms").children[0].children[2];
+  firstPermission.value = "write";
+  firstPermission.emit("change");
   el("room-search").value = "Ured";
   el("room-search").emit("input");
   el("room-floor").value = JSON.stringify("1. kat");
   el("room-floor").emit("change");
+  const [read, , permission] = el("rooms").children[0].children;
+  assert.equal(permission.hidden, true);
+  read.checked = true;
+  read.emit("change");
+  assert.equal(permission.hidden, false);
+  read.checked = false;
+  read.emit("change");
+  assert.equal(permission.hidden, true);
   el("select-visible").emit("click");
+  assert.equal(el("rooms").children[0].children[2].hidden, false);
   el("user-form").emit("submit");
   await tick();
   assert.deepEqual(requests.at(-1).body.roomIds, ["a", "b"]);
+  assert.deepEqual(requests.at(-1).body.writeRoomIds, ["a"]);
   el("room-floor").value = JSON.stringify("1. kat");
   el("room-floor").emit("change");
   el("clear-visible").emit("click");
@@ -89,6 +102,13 @@ test("room search and floor bulk selection preserve grants hidden by filters", a
   el("user-form").emit("submit");
   await tick();
   assert.deepEqual(requests.at(-1).body.roomIds, ["a"]);
+  assert.deepEqual(requests.at(-1).body.writeRoomIds, ["a"]);
+  el("room-floor").value = JSON.stringify("Prizemlje");
+  el("room-floor").emit("change");
+  el("clear-visible").emit("click");
+  el("user-form").emit("submit");
+  await tick();
+  assert.deepEqual(requests.at(-1).body.writeRoomIds, []);
 });
 
 test("full access and no access are distinct; rejected saves retain the editor draft", async () => {
@@ -96,7 +116,8 @@ test("full access and no access are distinct; rejected saves retain the editor d
   await tick();
   el("all-rooms").checked = true;
   el("all-rooms").emit("change");
-  assert.equal(el("room-field").disabled, true);
+  assert.equal(el("room-field").disabled, false);
+  assert.ok(el("rooms").children.every(row => row.children[0].disabled && !row.children[2].disabled && !row.children[2].hidden));
   el("user-form").emit("submit");
   await tick();
   assert.equal(requests.at(-1).body.roomIds, null);

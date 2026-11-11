@@ -144,10 +144,20 @@ test("first login requires password setup before granting access and persists co
     }, { database: oldDatabase });
     oldDatabase.close();
     const oldSchema = new DatabaseSync(databaseFile);
-    oldSchema.exec("ALTER TABLE dashboard_users DROP COLUMN must_change_password; PRAGMA user_version = 1;");
+    oldSchema.exec(`
+      ALTER TABLE dashboard_users DROP COLUMN must_change_password;
+      ALTER TABLE dashboard_users DROP COLUMN can_edit_device_settings;
+      ALTER TABLE dashboard_room_grants DROP COLUMN can_write;
+      PRAGMA user_version = 1;
+    `);
+    oldSchema.prepare("UPDATE dashboard_users SET all_rooms = 0 WHERE username = ?").run("existing");
+    oldSchema.prepare("INSERT INTO dashboard_room_grants VALUES (?, ?)").run("existing", "Existing room");
     oldSchema.close();
 
-    const { request } = await startDashboard(t, env);
+    const { request, database } = await startDashboard(t, env);
+    assert.deepEqual(database.readUsers()[0].roomIds, ["Existing room"]);
+    assert.deepEqual(database.readUsers()[0].writeRoomIds, []);
+    assert.equal(database.readUsers()[0].canEditDeviceSettings, false);
     assert.equal((await login(request, "existing", "existing-password")).headers.get("location"), "/");
     const admin = session(await login(request, "admin", "test-admin"));
     const create = await request("/api/admin/users", {
@@ -176,7 +186,20 @@ test("first login requires password setup before granting access and persists co
     assert.equal((await setupPassword(request, pending, "temporary-password")).status, 400);
     const completed = await setupPassword(request, pending, "personal-password");
     assert.equal(completed.headers.get("location"), "/");
-    assert.equal((await request("/api/config", session(completed))).status, 200);
+    const active = session(completed);
+    assert.deepEqual((await (await request("/api/config", active)).json()).widgets, []);
+    assert.equal((await request("/trends.html", active)).status, 200);
+    assert.ok((await (await request("/api/history/catalog", active)).json()).items.length);
+    for (const [route, body] of [
+      ["/api/history/browse", {}], ["/api/alarms/query", {}],
+      ["/api/history/query", { historyItemId: "demo-history", timeFrom: "2026-01-01T00:00:00Z", timeTo: "2026-01-02T00:00:00Z" }],
+    ]) {
+      const response = await request(route, {
+        method: "POST", headers: { ...active.headers, "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+      assert.equal(response.status, 200, route);
+    }
+    assert.equal((await request("/api/dashboard/settings", active)).status, 403);
     for (const auth of [pending, secondPending]) {
       assert.equal((await request("/api/config", auth)).status, 401);
     }
@@ -248,22 +271,22 @@ test("admin manages persistent users and room permissions apply to all dashboard
   const post = (url, body, auth = admin) => request(url, {
     method: "POST", headers: { ...auth.headers, "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
-  const createUser = (username, roomIds) => post("/api/admin/users", {
-    previousUsername: null, username, password: "viewer-pass", roomIds,
+  const createUser = (username, roomIds, canEditDeviceSettings = false) => post("/api/admin/users", {
+    previousUsername: null, username, password: "viewer-pass", roomIds, canEditDeviceSettings,
   });
   assert.equal((await createUser("viewer", ["missing"])).status, 400);
   assert.equal((await createUser("viewer", [rooms[0].id])).status, 201);
-  assert.equal((await createUser("second", [rooms[1].id])).status, 201);
+  assert.equal((await createUser("second", [rooms[1].id], true)).status, 201);
   assert.equal((await createUser("admin", null)).status, 409);
 
   const viewer = await activateUser(request, "viewer", "viewer-pass", "viewer-personal");
   const second = await activateUser(request, "second", "viewer-pass", "second-personal");
   assert.equal((await request("/api/admin/users", viewer)).status, 403);
-  for (const url of ["/api/dashboard-transfer/export", "/api/history/catalog", "/api/discovery/auto", "/api/dashboard/events"]) {
+  for (const url of ["/api/dashboard-transfer/export", "/api/discovery/auto", "/api/dashboard/events"]) {
     assert.equal((await request(url, viewer)).status, 403, url);
   }
   assert.equal((await post("/api/devices/write", { widgetId: widgets[0].id, value: 1 }, viewer)).status, 403);
-  assert.equal((await post("/api/history/query", {}, viewer)).status, 403);
+  assert.equal((await post("/api/dashboard/refresh", {}, viewer)).status, 403);
 
   const read = async (url, auth = viewer) => {
     const response = await request(url, auth);
@@ -275,6 +298,32 @@ test("admin manages persistent users and room permissions apply to all dashboard
   assert.deepEqual((await read("/api/snapshot")).widgets.map(widget => widget.id), [widgets[0].id]);
   assert.deepEqual((await read("/api/devices/settings")).rooms, [rooms[0].id]);
   assert.deepEqual(Object.keys((await read("/api/devices/metadata")).metadataById), [widgets[0].id]);
+  assert.equal((await read("/api/config")).cardSettingsEnabled, false);
+  assert.equal((await read("/api/config", second)).cardSettingsEnabled, true);
+  const refreshed = [];
+  poller.refreshScope = async ids => {
+    refreshed.push(ids);
+    return { readAt: "2026-01-01T00:00:00Z", pointCount: ids.length, errorCount: 0 };
+  };
+  for (const target of [{ scope: "device", id: `${firstZone}/S1` }, { scope: "room", id: rooms[0].id }]) {
+    assert.equal((await post("/api/dashboard/refresh-scope", target, viewer)).status, 200);
+  }
+  for (const target of [{ scope: "device", id: `${secondZone}/S1` }, { scope: "room", id: rooms[1].id }]) {
+    assert.equal((await post("/api/dashboard/refresh-scope", target, viewer)).status, 404);
+  }
+  assert.deepEqual(refreshed, [[widgets[0].id], [widgets[0].id]]);
+  const card = { key: `${secondZone}/S1`, label: "Uređena kartica", primaryPointId: widgets[1].id, primaryUnit: "°C", secondaryPointIds: [] };
+  assert.equal((await post("/api/devices/settings", card, viewer)).status, 403);
+  assert.equal((await post("/api/devices/settings", { ...card, key: `${firstZone}/S1` }, second)).status, 403);
+  assert.equal((await post("/api/devices/settings", { ...card, room: rooms[0].id }, second)).status, 403);
+  assert.equal((await post("/api/devices/settings", { ...card, primaryPointId: widgets[0].id }, second)).status, 400);
+  const saved = await post("/api/devices/settings", card, second);
+  assert.equal(saved.status, 200);
+  const edited = await saved.json();
+  assert.equal(edited.device.label, card.label);
+  assert.equal(edited.device.room, rooms[1].id);
+  assert.deepEqual(edited.rooms, [rooms[1].id]);
+  assert.equal((await post("/api/devices/rooms", { keys: [card.key], room: "" }, second)).status, 403);
 
   const stream = await request("/events", { ...viewer, signal: AbortSignal.timeout(6000) });
   const reader = stream.body.getReader();

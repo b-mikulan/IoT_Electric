@@ -118,6 +118,7 @@ let deviceMetadataRequest = 0;
 let deviceMetadataRefreshTimer;
 const deviceSettingsByKey = new Map();
 let deviceSettingsEnabled = false;
+let cardSettingsEnabled = false;
 let deviceSettingsWarning = "";
 let deviceSettingsRequest = 0;
 let cardSettingsContext = null;
@@ -205,10 +206,11 @@ function renderDeviceCards() {
     ? deviceDemoWidgets
     : [...configById.values()].map((config) => {
       const point = latestValuesById.get(config.id)?.widget;
-      return { ...config, ...(point ? { value: point.value, state: point.state, error: point.error, updatedAt: point.updatedAt, readAt: point.readAt } : {}) };
+      return { ...config, writable: config.writable || config.deviceWritable === true,
+        ...(point ? { value: point.value, state: point.state, error: point.error, updatedAt: point.updatedAt, readAt: point.readAt } : {}) };
     });
   deviceCardView.update({ widgets, status: deviceConnectionStatus, readAt: deviceReadAt, demo: deviceDemoMode,
-    ...deviceMetadata, settingsEnabled: widgetEditingEnabled || deviceSettingsEnabled,
+    ...deviceMetadata, settingsEnabled: widgetEditingEnabled || deviceSettingsEnabled || cardSettingsEnabled,
     deviceSettings: [...deviceSettingsByKey.values()],
     rooms: storedRooms, roomRules: storedRoomRules, floors: storedFloors, roomDetails: storedRoomDetails, roomEditingEnabled: deviceSettingsEnabled,
     warnings: [...(deviceMetadata.warnings || []), ...(deviceSettingsWarning ? [deviceSettingsWarning] : [])],
@@ -1839,6 +1841,8 @@ function populateCardSettings(entry) {
   cardSettings["new-room"].value = "";
   populateFloorSelect(cardSettings["new-room-floor"]);
   updateCardRoomMode();
+  const roomField = document.querySelector("#device-settings-room-field");
+  if (roomField) roomField.hidden = !deviceSettingsEnabled;
 
   const choices = metricChoicesForDevice(device);
   const configuredIds = new Set(choices.map((choice) => choice.id));
@@ -1874,13 +1878,14 @@ function populateCardSettings(entry) {
   cardSettings.search.value = "";
   updateCardSecondaryMode();
   cardSettings.functions.disabled = !widgetEditingEnabled;
+  cardSettings.functions.hidden = !widgetEditingEnabled && cardSettingsEnabled;
   cardSettings.remove.hidden = !widgetEditingEnabled;
   cardSettings["remove-confirmation"].hidden = true;
 }
 
 function openDeviceCardSettingsDialog(device) {
   if (!device || cardSettingsBusy || widgetClearBusy) return;
-  if (!deviceSettingsEnabled) {
+  if (!deviceSettingsEnabled && !cardSettingsEnabled) {
     openDeviceSettingsDialog(device);
     return;
   }
@@ -1917,7 +1922,9 @@ cardSettings.dialog.addEventListener("cancel", (event) => { if (cardSettingsBusy
 cardSettings.reset.addEventListener("click", () => {
   if (!cardSettingsContext || cardSettingsBusy) return;
   populateCardSettings(null);
-  showCardSettingsStatus("Automatski naziv, prostorija, očitanja i jedinica su odabrani. Spremi karticu za potvrdu.");
+  showCardSettingsStatus(deviceSettingsEnabled
+    ? "Automatski naziv, prostorija, očitanja i jedinica su odabrani. Spremi karticu za potvrdu."
+    : "Automatski naziv, očitanja i jedinica su odabrani. Spremi karticu za potvrdu.");
 });
 cardSettings.functions.addEventListener("click", () => {
   if (!cardSettingsContext || cardSettingsBusy) return;
@@ -1926,9 +1933,9 @@ cardSettings.functions.addEventListener("click", () => {
 });
 cardSettings.form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!cardSettingsContext || cardSettingsBusy || !deviceSettingsEnabled) return;
+  if (!cardSettingsContext || cardSettingsBusy || !(deviceSettingsEnabled || cardSettingsEnabled)) return;
   const newRoom = cardSettings["new-room"].value.trim();
-  const needsRoom = cardSettings.room.value === "new";
+  const needsRoom = deviceSettingsEnabled && cardSettings.room.value === "new";
   const customUnit = cardSettings["unit-mode"].value === "custom";
   const unit = cardSettings.unit.value.trim();
   const invalidUnit = customUnit && (!unit || unit.length > 40);
@@ -1947,7 +1954,8 @@ cardSettings.form.addEventListener("submit", async (event) => {
     : [...cardSettingsContext.secondaryIds].filter((id) => id !== effectiveCardPrimaryId()
       && globalThis.IoTWidgetGrouping.deriveWidgetGrouping(id).key === cardSettingsContext.key);
   const primaryUnit = cardSettings["unit-mode"].value === "auto" ? null : customUnit ? unit : "";
-  const settings = { key: cardSettingsContext.key, label: cardSettings.label.value.trim() || null, room, primaryPointId, primaryUnit, secondaryPointIds };
+  const settings = { key: cardSettingsContext.key, label: cardSettings.label.value.trim() || null, primaryPointId, primaryUnit, secondaryPointIds };
+  if (deviceSettingsEnabled) settings.room = room;
   if (needsRoom) { settings.room = ""; settings.newRoom = { name: newRoom, floorId: cardSettings["new-room-floor"].value || null }; }
   // Older reconnect reads must not replace the result of this user save.
   const saveRequest = ++deviceSettingsRequest;
@@ -1976,7 +1984,9 @@ cardSettings.form.addEventListener("submit", async (event) => {
       cardSettingsContext.device = current;
       cardSettings.title.textContent = `Postavke kartice ${current.label}`;
     }
-    showCardSettingsStatus("Naziv, prostorija, očitanja i jedinica kartice su spremljeni.", "success");
+    showCardSettingsStatus(deviceSettingsEnabled
+      ? "Naziv, prostorija, očitanja i jedinica kartice su spremljeni."
+      : "Postavke kartice su spremljene.", "success");
   } catch (error) {
     showCardSettingsStatus(error.message || "Postavke kartice nisu spremljene.", "error");
   } finally {
@@ -2245,7 +2255,7 @@ async function boot() {
     if (adminLink) adminLink.hidden = config.isAdmin !== true;
     const readOnly = config.readOnly === true;
     if (readOnly) {
-      for (const selector of [".trends-open", "#general-settings-open", "#refresh-pause"]) {
+      for (const selector of ["#general-settings-open", "#refresh-pause"]) {
         const control = document.querySelector(selector);
         if (control) control.hidden = true;
       }
@@ -2253,18 +2263,21 @@ async function boot() {
     phase = "initialization";
     deviceDemoMode = config.demoMode === true;
     const deviceContainer = document.querySelector("#device-cards-section");
+    const controlDeviceKeys = new Set(config.controlDeviceKeys || []);
     deviceCardView = deviceContainer && globalThis.IoTDeviceCards?.create({
       container: deviceContainer,
       readOnly,
-      onWrite: readOnly ? undefined : writeDeviceCommand,
+      controlDeviceKeys,
+      onWrite: !readOnly || controlDeviceKeys.size ? writeDeviceCommand : undefined,
       onSettings: openDeviceCardSettingsDialog,
       onRooms: openRoomsDialog,
       onMove: openBulkRoomDialog,
-      onRefresh: readOnly ? undefined : refreshDeviceScope,
+      onRefresh: readOnly && deviceDemoMode ? undefined : refreshDeviceScope,
     });
     demoBadge.hidden = !config.demoMode;
     widgetEditingEnabled = config.widgetEditingEnabled === true;
     deviceSettingsEnabled = config.deviceSettingsEnabled === true;
+    cardSettingsEnabled = config.cardSettingsEnabled === true;
     applyDeviceSettings(config.deviceSettings || [], config.rooms, config.roomRules, config.floors, config.roomDetails);
     discoveryOpen.hidden = config.discoveryEnabled !== true;
     visibilityOpen.hidden = !widgetEditingEnabled;

@@ -19,14 +19,28 @@ class DashboardDatabase {
         const { user_version: version } = this.#db.prepare("PRAGMA user_version").get();
         if (application === 0 && version === 0 && !this.#db.prepare("SELECT 1 FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*' LIMIT 1").get()) {
           this.#db.exec(fs.readFileSync(path.join(__dirname, "dashboardSchema.sql"), "utf8"));
-        } else if (application === 1229935684 && version === 1) {
+          return;
+        }
+        if (application !== 1229935684 || ![1, 2, 3, 4].includes(version)) {
+          throw new Error("DASHBOARD_DB_FILE nije podržana baza dashboarda.");
+        }
+        if (version === 1) {
           this.#db.exec(`
             ALTER TABLE dashboard_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0
               CHECK (must_change_password IN (0, 1));
-            PRAGMA user_version = 2;
           `);
-        } else if (application !== 1229935684 || version !== 2) {
-          throw new Error("DASHBOARD_DB_FILE nije podržana baza dashboarda.");
+        }
+        if (version < 3) {
+          this.#db.exec(`
+            ALTER TABLE dashboard_room_grants ADD COLUMN can_write INTEGER NOT NULL DEFAULT 0 CHECK (can_write IN (0, 1));
+          `);
+        }
+        if (version < 4) {
+          this.#db.exec(`
+            ALTER TABLE dashboard_users ADD COLUMN can_edit_device_settings INTEGER NOT NULL DEFAULT 0
+              CHECK (can_edit_device_settings IN (0, 1));
+            PRAGMA user_version = 4;
+          `);
         }
       });
     } catch (error) {
@@ -115,11 +129,14 @@ class DashboardDatabase {
     const users = new Map(this.#db.prepare("SELECT * FROM dashboard_users ORDER BY username").all().map(row => [
       row.username, {
         username: row.username, passwordHash: row.password_hash, roomIds: row.all_rooms ? null : [],
-        mustChangePassword: Boolean(row.must_change_password),
+        writeRoomIds: [], mustChangePassword: Boolean(row.must_change_password),
+        canEditDeviceSettings: Boolean(row.can_edit_device_settings),
       },
     ]));
-    for (const { username, room_id } of this.#db.prepare("SELECT * FROM dashboard_room_grants ORDER BY room_id").all()) {
-      users.get(username).roomIds.push(room_id);
+    for (const { username, room_id, can_write } of this.#db.prepare("SELECT * FROM dashboard_room_grants ORDER BY room_id").all()) {
+      const user = users.get(username);
+      user.roomIds?.push(room_id);
+      if (can_write) user.writeRoomIds.push(room_id);
     }
     return [...users.values()];
   }
@@ -127,11 +144,15 @@ class DashboardDatabase {
   saveUsers(users) {
     this.transaction(() => {
       this.#db.exec("DELETE FROM dashboard_users");
-      const insertUser = this.#db.prepare("INSERT INTO dashboard_users (username, password_hash, all_rooms, must_change_password) VALUES (?, ?, ?, ?)");
-      const insertGrant = this.#db.prepare("INSERT INTO dashboard_room_grants VALUES (?, ?)");
-      for (const { username, passwordHash, roomIds, mustChangePassword } of users) {
-        insertUser.run(username, passwordHash, Number(roomIds === null), Number(mustChangePassword === true));
-        for (const id of new Set(roomIds)) insertGrant.run(username, id);
+      const insertUser = this.#db.prepare(`
+        INSERT INTO dashboard_users (username, password_hash, all_rooms, must_change_password, can_edit_device_settings)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      const insertGrant = this.#db.prepare("INSERT INTO dashboard_room_grants (username, room_id, can_write) VALUES (?, ?, ?)");
+      for (const { username, passwordHash, roomIds, writeRoomIds, mustChangePassword, canEditDeviceSettings } of users) {
+        insertUser.run(username, passwordHash, Number(roomIds === null), Number(mustChangePassword === true), Number(canEditDeviceSettings === true));
+        const writable = new Set(writeRoomIds);
+        for (const id of new Set(roomIds ?? writeRoomIds)) insertGrant.run(username, id, Number(writable.has(id)));
       }
       this.saveDocument("usersInitialized", true);
     });

@@ -154,10 +154,11 @@ class DeviceWidgetStore {
     });
   }
 
-  save(settings, { deviceKeys, pointIds, roomNames = [] }) {
+  save(settings, { deviceKeys, pointIds, roomNames = [], authorizeCardEdit }) {
     return this.#enqueue(async () => {
       if (!this.enabled) throw new DeviceWidgetStoreError("Device card settings require a writable DEVICE_WIDGETS_FILE or WIDGETS_FILE directory.", 409, "DEVICE_WIDGET_FILE_UNAVAILABLE");
-      const entry = normalizeSettings(settings, { requireFields: true });
+      const entry = normalizeSettings(authorizeCardEdit ? { ...settings, room: null } : settings, { requireFields: true });
+      authorizeCardEdit?.(entry.key);
       if (!new Set(deviceKeys).has(entry.key)) throw new DeviceWidgetStoreError("The device is not present on the dashboard.", 404, "DEVICE_NOT_FOUND");
       const configuredPoints = new Set(pointIds);
       if ([entry.primaryPointId, ...(entry.secondaryPointIds || [])].some((id) => id !== null && !configuredPoints.has(id))) {
@@ -167,11 +168,14 @@ class DeviceWidgetStore {
         throw invalidSettings("All readings must belong to this device.");
       }
       const { document } = await this.#read();
-      if (settings.newRoom) {
+      if (authorizeCardEdit) {
+        authorizeCardEdit(entry.key);
+        entry.room = document.devices.find(device => normalizeSettings(device).key === entry.key)?.room ?? null;
+      } else if (settings.newRoom) {
         this.#ensureOrganization(document, roomNames);
         entry.room = this.#organization(() => organization.addRoom(document, settings.newRoom.name, settings.newRoom.floorId ?? null)).id;
       }
-      if (entry.room) entry.room = registerRoom(document, entry.room);
+      if (!authorizeCardEdit && entry.room) entry.room = registerRoom(document, entry.room);
       const known = new Set(document.devices.map((device) => normalizeSettings(device).key));
       for (const key of deviceKeys) {
         if (!known.has(key)) {
