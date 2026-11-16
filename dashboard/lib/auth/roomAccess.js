@@ -34,6 +34,8 @@ function scopeRooms(index, roomIds, writeRoomIds = []) {
       primaryUnit: device?.primaryUnit ?? null,
       primaryPointId: ownPoint(device?.primaryPointId) ? device.primaryPointId : null,
       secondaryPointIds: device?.secondaryPointIds?.filter(ownPoint) ?? null,
+      // Never reveal members outside the viewer's rooms, not even their count.
+      ...(device?.lightMembers && { lightMembers: device.lightMembers.filter(member => devices.has(member)) }),
     };
   });
   return {

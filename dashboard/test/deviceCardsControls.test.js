@@ -861,3 +861,59 @@ test("only the command's own fresh point can confirm a partial read, including a
   view.updateValues({ widgets: [{ id: a.id, readAt: "own-room" }] });
   assert.match(byClass(container, "dc-command-status")[0].textContent, /potvrđena je novim očitanjem/);
 });
+
+test("light group cards hold their listed lights in a closed disclosure and release them when the group is filtered out", (t) => {
+  const group = { ...device("lightGroup", { brightnessSet: point("brightnessSet", 50) }), key: "ES/GRP", label: "Grupa hodnik" };
+  const member = { ...device("light", { brightnessSet: point("brightnessSet", 20, { id: "01/ES/L1/Values/LtPct" }) }), key: "ES/L1", label: "Svjetlo 1" };
+  const loose = { ...device("light", { brightnessSet: point("brightnessSet", 30, { id: "01/ES/L2/Values/LtPct" }) }), key: "ES/L2", label: "Svjetlo 2" };
+  const calls = [];
+  const { container, update } = setup(t, [group, member, loose], async (body) => { calls.push(body); });
+  const settings = { deviceSettings: [{ key: group.key, lightMembers: [member.key, "ES/absent"] }] };
+  update(undefined, undefined, settings);
+  const grid = byClass(container, "dc-grid")[0];
+  const keys = (node) => node.children.map((child) => child.dataset.deviceKey);
+  assert.deepEqual(keys(grid), [group.key, loose.key]);
+  const panel = byClass(container, "dc-group-members")[0];
+  assert.equal(panel.open, undefined);
+  assert.equal(panel.hidden, false);
+  assert.equal(panel.children[0].textContent, "Svjetla u grupi (1)");
+  assert.deepEqual(keys(byClass(panel, "dc-group-member-list")[0]), [member.key]);
+  assert.equal(byClass(container, "dc-load-count")[0].textContent, "Prikazano 2 od 2 uređaja");
+
+  // The nested light keeps its own controls and command identity.
+  const nestedNode = byClass(panel, "dc-group-member-list")[0].children[0];
+  const slider = byClass(nestedNode, "dc-range")[0];
+  slider.value = "70";
+  slider.dispatch("change");
+  assert.deepEqual(calls, [{ widgetId: member.roles.brightnessSet.id, value: 70 }]);
+
+  // Open state and node identity survive a settings refresh.
+  panel.open = true;
+  update(undefined, undefined, settings);
+  assert.equal(byClass(container, "dc-group-members")[0], panel);
+  assert.equal(panel.open, true);
+  assert.equal(byClass(panel, "dc-group-member-list")[0].children[0], nestedNode);
+
+  // A type filter that hides the group shows the light on its own, captioned with its group.
+  const typeFilter = byClass(container, "dc-type-filter")[0];
+  typeFilter.value = "light";
+  typeFilter.dispatch("change");
+  assert.deepEqual(keys(grid), [member.key, loose.key]);
+  assert.equal(byClass(nestedNode, "dc-group-note")[0].textContent, "U grupi: Grupa hodnik");
+  typeFilter.value = "all";
+  typeFilter.dispatch("change");
+
+  // A text search lists matching lights flat instead of hiding them in a closed group.
+  const search = byClass(container, "dc-search")[0];
+  search.value = "svjetlo 1";
+  search.dispatch("input");
+  assert.deepEqual(keys(grid), [member.key]);
+  search.value = "";
+  search.dispatch("input");
+
+  // Removing membership returns the light to the main list.
+  update(undefined, undefined, { deviceSettings: [] });
+  assert.deepEqual(keys(grid), [group.key, member.key, loose.key]);
+  assert.equal(panel.hidden, true);
+  assert.equal(byClass(nestedNode, "dc-group-note")[0].hidden, true);
+});

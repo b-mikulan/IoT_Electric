@@ -59,6 +59,12 @@ Prioritet tipova je: zona → roleta → klima → rasvjeta → senzor → gener
 
 Prednja strana koristi predloške: svjetlo prikazuje povratnu razinu i kontrolu zadane razine; klima temperaturu, vlagu, CO₂, stvarni način rada i dostupne naredbe; roleta očitani položaj te naredbe položaja/lamela; senzor i zona mjerne podatke. Korisna klasifikacija ne jamči prikaz svakog podatka na prednjoj strani: primjerice stanje/kut rolete i prisutnost u grupi rasvjete dostupni su u detaljima. Predloške možemo proširivati bez promjene vezanja izvora.
 
+### Svjetla u grupi rasvjete
+
+Administrator u **Postavke kartice** grupe rasvjete označava pojedinačna svjetla koja se prikazuju unutar te kartice, u početno zatvorenom dijelu **Svjetla u grupi (N)**. Popis je samo organizacija dashboarda: ne mijenja DALI konfiguraciju ni EBO bindinge, a grupna naredba i dalje upravlja stvarnom grupom preko `GrpPct`. Svjetla u grupi zadržavaju vlastitu prostoriju, kontrole, naredbene ID-jeve i dozvole.
+
+Svjetlo može biti u najviše jednoj grupi. Kad filtar vrste, prostorije ili kata ili ovlasti korisnika izostave grupu, svjetlo se prikazuje samostalno s oznakom grupe; tekstualna pretraga uvijek prikazuje pronađena svjetla izravno. Korisnik vidi samo svjetla iz svojih prostorija, a popis mijenja samo administrator. Spremljeni, trenutačno nedostupni članovi ostaju zapisani dok ih administrator ne ukloni. Popis je dio backupa i prijenosa konfiguracije.
+
 ## 5. Prostorija
 
 Učitava se Description točne zonske putanje. Za uređaj se bira najduži odgovarajući predak iz poznatih zona. Prazni i placeholder opisi se odbacuju. Rasvjeta pod potvrđenim RP32/Z312 dobiva Kitchen. AC309 i B301 nemaju potvrđenu sobu. Isti kod Z312 na drugom kontroleru ne prenosi naziv sobe automatski.

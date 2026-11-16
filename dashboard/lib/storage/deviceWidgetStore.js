@@ -66,7 +66,38 @@ function normalizeSettings(value, { requireFields = false } = {}) {
     new Set(result.secondaryPointIds).size !== result.secondaryPointIds.length ||
     result.secondaryPointIds.includes(result.primaryPointId)
   )) throw invalidSettings("Primary and secondary readings must be distinct.");
+  // Lights shown inside a light-group card. Dashboard organization only; the
+  // controller's DALI group is unchanged. Omitted keeps the stored list,
+  // null or an empty list clears it.
+  if (Object.hasOwn(value, "lightMembers")) result.lightMembers = normalizeLightMembers(value.lightMembers, key);
   return result;
+}
+
+function normalizeLightMembers(value, groupKey) {
+  if (value === null || value === undefined) return null;
+  if (!Array.isArray(value) || value.length > 500) throw invalidSettings("A light group can list at most 500 lights.");
+  const members = value.map((member) => {
+    if (typeof member !== "string" || !member.trim() || member.trim().length > 4_096) throw invalidSettings("Light group members must be device keys.");
+    return member.trim();
+  });
+  if (new Set(members).size !== members.length) throw invalidSettings("A light can be listed only once in a group.");
+  if (members.includes(groupKey)) throw invalidSettings("A light group cannot contain itself.");
+  return members.length ? members : null;
+}
+
+function checkLightMembers(document, entry, previous, { lightKeys, lightGroupKeys, deviceKeys }) {
+  if (!entry.lightMembers) return;
+  if (!lightGroupKeys?.has(entry.key)) throw invalidSettings("Svjetla se mogu dodati samo grupi rasvjete.");
+  const present = new Set(deviceKeys);
+  const kept = new Set(previous?.lightMembers || []);
+  for (const member of entry.lightMembers) {
+    // Previously saved references may be temporarily absent; keep them.
+    if (kept.has(member)) continue;
+    if (!lightKeys?.has(member)) throw invalidSettings("U grupu se mogu dodati samo postojeća pojedinačna svjetla.");
+    const other = document.devices.find((device) => device.key !== entry.key && present.has(device.key)
+      && Array.isArray(device.lightMembers) && device.lightMembers.includes(member));
+    if (other) throw new DeviceWidgetStoreError("Svjetlo je već prikazano u drugoj grupi rasvjete. Najprije ga ukloni iz te grupe.", 409, "LIGHT_ALREADY_GROUPED");
+  }
 }
 
 function parseDocument(raw) {
@@ -154,7 +185,7 @@ class DeviceWidgetStore {
     });
   }
 
-  save(settings, { deviceKeys, pointIds, roomNames = [], authorizeCardEdit }) {
+  save(settings, { deviceKeys, pointIds, roomNames = [], authorizeCardEdit, lightKeys, lightGroupKeys }) {
     return this.#enqueue(async () => {
       if (!this.enabled) throw new DeviceWidgetStoreError("Device card settings require a writable DEVICE_WIDGETS_FILE or WIDGETS_FILE directory.", 409, "DEVICE_WIDGET_FILE_UNAVAILABLE");
       const entry = normalizeSettings(authorizeCardEdit ? { ...settings, room: null } : settings, { requireFields: true });
@@ -168,6 +199,11 @@ class DeviceWidgetStore {
         throw invalidSettings("All readings must belong to this device.");
       }
       const { document } = await this.#read();
+      if (Object.hasOwn(entry, "lightMembers")) {
+        if (authorizeCardEdit) throw new DeviceWidgetStoreError("Uređivanje svjetala u grupi zahtijeva administratorski pristup.", 403, "ADMIN_REQUIRED");
+        const previous = document.devices.find((device) => device.key === entry.key);
+        checkLightMembers(document, entry, previous && normalizeSettings(previous), { lightKeys, lightGroupKeys, deviceKeys });
+      }
       if (authorizeCardEdit) {
         authorizeCardEdit(entry.key);
         entry.room = document.devices.find(device => normalizeSettings(device).key === entry.key)?.room ?? null;
@@ -186,9 +222,11 @@ class DeviceWidgetStore {
       const index = document.devices.findIndex((device) => normalizeSettings(device).key === entry.key);
       if (index < 0) document.devices.push(entry);
       else document.devices[index] = { ...document.devices[index], ...entry };
+      const saved = document.devices[index < 0 ? document.devices.length - 1 : index];
+      if (saved.lightMembers === null) delete saved.lightMembers;
       await this.#write(document);
       this.#publish(document);
-      return structuredClone(entry);
+      return normalizeSettings(saved);
     });
   }
 

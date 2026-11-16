@@ -123,6 +123,8 @@ test("a failed SQLite migration can retry from intact JSON and a new live databa
 test("portable export/import retains room assignments, empty rooms, units, write flags and metadata without runtime values or credentials", t => {
   const { config, transfer } = fixture(t);
   const data = bundle();
+  // Group membership travels with the card, including references absent from this installation.
+  data.deviceWidgets.devices[0].lightMembers = ["ES/Zones/Z9/Light"];
   const preview = transfer.prepare(data);
   assert.deepEqual(preview.summary, { points: 1, devices: 1, rooms: 2, writablePoints: 1, added: 1, removed: 1, metadataPoints: 1, legacy: false, warnings: [] });
   assert.equal(read(config.widgetsFile)[0].id, "old-point", "preview must not write");
@@ -130,6 +132,7 @@ test("portable export/import retains room assignments, empty rooms, units, write
   const exported = transfer.export();
   assert.equal(exported.deviceWidgets.devices[0].primaryUnit, "°C");
   assert.equal(exported.deviceWidgets.devices[0].room, "Kitchen");
+  assert.deepEqual(exported.deviceWidgets.devices[0].lightMembers, ["ES/Zones/Z9/Light"]);
   assert.deepEqual(exported.deviceWidgets.rooms, ["Empty room"]);
   assert.deepEqual(exported.deviceWidgets.roomRules, data.deviceWidgets.roomRules);
   assert.equal(exported.widgets[0].writable, true);

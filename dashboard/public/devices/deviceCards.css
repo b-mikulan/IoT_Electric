@@ -163,6 +163,13 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-details { border-top: 1px solid #edf1ee; margin-top: 19px; padding-top: 12px; }
 .dc-details > summary { width: max-content; max-width: 100%; color: #65776a; font-size: .68rem; cursor: pointer; }
 .dc-details-content { padding-top: 10px; overflow-wrap: anywhere; }
+.dc-group-note { margin: 2px 0 0; color: var(--dc-accent); font-size: .68rem; line-height: 1.45; }
+.dc-group-members { border-top: 1px solid #edf1ee; margin-top: 19px; padding-top: 12px; }
+.dc-group-members[hidden] { display: none; }
+.dc-group-members > summary { width: max-content; max-width: 100%; color: #365e52; font-size: .74rem; font-weight: 650; cursor: pointer; }
+.dc-group-member-list { display: grid; gap: 12px; padding-top: 12px; }
+.dc-group-member-list > .dc-card { margin: 0; box-shadow: none; border: 1px solid #e3ebe7; }
+.dc-group-members > summary:focus-visible { outline: 2px solid var(--dc-accent); outline-offset: 4px; }
 .dc-detail-reason, .dc-detail-room-source { font-size: .69rem; line-height: 1.6; color: #7b8d82; margin: 4px 0 10px; }
 .dc-detail-heading { font-size: .7rem; font-weight: 700; margin: 17px 0 9px; color: #4a6656; }
 .dc-point-list { font-size: .67rem; line-height: 1.6; margin: 0; }

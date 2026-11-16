@@ -138,6 +138,9 @@
     let filterSignature = "";
     let deviceIndex = null;
     let devicePositions = new Map();
+    let savedSettings = [];
+    let memberParents = new Map();
+    let pageDevices = [];
 
     container.classList.add("device-cards-section");
     const headerActions = el("div", "dc-header-actions");
@@ -327,8 +330,23 @@
 
     function updateSummary() {
       const count = filteredDevices.length;
-      const shown = Math.min(count, displayLimit);
-      summary.textContent = devices.length ? `${count === devices.length ? count : `${count} od ${devices.length}`} kartica uređaja${shown < count ? ` · prikazano ${shown}` : ""}${connection !== "connected" ? " · Očitanja se trenutačno ne osvježavaju" : ""}` : "";
+      const shown = Math.min(pageDevices.length, displayLimit);
+      summary.textContent = devices.length ? `${count === devices.length ? count : `${count} od ${devices.length}`} kartica uređaja${shown < pageDevices.length ? ` · prikazano ${shown}` : ""}${connection !== "connected" ? " · Očitanja se trenutačno ne osvježavaju" : ""}` : "";
+    }
+
+    // Light key → light-group key. Saved settings, not device objects, carry
+    // membership, so live value updates never move a light out of its group.
+    // shortcut: a light is shown in its first listed group only; the store
+    // rejects a second group, revisit if multi-group membership is needed.
+    function groupMembership() {
+      const parents = new Map();
+      for (const entry of savedSettings) {
+        if (devicesByKey.get(entry?.key)?.type !== "lightGroup" || !Array.isArray(entry.lightMembers)) continue;
+        for (const member of entry.lightMembers) {
+          if (devicesByKey.get(member)?.type === "light" && !parents.has(member)) parents.set(member, entry.key);
+        }
+      }
+      return parents;
     }
 
     function reconcileCommand(device) {
@@ -362,7 +380,7 @@
     }
 
     function showMore() {
-      if (destroyed || displayLimit >= filteredDevices.length) return;
+      if (destroyed || displayLimit >= pageDevices.length) return;
       displayLimit += CARD_BATCH_SIZE;
       applyFilter();
     }
@@ -375,9 +393,21 @@
         && (selectedFloor === "all" || device.room && (device.room.floorId || "unknown") === selectedFloor)
         && (typeFilter.value === "all" || device.type === typeFilter.value) && searchIndex.get(device.key)?.includes(query));
       const count = filteredDevices.length;
-      const shownDevices = filteredDevices.slice(0, displayLimit);
-      const shownKeys = new Set(shownDevices.map((device) => device.key));
-      for (const device of shownDevices) {
+      // A text search lists matching lights on their own, captioned with their
+      // group. Otherwise a shown group holds all of its accessible lights,
+      // and only lights whose group is filtered out stay on the main list.
+      const nested = query === "";
+      const filteredKeys = new Set(filteredDevices.map((device) => device.key));
+      pageDevices = nested ? filteredDevices.filter((device) => !filteredKeys.has(memberParents.get(device.key))) : filteredDevices;
+      const shownDevices = pageDevices.slice(0, displayLimit);
+      const members = new Map();
+      if (nested) for (const device of devices) {
+        const parent = memberParents.get(device.key);
+        if (parent) members.set(parent, [...(members.get(parent) || []), device]);
+      }
+      const groupedDevices = shownDevices.flatMap((device) => [device, ...(members.get(device.key) || [])]);
+      const shownKeys = new Set(groupedDevices.map((device) => device.key));
+      for (const device of groupedDevices) {
         if (!cards.has(device.key)) cards.set(device.key, makeCard(device));
         const card = cards.get(device.key);
         if (card.needsRefresh) { card.update(device); card.needsRefresh = false; }
@@ -390,15 +420,18 @@
         card.selection.hidden = !selectionMode;
         card.checkbox.checked = selectedKeys.has(device.key);
         card.node.classList.toggle("dc-card-selected", selectedKeys.has(device.key));
+        const parent = memberParents.get(device.key);
+        card.setGroupNote(shown && parent && !(nested && filteredKeys.has(parent)) ? devicesByKey.get(parent)?.label : "");
       }
       // Moving existing nodes preserves focused controls and their drafts.
       // Only the requested slice belongs to the live grid.
       for (let index = 0; index < shownDevices.length; index++) {
-        const node = cards.get(shownDevices[index].key).node;
-        if (grid.children[index] !== node) grid.insertBefore(node, grid.children[index] || null);
+        const card = cards.get(shownDevices[index].key);
+        if (grid.children[index] !== card.node) grid.insertBefore(card.node, grid.children[index] || null);
+        card.setMembers((members.get(card.device.key) || []).map((device) => cards.get(device.key).node));
       }
-      loadMore.hidden = shownDevices.length >= count;
-      loadCount.textContent = `Prikazano ${shownDevices.length} od ${count} uređaja`;
+      loadMore.hidden = shownDevices.length >= pageDevices.length;
+      loadCount.textContent = `Prikazano ${shownDevices.length} od ${pageDevices.length} uređaja`;
       loadButton.disabled = loadMore.hidden;
       selectShown.title = `Odaberi sve uređaje koji odgovaraju filtrima (${count}), uključujući one niže na popisu.`;
       selectShown.textContent = `Odaberi sve rezultate (${count})`;
@@ -527,7 +560,14 @@
       const identity = el("div", "dc-identity");
       const title = el("h3", "dc-card-title", initial.label);
       const room = el("p", "dc-room");
-      identity.append(title, room);
+      const groupNote = el("p", "dc-group-note");
+      groupNote.hidden = true;
+      identity.append(title, room, groupNote);
+      card.setGroupNote = (label) => {
+        groupNote.hidden = !label;
+        const text = label ? `U grupi: ${label}` : "";
+        if (groupNote.textContent !== text) groupNote.textContent = text;
+      };
       const settings = el("button", "dc-settings-button");
       settings.type = "button";
       settings.hidden = true;
@@ -559,7 +599,22 @@
       commandStatus.setAttribute("role", "status");
       commandStatus.setAttribute("aria-live", "polite");
       commandStatus.hidden = true;
-      node.append(selectionLabel, top, body, states, commandStatus, refreshStatus, details);
+      // Starts closed; the same element survives updates, so its open state does too.
+      const membersPanel = el("details", "dc-group-members");
+      const membersSummary = el("summary", "");
+      const membersList = el("div", "dc-group-member-list");
+      membersPanel.append(membersSummary, membersList);
+      membersPanel.hidden = true;
+      card.setMembers = (nodes) => {
+        membersPanel.hidden = nodes.length === 0;
+        const text = `Svjetla u grupi (${nodes.length})`;
+        if (membersSummary.textContent !== text) membersSummary.textContent = text;
+        for (let index = 0; index < nodes.length; index++) {
+          if (membersList.children[index] !== nodes[index]) membersList.insertBefore(nodes[index], membersList.children[index] || null);
+        }
+        while (membersList.children.length > nodes.length) membersList.children[nodes.length].remove();
+      };
+      node.append(selectionLabel, top, body, states, commandStatus, refreshStatus, details, membersPanel);
 
       const pointFor = (role) => card.device.roles?.[role];
       const draftKey = (role) => `${card.device.key}\u0000${role}`;
@@ -970,6 +1025,8 @@
       devices = Array.isArray(result) ? result : result?.devices || [];
       devicePositions = new Map(devices.map((device, index) => [device.key, index]));
       devicesByKey = new Map(devices.map((device) => [device.key, device]));
+      savedSettings = Array.isArray(deviceSettings) ? deviceSettings : [];
+      memberParents = groupMembership();
       searchIndex = new Map(devices.map((device) => [device.key, searchText([device.label, device.key, device.context, roomCaption(device.room)].filter(Boolean).join(" "))]));
       const present = new Set(devices.map((device) => device.key));
       for (const key of selectedKeys) if (!present.has(key)) selectedKeys.delete(key);
@@ -1016,7 +1073,7 @@
       }
       let updatedCards = 0;
       for (const key of dirty) if (updateCard(devicesByKey.get(key))) updatedCards++;
-      if (filtersChanged) { updateFilters(); applyFilter(); }
+      if (filtersChanged) { memberParents = groupMembership(); updateFilters(); applyFilter(); }
       else if (connectionChanged) updateSummary();
       return { changedDevices: changed.length, updatedCards };
     }
