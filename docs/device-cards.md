@@ -63,6 +63,8 @@ Prednja strana koristi predloške: svjetlo prikazuje povratnu razinu i kontrolu 
 
 Administrator u **Postavke kartice** grupe rasvjete označava pojedinačna svjetla koja se prikazuju unutar te kartice, u početno zatvorenom dijelu **Svjetla u grupi (N)**. Popis je samo organizacija dashboarda: ne mijenja DALI konfiguraciju ni EBO bindinge, a grupna naredba i dalje upravlja stvarnom grupom preko `GrpPct`. Svjetla u grupi zadržavaju vlastitu prostoriju, kontrole, naredbene ID-jeve i dozvole.
 
+Unutar grupe svjetlo je sažeti red: naziv, očitana svjetlina, prekidač i klizač ispod njih. To je ista kartica kao na glavnom popisu, samo drukčije složena, pa naredbe i njihova potvrda rade jednako. Upozorenja, odabrana vrijednost i status naredbe ostaju vidljivi u redu. Strelica uz naziv otvara prostoriju, dodatna očitanja, osvježavanje, postavke i detalje funkcija; otvoreni red ostaje otvoren i kad stignu nova očitanja.
+
 Svjetlo može biti u najviše jednoj grupi. Kad filtar vrste, prostorije ili kata ili ovlasti korisnika izostave grupu, svjetlo se prikazuje samostalno s oznakom grupe; tekstualna pretraga uvijek prikazuje pronađena svjetla izravno. Korisnik vidi samo svjetla iz svojih prostorija, a popis mijenja samo administrator. Spremljeni, trenutačno nedostupni članovi ostaju zapisani dok ih administrator ne ukloni. Popis je dio backupa i prijenosa konfiguracije.
 
 ## 5. Prostorija

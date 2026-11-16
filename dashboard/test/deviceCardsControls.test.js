@@ -917,3 +917,31 @@ test("light group cards hold their listed lights in a closed disclosure and rele
   assert.equal(panel.hidden, true);
   assert.equal(byClass(nestedNode, "dc-group-note")[0].hidden, true);
 });
+
+test("a light listed in a group opens its extra actions on request and stays open across updates", (t) => {
+  const group = { ...device("lightGroup", { brightnessSet: point("brightnessSet", 50) }), key: "ES/GRP", label: "Grupa hodnik" };
+  const member = { ...device("light", { brightnessSet: point("brightnessSet", 20, { id: "01/ES/L1/Values/LtPct" }) }), key: "ES/L1", label: "Svjetlo 1" };
+  const { container, update } = setup(t, [group, member], async () => {});
+  const settings = { deviceSettings: [{ key: group.key, lightMembers: [member.key] }] };
+  update(undefined, undefined, settings);
+  const row = byClass(container, "dc-group-member-list")[0].children[0];
+  const expand = byClass(row, "dc-member-expand")[0];
+  assert.ok(expand, "the listed light has no control for its extra actions");
+  const isOpen = () => row.className.split(" ").includes("dc-member-open");
+  assert.equal(isOpen(), false);
+  assert.equal(expand.attributes["aria-expanded"], "false");
+  assert.equal(expand.attributes["aria-label"], "Više o uređaju Svjetlo 1");
+
+  expand.dispatch("click");
+  assert.equal(isOpen(), true);
+  assert.equal(expand.attributes["aria-expanded"], "true");
+
+  // New readings must not close what the user opened.
+  update([group, { ...member, roles: { brightnessSet: point("brightnessSet", 45, { id: "01/ES/L1/Values/LtPct" }) } }], undefined, settings);
+  assert.equal(isOpen(), true);
+  assert.equal(expand.attributes["aria-expanded"], "true");
+
+  expand.dispatch("click");
+  assert.equal(isOpen(), false);
+  assert.equal(expand.attributes["aria-expanded"], "false");
+});

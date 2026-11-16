@@ -167,8 +167,40 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-group-members { border-top: 1px solid #edf1ee; margin-top: 19px; padding-top: 12px; }
 .dc-group-members[hidden] { display: none; }
 .dc-group-members > summary { width: max-content; max-width: 100%; color: #365e52; font-size: .74rem; font-weight: 650; cursor: pointer; }
-.dc-group-member-list { display: grid; gap: 12px; padding-top: 12px; }
-.dc-group-member-list > .dc-card { margin: 0; box-shadow: none; border: 1px solid #e3ebe7; }
+.dc-member-expand { display: none; }
+/* A light listed in a group is the same card laid out as a compact row: name,
+   reading and switch on one line, the slider below. Warnings and command
+   status stay visible; the room, refresh, settings and details wait behind
+   the chevron. */
+.dc-group-member-list { padding-top: 8px; }
+.device-cards-section .dc-group-member-list > .dc-card.card-panel { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; margin: 0; padding: 9px 4px; border: 0; border-top: 1px solid #edf1ee; border-radius: 0; background: transparent; box-shadow: none; }
+.device-cards-section .dc-group-member-list > .dc-card.card-panel.dc-card-selected { background: #f4faf7; box-shadow: inset 3px 0 #008577; }
+.dc-group-member-list > .dc-card > :is(.dc-card-top, .dc-card-body) { display: contents; }
+:where(.dc-group-member-list > .dc-card) > *, :where(.dc-group-member-list > .dc-card > :is(.dc-card-top, .dc-card-body)) > * { flex: 0 0 100%; min-width: 0; order: 9; }
+.dc-group-member-list > .dc-card :is(.dc-device-icon, .dc-type-label, .dc-room, .dc-card-actions, .dc-details, .dc-toggle-label, .dc-control-heading) { display: none; }
+.dc-group-member-list > .dc-card .dc-metric-main .dc-metric-label { display: none; }
+.dc-group-member-list > .dc-card .dc-metric:not(.dc-metric-main) { display: none; margin-top: 6px; }
+.dc-group-member-list > .dc-card .dc-metric:not(.dc-metric-main) .dc-metric-value { font-size: .78rem; }
+.dc-group-member-list > .dc-card .dc-card-selection { flex: 0 0 auto; order: 0; padding: 0 0 0 4px; }
+.dc-group-member-list > .dc-card .dc-card-selection > span { display: none; }
+.device-cards-section .dc-group-member-list > .dc-card .dc-member-expand { display: grid; place-items: center; flex: 0 0 26px; order: 1; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #647771; cursor: pointer; }
+.dc-member-expand svg { display: block; width: 16px; height: 16px; transition: transform .2s ease; }
+.dc-member-open > .dc-card-top > .dc-member-expand svg { transform: rotate(90deg); }
+.dc-group-member-list > .dc-card .dc-identity { flex: 1 1 0; order: 2; }
+.device-cards-section .dc-group-member-list > .dc-card .dc-card-title { font-size: .82rem; font-weight: 650; line-height: 1.35; letter-spacing: 0; }
+.dc-group-member-list > .dc-card .dc-metric-main { flex: 0 0 auto; order: 3; }
+.device-cards-section .dc-group-member-list > .dc-card .dc-metric-main .dc-metric-value { font-size: .8rem; line-height: 1.4; font-weight: 650; letter-spacing: 0; }
+.device-cards-section .dc-group-member-list > .dc-card .dc-toggle { flex: 0 0 auto; order: 4; width: auto; padding: 4px; border-radius: 999px; background: transparent; }
+.dc-group-member-list > .dc-card .dc-control { order: 5; }
+.device-cards-section .dc-group-member-list > .dc-card .dc-range { margin: 9px 0 5px; }
+.dc-group-member-list > .dc-card .dc-state-line { order: 6; margin-top: 6px; }
+.dc-group-member-list > .dc-card .dc-state-line[hidden] { display: none; }
+.dc-group-member-list > .dc-card .dc-command-status { order: 7; margin-top: 8px; padding: 8px 10px; }
+.dc-group-member-list > .dc-card .dc-refresh-status { order: 8; }
+.dc-group-member-list > .dc-card.dc-member-open :is(.dc-room, .dc-details) { display: block; }
+.dc-group-member-list > .dc-card.dc-member-open .dc-metric:not(.dc-metric-main) { display: flex; }
+.dc-group-member-list > .dc-card.dc-member-open .dc-card-actions { display: flex; order: 10; margin-top: 8px; }
+.dc-group-member-list > .dc-card .dc-details { order: 11; margin-top: 8px; padding-top: 8px; }
 .dc-group-members > summary:focus-visible { outline: 2px solid var(--dc-accent); outline-offset: 4px; }
 .dc-detail-reason, .dc-detail-room-source { font-size: .69rem; line-height: 1.6; color: #7b8d82; margin: 4px 0 10px; }
 .dc-detail-heading { font-size: .7rem; font-weight: 700; margin: 17px 0 9px; color: #4a6656; }

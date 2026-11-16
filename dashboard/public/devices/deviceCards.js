@@ -10,6 +10,7 @@
     generic: ["M5 5h14v14H5zM9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"],
     settings: ["M10 3h4l.5 2.2 1.5.9 2.2-.6 2 3.5-1.7 1.6v1.8l1.7 1.6-2 3.5-2.2-.6-1.5.9-.5 2.2h-4l-.5-2.2-1.5-.9-2.2.6-2-3.5 1.7-1.6v-1.8L3.8 9l2-3.5 2.2.6 1.5-.9L10 3Z", "M15 11.7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"],
     refresh: ["M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5", "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5"],
+    chevron: ["m9 6 6 6-6 6"],
   };
   const roleLabels = {
     brightnessSet: "Zadana svjetlina", brightnessStatus: "Očitana svjetlina",
@@ -588,7 +589,18 @@
       const cardActions = el("div", "dc-card-actions");
       cardActions.append(refresh, settings);
       const type = el("span", "dc-type-label", typeLabels[initial.type] || "Uređaj");
-      top.append(deviceIcon, identity, cardActions, type);
+      // Shown only while the card is a row inside a light group, where it
+      // opens the room, refresh, settings and details (see deviceCards.css).
+      let memberOpen = false;
+      const expand = el("button", "dc-member-expand");
+      expand.type = "button";
+      expand.append(icon("chevron"));
+      const syncMemberOpen = () => {
+        node.classList.toggle("dc-member-open", memberOpen);
+        expand.setAttribute("aria-expanded", String(memberOpen));
+      };
+      expand.addEventListener("click", () => { memberOpen = !memberOpen; syncMemberOpen(); });
+      top.append(expand, deviceIcon, identity, cardActions, type);
       const body = el("div", "dc-card-body");
       const states = el("div", "dc-state-line");
       const details = el("details", "dc-details");
@@ -956,6 +968,9 @@
           deviceIcon.replaceChildren(icon(device.type));
           type.textContent = typeLabels[device.type] || "Uređaj";
         }
+        syncMemberOpen();
+        expand.setAttribute("aria-label", `Više o uređaju ${device.label}`);
+        expand.title = `Više o uređaju ${device.label}`;
         title.textContent = device.label;
         checkbox.setAttribute("aria-label", `Odaberi uređaj ${device.label} · ${device.key}`);
         settings.hidden = !settingsEnabled || typeof onSettings !== "function";
