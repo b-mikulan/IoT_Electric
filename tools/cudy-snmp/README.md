@@ -1,5 +1,64 @@
 # Cudy SNMP MAC probe
 
+## Citanje MAC tablice preko weba (GS1016E)
+
+Za switch koji prikazuje MAC tablicu na webu, ali je ne izlaze preko SNMP-a:
+
+```powershell
+python tools/cudy-snmp/web_mac_table.py
+```
+
+Potreban je Python 3.10+; ova skripta nema dodatnih biblioteka za instalirati.
+Na pocetku pita **URL** (Enter za `http://10.110.3.241`) i **web lozinku**
+(skriven unos). Prihvaca i samu IP adresu ili URL s `homepage.html`.
+Korisnik je `admin`, kao u snimljenoj web prijavi. SNMP community ovdje se ne koristi.
+Racunalo mora imati pristup switchu, primjerice preko postojeceg ZeroTier VPN-a.
+
+Skripta se prijavi, procita sve stranice **Dynamic MAC Address Table** i ispise
+VLAN, MAC, fizicki port, aging vrijednost i broj redaka po portu. Lozinku i cookie
+drzi u memoriji; ne zapisuje ih ni HAR. Ne mijenja postavke switcha i ne cita
+Excel datoteke. Ovo je jednokratni probni dohvat, bez alarma i periodickog pracenja.
+Kod HTTP URL-a prijava koristi HTTP, kao snimljeno web sucelje; za udaljeni
+pristup koristi postojecu VPN vezu. HTTPS provjera certifikata ostaje ukljucena.
+
+Implementacija prati snimljeni GS1016E protokol:
+
+- `POST /logon.cgi`: `username=admin`, uneseni `password`, `logon=Login`.
+  Provjerava `allow=1` i session cookie, zatim otvara `homepage.html`.
+- `GET /security_Maccfg.html`: cita broj portova i velicinu stranice/batcha.
+- `GET /freshdynamicmac.cgi?firstreq=1&times=4`: pocetak citanja;
+  sljedece stranice koriste `firstreq=0`. `times` se racuna iz postavki stranice.
+- `GET /dynamicmacentry.xml`: cita tekstualne batch odgovore do kraja stranice.
+  Stanja 5 i 7 oznacavaju kraj cijele tablice, ukljucujuci odgovor s nula redaka.
+- Dinamicka tablica koristi bit **n** za port **n**: `0x8` je port 3,
+  `0x10000` je port 16. Aktivni trunkovi zasad nisu podrzani; skripta prijavi
+  gresku umjesto pretpostavljanja fizickog porta.
+
+Stanje 128 bilo je prolazno u HAR-u, ali njegovo znacenje nije potvrdeno;
+skripta upozori i nastavi cekati unutar roka od 30 sekundi po stranici.
+Mrezna greska, istek prijave, ponovljeni VLAN/MAC, nepoznati format ili limit
+stranica prekidaju citanje s greskom. Nepotpuni rezultati ne prikazuju se kao
+uspjesno procitana tablica. Ne ponavlja automatski neuspjeli HTTP zahtjev jer
+bi server vec mogao pomaknuti pokazivac na sljedeci batch.
+
+Tijekom probe nemoj istovremeno osvjezavati MAC tablicu u browseru ili pokretati
+drugu instancu za isti switch: ne znamo je li serverski pokazivac zajednicki.
+Tablica se moze mijenjati tijekom citanja; ovo nije atomarna snimka niti popis
+svih trajno spojenih uredjaja. Na uplinku se moze vidjeti mnogo udaljenih MAC-ova.
+Drugaciji firmware moze zahtijevati prilagodbu web protokola.
+
+Opcije: `--timeout 5` (HTTP zahtjev) i `--max-pages 128` (sigurnosni limit).
+Exit code: 0 = potvrden kraj tablice (moze biti prazna), 1 = greska/nepotpun
+dohvat, 2 = neispravni CLI argumenti, 130 = korisnik prekinuo unos ili citanje.
+
+Offline testovi s izmisljenim podacima, bez switcha i stvarnih lozinki:
+
+```powershell
+python -m unittest discover -s tools/cudy-snmp -p test_web_mac_table.py -v
+```
+
+## Citanje preko SNMP-a
+
 Jednokratno, read-only ocitanje MAC tablica. Ne mijenja switch, ne salje alarme i ne cita Excel datoteke.
 
 Iz korijena repozitorija:
