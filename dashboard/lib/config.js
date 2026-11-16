@@ -221,6 +221,8 @@ function loadConfig(env = process.env, { rawWidgets = readWidgetConfiguration(en
     widgetsFile,
     deviceWidgetsFile,
     deviceMetadataFile,
+    // Hop count (such as 1) or address list of the reverse proxy in front, if any.
+    trustProxy: String(env.TRUST_PROXY || "").trim(),
   };
   config.dashboardSettingsFile = settingsFile(config);
   if (config.dashboardSettingsFile && [widgetsFile, deviceWidgetsFile, deviceMetadataFile].some(file => file && path.resolve(file).toLowerCase() === path.resolve(config.dashboardSettingsFile).toLowerCase())) {

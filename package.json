@@ -14,7 +14,7 @@
     "start": "node middleware/server.js",
     "test": "npm run test:middleware && npm run test:tools && npm run test:dashboard",
     "test:dashboard": "npm test --prefix dashboard",
-    "test:middleware": "node --test test/middlewareAuth.test.js test/routes.test.js test/containerItems.test.js",
+    "test:middleware": "node --test test/middlewareAuth.test.js test/routes.test.js test/containerItems.test.js test/ewsClient.test.js",
     "test:tools": "node --test test/knxExtractor.test.js test/stackSetup.test.js test/widgetGroupingPreview.test.js test/buildingCatalog.test.js"
   },
   "dependencies": {
@@ -24,7 +24,6 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "adm-zip": "^0.6.0",
-    "soap": "^1.9.3"
+    "adm-zip": "^0.6.0"
   }
 }

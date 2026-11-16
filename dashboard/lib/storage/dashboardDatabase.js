@@ -114,6 +114,8 @@ class DashboardDatabase {
       const id = randomUUID();
       const previous = { ...this.readConfiguration(), dashboardSettings: previousSettings };
       this.#db.prepare("INSERT INTO dashboard_backups VALUES (?, ?, ?)").run(id, new Date().toISOString(), JSON.stringify(previous));
+      // Each backup is a full configuration copy; keep the newest ten.
+      this.#db.exec("DELETE FROM dashboard_backups WHERE id NOT IN (SELECT id FROM dashboard_backups ORDER BY created_at DESC, rowid DESC LIMIT 10)");
       this.saveConfiguration(configuration);
       return id;
     });

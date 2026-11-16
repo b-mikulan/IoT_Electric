@@ -1,3 +1,5 @@
+const { middlewareRequest } = require("../middlewareClient");
+
 const asArray = (value) => value == null || value === "" ? [] : Array.isArray(value) ? value : [value];
 
 function failure(message, status = 502, code = "TELEMETRY_FAILED") {
@@ -88,27 +90,20 @@ class TelemetryClient {
   async request(endpoint, body) {
     const { middlewareUrl, username, password, timeoutMs } = this.config;
     try {
-      const response = await this.fetch(`${middlewareUrl.replace(/\/+$/, "")}${endpoint}`, {
-        method: body === undefined ? "GET" : "POST",
-        headers: {
-          Accept: "application/json", "Content-Type": "application/json",
-          Authorization: `Basic ${Buffer.from(`${username}:${password}`, "utf8").toString("base64")}`,
-        },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        signal: AbortSignal.timeout(timeoutMs || 10000),
-      });
-      const payload = await response.json();
+      const { ok, status, payload } = await middlewareRequest({
+        fetchImpl: this.fetch, middlewareUrl: middlewareUrl.replace(/\/+$/, ""), username, password, timeoutMs: timeoutMs || 10000,
+      }, endpoint, body);
       // Also recognize faults from older middleware deployments that returned HTTP 200.
       if (payload?.soapFault) {
         const reason = String(payload.soapFault.reason || "EWS greška.");
         throw failure(`Kontroler je odbio zahtjev: ${reason}`);
       }
-      if (!response.ok) throw failure(`Middleware je odbio dohvat (${response.status}).`);
+      if (!ok) throw failure(`Middleware je odbio dohvat (${status}).`);
       if (payload?.error) throw failure("Middleware je prijavio grešku pri dohvatu.");
       return payload;
     } catch (error) {
       if (error.code === "TELEMETRY_FAILED") throw error;
-      if (error.name === "TimeoutError" || error.name === "AbortError") {
+      if (error.timedOut || error.name === "TimeoutError" || error.name === "AbortError") {
         throw failure("Isteklo je vrijeme za dohvat. Pokušaj ponovno.", 504, "TELEMETRY_TIMEOUT");
       }
       throw failure("Dohvat preko middlewarea nije uspio.");
