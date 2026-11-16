@@ -146,6 +146,8 @@ function createApp({
   });
   poller.setWriteRefreshResolver?.(id => resolveRefreshScope(config.widgets, refreshModelOptions(), id, config.afterWriteScope));
   app.disable("x-powered-by");
+  // Without this, everyone behind a reverse proxy shares one login-throttle address.
+  if (config.trustProxy) app.set("trust proxy", /^d+$/.test(config.trustProxy) ? Number(config.trustProxy) : config.trustProxy);
   if (dashboardAuth) app.use(dashboardAuth.router);
 
   function currentRoomIndex(metadata = demo || deviceMetadata.groupingMetadata?.()) {

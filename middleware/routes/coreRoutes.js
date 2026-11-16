@@ -17,17 +17,9 @@ function queryBoolean(value, name, fallback) {
 function createCoreRouter(ews) {
   const router = express.Router();
 
-  router.get("/info", async (req, res) => {
-    try {
-      const info = await ews.getWebServiceInformation();
-      res.json(info);
-    } catch (error) {
-      res.status(500).json({
-        error: error.message,
-        body: error.body || null,
-      });
-    }
-  });
+  router.get("/info", asyncRoute(async (req, res) => {
+    res.json(await ews.getWebServiceInformation());
+  }));
 
   router.get("/containers", asyncRoute(async (req, res) => {
     const id = queryString(req.query.id, "id");

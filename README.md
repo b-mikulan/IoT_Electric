@@ -50,6 +50,8 @@ If a later page fails, the middleware returns the collected items with an error 
 
 `EWS_CONTAINER_TIMEOUT_MS` sets the total controller-read budget, including authentication and every page (default 8000 ms). Keep the dashboard's `DASHBOARD_MIDDLEWARE_TIMEOUT_MS` comfortably above it (default 10000 ms). The deadline aborts the controller fetch and returns any already collected pages. For larger installations, use individual pages or increase both budgets together.
 
+`EWS_REQUEST_TIMEOUT_MS` limits every other controller call, including writes (default 30000 ms). The middleware also stops a controller call as soon as the REST client that asked for it disconnects or times out, so a request the dashboard already gave up on does not keep waiting on the controller. A write that was cut off this way may or may not have reached the controller; check the actual state. Known issues that were deliberately left open are listed in [docs/known-issues.md](docs/known-issues.md).
+
 ## Repository layout
 
 For a large-building inventory independent of the dashboard, use the [offline topology mapper](tools/ews-topology/README.md). It saves every EWS page to a resumable checkpoint and exports JSON/CSV for inspection and the existing widget grouping preview.
@@ -65,7 +67,6 @@ Import its checkpoint into the [SQLite building catalog](tools/building-catalog/
 ├── scripts/                     # Repository maintenance helpers
 ├── tools/
 │   ├── building-catalog/        # Offline catalog import and search CLI
-│   ├── ews-sandbox/             # Manual EWS experiments; not used by the application
 │   ├── ews-topology/            # Resumable Python topology mapper with JSON/CSV exports
 │   ├── gpa-translator/           # Gira project name/status translator and review UI
 │   └── knx-extractor/            # KNX project extraction utility and legacy fixtures
@@ -169,6 +170,6 @@ Middleware password verification uses asynchronous scrypt. Each middleware proce
 
 Successfully verified credentials are remembered for five minutes as a keyed fingerprint, so routine dashboard polling avoids repeated password derivation and can continue during throttling. No plaintext password is stored in this cache. The configured account/hash stays fixed for the process lifetime; restart the middleware after rotating credentials. The limits and cache are process-local, so multiple replicas have separate budgets. Health and Swagger pages remain outside authentication limits. Behind a reverse proxy, clients share its socket address unless trusted-proxy handling is explicitly configured; do not blindly trust incoming `X-Forwarded-For` headers.
 
-The current Compose configuration is intended for an isolated test server. Use HTTPS for both services in production and set `DASHBOARD_SECURE_COOKIES=true` for the dashboard.
+The current Compose configuration is intended for an isolated test server. Use HTTPS for both services in production and set `DASHBOARD_SECURE_COOKIES=true` for the dashboard. Behind a reverse proxy also set `DASHBOARD_TRUST_PROXY` (and `MIDDLEWARE_TRUST_PROXY` if the middleware is proxied) to the number of proxy hops, usually `1`; otherwise all clients share the proxy's address and one person's failed logins throttle everyone.
 
 The middleware image installs the project CA certificate from `middleware/root_certificate_iotelectric.crt`. Replace it when the target controller uses a different CA. If no private CA is needed, remove the certificate `COPY`, `update-ca-certificates`, and `NODE_EXTRA_CA_CERTS` lines from the Dockerfile together.

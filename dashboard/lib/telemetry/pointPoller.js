@@ -1,6 +1,7 @@
 const { EventEmitter } = require("node:events");
 const { isDeepStrictEqual } = require("node:util");
 const { widgetGroup } = require("../config");
+const { middlewareRequest } = require("../middlewareClient");
 
 const NO_VALUE_ERROR = "No value returned by middleware";
 
@@ -689,38 +690,16 @@ class PointPoller extends EventEmitter {
 
     const refreshGeneration = this.#writeRefreshGeneration;
     this.#writesInFlight.add(pointId);
-    const authorization = Buffer.from(
-      `${this.#username}:${this.#password}`,
-      "utf8"
-    ).toString("base64");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
-
     try {
-      const response = await this.#fetch(
-        `${this.#middlewareUrl}/api/values/write`,
-        {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            Authorization: `Basic ${authorization}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ items: [{ id: pointId, value }] }),
-          signal: controller.signal,
-        }
-      );
-
-      if (!response || !response.ok) {
-        const status = response?.status ? ` (${response.status})` : "";
+      const { ok, status, payload } = await this.#request("/api/values/write", { items: [{ id: pointId, value }] });
+      if (!ok) {
         throw new PointWriteError(
-          `Middleware rejected the write request${status}.`,
+          `Middleware rejected the write request${status ? ` (${status})` : ""}.`,
           502,
           "MIDDLEWARE_WRITE_FAILED"
         );
       }
 
-      const payload = await response.json();
       const result = Array.isArray(payload?.results)
         ? payload.results.find((item) => item?.id === pointId)
         : null;
@@ -763,7 +742,7 @@ class PointPoller extends EventEmitter {
     } catch (error) {
       if (error instanceof PointWriteError) throw error;
 
-      if (controller.signal.aborted) {
+      if (error?.timedOut) {
         throw new PointWriteError(
           "Middleware write timed out. Check the current value before trying again.",
           504,
@@ -777,7 +756,6 @@ class PointPoller extends EventEmitter {
         "MIDDLEWARE_WRITE_FAILED"
       );
     } finally {
-      clearTimeout(timeout);
       this.#writesInFlight.delete(pointId);
     }
   }
@@ -870,37 +848,27 @@ class PointPoller extends EventEmitter {
     });
   }
 
+  #request(endpoint, body) {
+    return middlewareRequest({
+      fetchImpl: this.#fetch, middlewareUrl: this.#middlewareUrl, username: this.#username,
+      password: this.#password, timeoutMs: this.#timeoutMs,
+    }, endpoint, body);
+  }
+
   async #fetchContainer(containerId) {
-    const authorization = Buffer.from(
-      `${this.#username}:${this.#password}`,
-      "utf8"
-    ).toString("base64");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
-
     try {
-      const url = new URL(`${this.#middlewareUrl}/api/containers`);
-      url.searchParams.set("id", containerId);
-      const response = await this.#fetch(url, {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Basic ${authorization}`,
-        },
-        signal: controller.signal,
-      });
-
-      if (!response || !response.ok) {
+      const { ok, status, payload } = await this.#request(`/api/containers?id=${encodeURIComponent(containerId)}`);
+      if (!ok) {
         throw new PointDiscoveryError(
-          `Middleware rejected the discovery request${response?.status ? ` (${response.status})` : ""}.`,
+          `Middleware rejected the discovery request${status ? ` (${status})` : ""}.`,
           502,
           "MIDDLEWARE_DISCOVERY_FAILED"
         );
       }
-
-      return await response.json();
+      return payload;
     } catch (error) {
       if (error instanceof PointDiscoveryError) throw error;
-      if (controller.signal.aborted) {
+      if (error?.timedOut) {
         throw new PointDiscoveryError(
           "Object discovery timed out.",
           504,
@@ -912,8 +880,6 @@ class PointPoller extends EventEmitter {
         502,
         "MIDDLEWARE_DISCOVERY_FAILED"
       );
-    } finally {
-      clearTimeout(timeout);
     }
   }
 
@@ -1064,46 +1030,19 @@ class PointPoller extends EventEmitter {
   }
 
   async #fetchPointBatch(ids) {
-    const authorization = Buffer.from(
-      `${this.#username}:${this.#password}`,
-      "utf8"
-    ).toString("base64");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
-    // Keep the timeout referenced so its abort can fire while poll() is pending.
-    let payload;
-
+    let result;
     try {
-      const response = await this.#fetch(
-        `${this.#middlewareUrl}/api/values/read`,
-        {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            Authorization: `Basic ${authorization}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ ids }),
-          signal: controller.signal,
-        }
-      );
-
-      if (!response || !response.ok) {
-        const status = response && response.status ? ` ${response.status}` : "";
-        throw new Error(`Middleware request failed${status}`);
-      }
-
-      payload = await response.json();
+      result = await this.#request("/api/values/read", { ids });
     } catch (error) {
-      if (controller.signal.aborted) {
+      if (error?.timedOut) {
         throw new Error(
           `Middleware request timed out after ${this.#timeoutMs} ms`
         );
       }
       throw error;
-    } finally {
-      clearTimeout(timeout);
     }
+    if (!result.ok) throw new Error(`Middleware request failed${result.status ? ` ${result.status}` : ""}`);
+    const { payload } = result;
 
     const values = payload && Array.isArray(payload.values) ? payload.values : [];
     const errors = payload && Array.isArray(payload.errors) ? payload.errors : [];

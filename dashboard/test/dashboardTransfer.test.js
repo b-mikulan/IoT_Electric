@@ -313,3 +313,13 @@ test("replacing a dashboard during a pending read discards old values and errors
   assert.equal(updates[0].widgets[0].id, point);
   poller.stop();
 });
+
+test("only the ten newest import backups are kept", (t) => {
+  const { DashboardDatabase } = require("../lib/storage/dashboardDatabase");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-backups-"));
+  const database = new DashboardDatabase(path.join(directory, "dashboard.sqlite"));
+  t.after(() => { database.close(); fs.rmSync(directory, { recursive: true, force: true }); });
+  const configuration = { widgets: [], deviceWidgets: { version: 1, devices: [] }, metadata: null, dashboardSettings: null };
+  const ids = Array.from({ length: 12 }, () => database.replaceConfiguration(configuration, null));
+  assert.deepEqual(ids.map(id => Boolean(database.readBackup(id))), [false, false, ...Array(10).fill(true)]);
+});
