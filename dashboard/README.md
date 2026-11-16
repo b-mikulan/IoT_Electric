@@ -7,6 +7,7 @@ For end users, see the [Croatian dashboard user guide](../docs/korisnicke-upute-
 ## Source layout
 
 - `public/pages/` contains the HTML entry points. Frontend assets are grouped under `public/dashboard/`, `public/devices/`, `public/admin/`, `public/trends/`, `public/transfer/` and `public/shared/`.
+- `public/partials/` holds markup shared by `index.html` and `technical.html`: the dialogs and their item templates. A page pulls a partial in with a line such as `{{> dialogs appTheme}}`, and the server composes the page on each request (`lib/http/pageTemplates.js`). Edit a shared dialog in the partial, not in the pages. Inside a partial, `{{#appTheme}}…{{/appTheme}}` marks markup only for the page that loads `dashboardTheme.css`, and `{{^appTheme}}…{{/appTheme}}` marks markup for the page that does not.
 - `lib/auth/` handles accounts, sessions and room access. `lib/devices/` handles device commands, metadata and room organization.
 - `lib/telemetry/` handles polling, history and refresh scopes. `lib/storage/` holds SQLite, the configuration stores and import/export.
 - `lib/http/` serves the existing asset URLs and writes Server-Sent Events.
