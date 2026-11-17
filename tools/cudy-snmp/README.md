@@ -1,5 +1,63 @@
 # Cudy SNMP MAC probe
 
+## Vise switcheva iz CSV-a
+
+`web_mac_batch.py` redom cita dinamicke MAC tablice svih switcheva iz CSV-a.
+Koristi isti web protokol kao jednokratna skripta ispod, korisnika `admin` i
+Python standardnu biblioteku (Python 3.10+, bez dodatnih paketa).
+
+Napravi privatni CSV, primjerice `switches.local.csv`, s obaveznim stupcima
+`ip,password` i opcionalnim `name`. Predlozak je `switches.example.csv`:
+
+```csv
+ip,password,name
+10.110.3.241,REPLACE_WITH_WEB_PASSWORD,R1
+10.110.3.242,REPLACE_WITH_WEB_PASSWORD,R2
+```
+
+Zamijeni lozinke stvarnim **web lozinkama**. Prihvaca zarez i Excelov separator
+tocka-zarez te UTF-8 s BOM-om. Vrijednosti koje sadrze separator stavi u dvostruke
+navodnike; navodnik unutar vrijednosti zapisi dvaput. Lozinkama se cuvaju razmaci.
+`ip` moze biti IP adresa ili puni HTTP(S) URL. Prazni IP/lozinka, duplikati URL-a
+i neispravni retci prekidaju provjeru prije bilo kojeg mreznog zahtjeva.
+
+```powershell
+python tools/cudy-snmp/web_mac_batch.py "C:\Users\bruno\Desktop\IoT_electric_sensitive\switches.local.csv"
+```
+
+Bez argumenta skripta pita za putanju CSV-a. Unutar `output/cudy-mac/` svaki se
+put stvara novi direktorij s UTC vremenom i jedinstvenom oznakom. Opcija
+`--output "D:\Cudy-results"` mijenja roditeljski direktorij rezultata.
+
+- `mac_table.csv`: zajednicka tablica sa switch_name, switch_url, vremenima
+  pocetka/zavrsetka u UTC-u, VLAN-om, MAC-om, portovima i aging_seconds.
+  Polje `ports` moze sadrzavati vise brojeva odvojenih zarezom.
+- `summary.csv`: redak za svaki pokusani switch, status `ok`, `error` ili
+  `interrupted`, broj MAC redaka i opis greske. Uspjesna prazna tablica ima
+  broj 0; neuspjelo citanje ima prazno polje broja MAC-ova.
+
+Rezultati se zapisuju nakon svakog uredjaja. Greska jednog switcha ne prekida
+ostale; retci nepotpuno procitane tablice ne ulaze u `mac_table.csv`.
+Ctrl+C sprema status trenutnog uredjaja i zaustavlja daljnje citanje; ranije
+procitani uredjaji ostaju zapisani. Status neobradjenih uredjaja nije upisan.
+Nestanak struje ili greska diska mogu ostaviti zadnji zapis nedovrsenim.
+
+CSV s lozinkama je citljiv tekst: drzi ga u privatnom direktoriju. Datoteke
+`*.local.csv` unutar ovog alata ignorira Git; predlozak sadrzi samo zamjenske
+lozinke. Rezultati ne sadrze lozinke ni session cookie. Ne pokreci vise citaca
+MAC tablice istog switcha istovremeno. Ogranicenja firmwarea i trunkova iz
+jednokratnog citaca vrijede i ovdje.
+
+Opcije `--timeout 5` i `--max-pages 128` vrijede za svaki uredjaj.
+Exit code: 0 = svi uredjaji uspjesno procitani; 1 = barem jedna greska;
+2 = neispravni CLI argumenti; 130 = korisnicki prekid.
+
+Offline testovi oba web citaca:
+
+```powershell
+python -m unittest discover -s tools/cudy-snmp -p "test_web_mac*.py" -v
+```
+
 ## Citanje MAC tablice preko weba (GS1016E)
 
 Za switch koji prikazuje MAC tablicu na webu, ali je ne izlaze preko SNMP-a:
