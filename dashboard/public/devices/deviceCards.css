@@ -88,6 +88,11 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-summary { font-size: .74rem; color: var(--dc-muted); margin: 16px 0; }
 .dc-read-warning { margin: 0 0 16px; padding: 10px 13px; border-radius: 10px; background: #f8f4e9; color: #826d3f; font-size: .73rem; line-height: 1.5; }
 .dc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 18px; }
+.dc-grid-heading { grid-column: 1 / -1; margin: 10px 0 -6px; color: var(--dc-ink); font-size: .95rem; font-weight: 700; line-height: 1.3; }
+.dc-grid-heading:first-child { margin-top: 0; }
+.dc-grid-heading-floor { margin-top: 22px; padding-bottom: 8px; border-bottom: 1px solid #dbe5e2; font-size: 1.15rem; }
+.dc-grid-heading-floor + .dc-grid-heading-room { margin-top: 0; }
+.dc-grid-heading-room { color: var(--dc-muted); font-size: .85rem; letter-spacing: .02em; }
 .dc-card { border: 1px solid #e1e9e6; border-radius: 22px; padding: 22px; background: #fff; box-shadow: 0 5px 20px rgba(24, 56, 48, .025); color: var(--dc-ink); min-width: 0; transition: box-shadow .15s, border-color .15s; }
 .dc-card:hover { box-shadow: 0 8px 26px rgba(24, 56, 48, .06); border-color: #cedbd5; }
 .dc-load-more { padding: 26px 0 10px; text-align: center; }

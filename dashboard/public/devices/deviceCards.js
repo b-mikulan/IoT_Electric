@@ -141,6 +141,7 @@
     let devicePositions = new Map();
     // Device keys in display order: floor, room, then kind of device.
     let displayOrder = [];
+    const headings = new Map();
     let savedSettings = [];
     let memberParents = new Map();
     let pageDevices = [];
@@ -389,6 +390,39 @@
       displayOrder = (typeof sort === "function" ? sort(devices, registeredFloors) : devices).map((device) => device.key);
     }
 
+    // A heading opens each floor and room in the shown slice, but only when
+    // the whole result spans more than one of them; a room continued after
+    // "Prikaži još uređaja" keeps its single heading. Devices without a room
+    // have no floor heading.
+    function headingFloorKey(device) { return device.room?.label ? device.room.floorId || "unknown" : null; }
+
+    function heading(key, className, text) {
+      let node = headings.get(key);
+      if (!node) { node = el("h3", `dc-grid-heading ${className}`); headings.set(key, node); }
+      if (node.textContent !== text) node.textContent = text;
+      return node;
+    }
+
+    function withHeadings(shown, page) {
+      const floorKeys = new Set(page.map(headingFloorKey).filter(Boolean));
+      const showFloors = floorKeys.size > 1;
+      const showRooms = new Set(page.map(roomKey)).size > 1;
+      const nodes = [];
+      let lastFloor, lastRoom;
+      for (const device of shown) {
+        const floorKey = headingFloorKey(device);
+        if (showFloors && floorKey && floorKey !== lastFloor) nodes.push(heading(`floor:${floorKey}`, "dc-grid-heading-floor", floorLabel(floorKey)));
+        lastFloor = floorKey;
+        const key = roomKey(device);
+        if (showRooms && key !== lastRoom) nodes.push(heading(key, "dc-grid-heading-room", device.room?.label || "Bez prostorije"));
+        lastRoom = key;
+        nodes.push(cards.get(device.key).node);
+      }
+      const used = new Set(nodes);
+      for (const node of headings.values()) if (!used.has(node)) node.remove();
+      return nodes;
+    }
+
     function applyFilter() {
       const query = searchText(search.value.trim());
       const signature = JSON.stringify([query, selectedFloor, selectedRoom, typeFilter.value]);
@@ -428,11 +462,14 @@
         card.setGroupNote(shown && parent && !(nested && filteredKeys.has(parent)) ? devicesByKey.get(parent) : null);
       }
       // Moving existing nodes preserves focused controls and their drafts.
-      // Only the requested slice belongs to the live grid.
-      for (let index = 0; index < shownDevices.length; index++) {
-        const card = cards.get(shownDevices[index].key);
-        if (grid.children[index] !== card.node) grid.insertBefore(card.node, grid.children[index] || null);
-        card.setMembers((members.get(card.device.key) || []).map((device) => cards.get(device.key).node));
+      // Only the requested slice, with its headings, belongs to the live grid.
+      const nodes = withHeadings(shownDevices, pageDevices);
+      for (let index = 0; index < nodes.length; index++) {
+        if (grid.children[index] !== nodes[index]) grid.insertBefore(nodes[index], grid.children[index] || null);
+      }
+      for (const device of shownDevices) {
+        const card = cards.get(device.key);
+        card.setMembers((members.get(card.device.key) || []).map((member) => cards.get(member.key).node));
       }
       loadMore.hidden = shownDevices.length >= pageDevices.length;
       loadCount.textContent = `Prikazano ${shownDevices.length} od ${pageDevices.length} uređaja`;
@@ -1103,7 +1140,7 @@
         selectedKeys.clear(); selectionMode = false; applyFilter();
         managementStatus.textContent = message; managementStatus.hidden = !message;
       },
-      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); selectedKeys.clear(); devices = []; displayOrder = []; deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
+      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); selectedKeys.clear(); devices = []; displayOrder = []; headings.clear(); deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
   }
 
   const api = { create };

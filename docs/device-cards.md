@@ -77,6 +77,8 @@ Administrator u **Postavke kartice** zone može dodati ili maknuti senzore. Spre
 
 Učitava se Description točne zonske putanje. Za uređaj se bira najduži odgovarajući predak iz poznatih zona. Prazni i placeholder opisi se odbacuju. Rasvjeta pod potvrđenim RP32/Z312 dobiva Kitchen. AC309 i B301 nemaju potvrđenu sobu. Isti kod Z312 na drugom kontroleru ne prenosi naziv sobe automatski.
 
+Kartice se uvijek slažu po katu (redom spremljenih katova; kat koji nije određen ide iza njih), zatim po prostoriji (abecedno, „2” prije „10”) i unutar prostorije po vrsti: pregled zone, grupa rasvjete, svjetlo, roleta, klima, senzor, ostalo. Uređaji bez prostorije idu na kraj. Kad prikaz obuhvaća više prostorija, ispred prve kartice svake prostorije stoji njezin naslov, a kad obuhvaća više katova i naslov kata. Kod jedne prostorije naslova nema. Očitanja ne pomiču kartice; redoslijed se mijenja tek kad se uređaju promijeni naziv, vrsta ili prostorija.
+
 ## 6. Stvarni upis
 
 Klik šalje `POST /api/devices/write` s punim `widgetId` i vrijednošću. Backend provjerava da točka postoji, da je vidljiva, da ima `writable:true`, da je izvorna `01` naredba i da vezanje nije dvosmisleno. Zatim radi novi `GetItems` s `metadata:true`, izvan cachea za prikaz: mora dobiti upravo traženi ID, izričit Writeable, valjano očitanje i State 0 (Good). Po potrebi učitava enum. Neuspjeh svježe provjere blokira upis.

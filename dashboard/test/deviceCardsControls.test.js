@@ -1015,3 +1015,75 @@ test("a room change delivered through updateValues moves the card, a value-only 
   view.updateValues({ widgets: [] });
   assert.deepEqual(gridCardKeys(container), ["ES/Z", "ES/C", "ES/L"]);
 });
+
+const twoFloors = [{ id: "f1", name: "1. kat" }, { id: "f2", name: "2. kat" }];
+const placed = (type, key, label, room) => ({ ...device(type, {}), key, label, room });
+const gridHeadings = (container) => byClass(byClass(container, "dc-grid")[0], "dc-grid-heading")
+  .map((node) => `${node.className.includes("dc-grid-heading-floor") ? "F" : "R"}:${node.textContent}`);
+const gridSequence = (container) => byClass(container, "dc-grid")[0].children
+  .map((node) => node.dataset.deviceKey || `${node.className.includes("dc-grid-heading-floor") ? "F" : "R"}:${node.textContent}`);
+
+test("a floor view heads each room before its cards", (t) => {
+  const devices = [
+    placed("climate", "ES/C10", "Klima", { id: "r10", label: "Ured 10", floorId: "f1" }),
+    placed("light", "ES/L2", "Svjetlo", { id: "r2", label: "Ured 2", floorId: "f1" }),
+    placed("zone", "ES/Z2", "Zona", { id: "r2", label: "Ured 2", floorId: "f1" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  selectFloor(container, "f1");
+  assert.deepEqual(gridSequence(container), ["R:Ured 2", "ES/Z2", "ES/L2", "R:Ured 10", "ES/C10"]);
+});
+
+test("all floors adds floor headings; one selected room shows none", (t) => {
+  const devices = [
+    placed("light", "ES/A", "A", { id: "r1", label: "Ured 1", floorId: "f1" }),
+    placed("light", "ES/B", "B", { id: "r2", label: "Hodnik", floorId: "f2" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridSequence(container), ["F:1. kat", "R:Ured 1", "ES/A", "F:2. kat", "R:Hodnik", "ES/B"]);
+  selectFloor(container, "f1");
+  byClass(container, "dc-room-filter").find((button) => button.dataset.room === "room:r1").dispatch("click");
+  assert.deepEqual(gridHeadings(container), []);
+  assert.deepEqual(gridSequence(container), ["ES/A"]);
+});
+
+test("a room split by load more keeps a single heading", (t) => {
+  const devices = [
+    ...Array.from({ length: 30 }, (_, index) => placed("light", `ES/L${index}`, `Svjetlo ${index}`, { id: "big", label: "Dvorana", floorId: "f1" })),
+    placed("light", "ES/X", "Svjetlo", { id: "small", label: "Ured", floorId: "f1" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridHeadings(container), ["R:Dvorana"]);
+  assert.equal(byClass(container, "dc-card").length, 24);
+  byClass(container, "dc-load-button")[0].dispatch("click");
+  assert.deepEqual(gridHeadings(container), ["R:Dvorana", "R:Ured"]);
+  assert.equal(byClass(container, "dc-card").length, 31);
+  assert.equal(byClass(container, "dc-load-count")[0].textContent, "Prikazano 31 od 31 uređaja");
+});
+
+test("devices without rooms produce no headings", (t) => {
+  const devices = ["A", "B", "C"].map((name) => placed("light", `ES/${name}`, name, undefined));
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridHeadings(container), []);
+  assert.deepEqual(gridSequence(container), ["ES/A", "ES/B", "ES/C"]);
+});
+
+test("two rooms with the same name get separate headings", (t) => {
+  const devices = [
+    placed("light", "ES/B1", "1", { id: "b", label: "Kuhinja", floorId: "f1" }),
+    placed("light", "ES/A1", "1", { id: "a", label: "Kuhinja", floorId: "f1" }),
+    placed("zone", "ES/A0", "0", { id: "a", label: "Kuhinja", floorId: "f1" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  selectFloor(container, "f1");
+  assert.deepEqual(gridSequence(container), ["R:Kuhinja", "ES/A0", "ES/A1", "R:Kuhinja", "ES/B1"]);
+});
+
+test("unassigned devices follow the rooms under their own heading", (t) => {
+  const devices = [
+    placed("light", "ES/N", "N", undefined),
+    placed("light", "ES/A", "A", { id: "r1", label: "Ured 1", floorId: "f1" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridSequence(container), ["R:Ured 1", "ES/A", "R:Bez prostorije", "ES/N"]);
+});
