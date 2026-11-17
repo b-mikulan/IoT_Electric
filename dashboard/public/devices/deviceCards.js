@@ -139,6 +139,8 @@
     let filterSignature = "";
     let deviceIndex = null;
     let devicePositions = new Map();
+    // Device keys in display order: floor, room, then kind of device.
+    let displayOrder = [];
     let savedSettings = [];
     let memberParents = new Map();
     let pageDevices = [];
@@ -380,11 +382,18 @@
       applyFilter();
     }
 
+    // Recomputed on a full update or when a label, type or room changes, so
+    // live readings never move a card.
+    function computeDisplayOrder() {
+      const sort = globalThis.IoTDeviceModel?.sortDevicesForDisplay;
+      displayOrder = (typeof sort === "function" ? sort(devices, registeredFloors) : devices).map((device) => device.key);
+    }
+
     function applyFilter() {
       const query = searchText(search.value.trim());
       const signature = JSON.stringify([query, selectedFloor, selectedRoom, typeFilter.value]);
       if (signature !== filterSignature) { filterSignature = signature; displayLimit = CARD_BATCH_SIZE; }
-      filteredDevices = devices.filter((device) => (selectedRoom === "all" || roomKey(device) === selectedRoom)
+      filteredDevices = displayOrder.map((key) => devicesByKey.get(key)).filter((device) => device && (selectedRoom === "all" || roomKey(device) === selectedRoom)
         && (selectedFloor === "all" || device.room && (device.room.floorId || "unknown") === selectedFloor)
         && (typeFilter.value === "all" || device.type === typeFilter.value) && searchIndex.get(device.key)?.includes(query));
       const count = filteredDevices.length;
@@ -1034,6 +1043,7 @@
       devices = Array.isArray(result) ? result : result?.devices || [];
       devicePositions = new Map(devices.map((device, index) => [device.key, index]));
       devicesByKey = new Map(devices.map((device) => [device.key, device]));
+      computeDisplayOrder();
       savedSettings = Array.isArray(deviceSettings) ? deviceSettings : [];
       memberParents = groupMembership();
       searchIndex = new Map(devices.map((device) => [device.key, searchText([device.label, device.key, device.context, roomCaption(device.room)].filter(Boolean).join(" "))]));
@@ -1082,7 +1092,7 @@
       }
       let updatedCards = 0;
       for (const key of dirty) if (updateCard(devicesByKey.get(key))) updatedCards++;
-      if (filtersChanged) { memberParents = groupMembership(); updateFilters(); applyFilter(); }
+      if (filtersChanged) { memberParents = groupMembership(); computeDisplayOrder(); updateFilters(); applyFilter(); }
       else if (connectionChanged) updateSummary();
       return { changedDevices: changed.length, updatedCards };
     }
@@ -1093,7 +1103,7 @@
         selectedKeys.clear(); selectionMode = false; applyFilter();
         managementStatus.textContent = message; managementStatus.hidden = !message;
       },
-      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); selectedKeys.clear(); devices = []; deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
+      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); selectedKeys.clear(); devices = []; displayOrder = []; deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
   }
 
   const api = { create };

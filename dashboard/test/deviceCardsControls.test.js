@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { create } = require("../public/devices/deviceCards");
-const { deviceMembership } = require("../public/devices/deviceModel");
+const { deviceMembership, sortDevicesForDisplay } = require("../public/devices/deviceModel");
 
 // A small DOM fixture keeps these interaction tests independent of a browser or controller.
 class Element {
@@ -51,7 +51,7 @@ function setup(t, initialDevices, onWrite, demo = false, initialReadAt, options 
   let readAt = initialReadAt;
   globalThis.document = { createElement: (tag) => new Element(tag), createElementNS: (_, tag) => new Element(tag), activeElement: null };
   // Devices are supplied ready-made; which card sits inside which is the real rule.
-  globalThis.IoTDeviceModel = options.model || { buildDevices: () => devices, deviceMembership };
+  globalThis.IoTDeviceModel = options.model || { buildDevices: () => devices, deviceMembership, sortDevicesForDisplay };
   const container = new Element("section");
   const view = create({ container, onWrite, onSettings: options.onSettings, onRooms: options.onRooms, onMove: options.onMove, onRefresh: options.onRefresh,
     readOnly: options.readOnly, controlDeviceKeys: options.controlDeviceKeys });
@@ -505,7 +505,8 @@ test("progressive cards mount 24 at a time and retain the loaded slice and fresh
   update(next);
   assert.equal(byClass(container, "dc-card").length, 48);
   assert.equal(byClass(container, "dc-card")[0], originalFirstCard);
-  assert.equal(byClass(byClass(container, "dc-card")[40], "dc-metric-value")[0].textContent, "99 °C");
+  // Cards follow room order: Kitchen (even sensors) first, so sensor 40 is the 21st card.
+  assert.equal(byClass(byClass(container, "dc-card")[20], "dc-metric-value")[0].textContent, "99 °C");
   more.dispatch("click");
   more.dispatch("click");
   assert.equal(byClass(container, "dc-card").length, 73);
@@ -544,7 +545,7 @@ test("bulk selection includes all filtered devices before scrolling and preserve
   search.dispatch("input");
   assert.equal(byClass(container, "dc-device-checkbox")[0].checked, true);
   byClass(container, "dc-move-selection")[0].dispatch("click");
-  assert.deepEqual(moves[0], devices.map((entry) => entry.key));
+  assert.deepEqual([...moves[0]].sort(), devices.map((entry) => entry.key).sort());
   update(devices.slice(1), undefined, { roomEditingEnabled: true });
   assert.equal(byClass(container, "dc-selection-count")[0].textContent, "Odabrano: 641");
 });
@@ -735,7 +736,7 @@ test("floor filtering combines with search, type, paging and selection across un
   update(devices, undefined, { roomEditingEnabled: true });
   assert.equal(byClass(container, "dc-card").length, 1);
   byClass(container, "dc-move-selection")[0].dispatch("click");
-  assert.deepEqual(moves, [devices.slice(0, 60).map(d => d.key)]);
+  assert.deepEqual(moves.map(keys => [...keys].sort()), [devices.slice(0, 60).map(d => d.key).sort()]);
 });
 
 test("incremental readings retain floor selection and button identity, and removed floors reset safely", t => {
@@ -981,4 +982,36 @@ test("a zone card lists its paired sensors, and a saved or emptied list replaces
   typeFilter.dispatch("change");
   assert.deepEqual(keys(grid), [first.key, second.key, loose.key]);
   assert.equal(byClass(grid.children[0], "dc-group-note")[0].textContent, "U zoni: Zona Z1");
+});
+
+const gridCardKeys = (container) => byClass(container, "dc-grid")[0].children.filter((node) => node.dataset.deviceKey).map((node) => node.dataset.deviceKey);
+const officeRoom = (id, label) => ({ id, label, floorId: "f1" });
+
+test("cards are ordered by room and type, and a repeated update keeps that order", (t) => {
+  const climate = { ...device("climate", {}), key: "ES/C", label: "Klima", room: officeRoom("r1", "Ured 1") };
+  const zone = { ...device("zone", {}), key: "ES/Z", label: "Zona", room: officeRoom("r1", "Ured 1") };
+  const other = { ...device("light", {}), key: "ES/L", label: "Svjetlo", room: officeRoom("r0", "Arhiva") };
+  const { container, update } = setup(t, [climate, zone, other], undefined, false, undefined, { floors: [{ id: "f1", name: "1. kat" }] });
+  assert.deepEqual(gridCardKeys(container), ["ES/L", "ES/Z", "ES/C"]);
+  update([{ ...climate }, zone, other]);
+  assert.deepEqual(gridCardKeys(container), ["ES/L", "ES/Z", "ES/C"]);
+});
+
+test("a room change delivered through updateValues moves the card, a value-only change moves nothing", (t) => {
+  const climate = { ...device("climate", {}), key: "ES/C", label: "Klima", room: officeRoom("r1", "Ured 1") };
+  const zone = { ...device("zone", {}), key: "ES/Z", label: "Zona", room: officeRoom("r1", "Ured 1") };
+  const other = { ...device("light", {}), key: "ES/L", label: "Svjetlo", room: officeRoom("r0", "Arhiva") };
+  let changed = [];
+  const model = {
+    createDeviceIndex: () => ({ getDevices: () => [climate, zone, other], updateValues: () => changed }),
+    deviceMembership, sortDevicesForDisplay,
+  };
+  const { container, view } = setup(t, [], undefined, false, undefined, { model, floors: [{ id: "f1", name: "1. kat" }] });
+  assert.deepEqual(gridCardKeys(container), ["ES/L", "ES/Z", "ES/C"]);
+  changed = [{ ...other, label: "Svjetlo" }];
+  view.updateValues({ widgets: [] });
+  assert.deepEqual(gridCardKeys(container), ["ES/L", "ES/Z", "ES/C"]);
+  changed = [{ ...other, room: officeRoom("r9", "Zzz") }];
+  view.updateValues({ widgets: [] });
+  assert.deepEqual(gridCardKeys(container), ["ES/Z", "ES/C", "ES/L"]);
 });
