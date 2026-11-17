@@ -392,8 +392,9 @@
 
     // A heading opens each floor and room in the shown slice, but only when
     // the whole result spans more than one of them; a room continued after
-    // "Prikaži još uređaja" keeps its single heading. Devices without a room
-    // have no floor heading.
+    // "Prikaži još uređaja" keeps its single heading. When floors are headed,
+    // devices without a room sit under their own floor-level "Bez prostorije"
+    // heading, matching the filter bar where it stands beside the floors.
     function headingFloorKey(device) { return device.room?.label ? device.room.floorId || "unknown" : null; }
 
     function heading(key, className, text) {
@@ -411,10 +412,15 @@
       let lastFloor, lastRoom;
       for (const device of shown) {
         const floorKey = headingFloorKey(device);
-        if (showFloors && floorKey && floorKey !== lastFloor) nodes.push(heading(`floor:${floorKey}`, "dc-grid-heading-floor", floorLabel(floorKey)));
-        lastFloor = floorKey;
         const key = roomKey(device);
-        if (showRooms && key !== lastRoom) nodes.push(heading(key, "dc-grid-heading-room", device.room?.label || "Bez prostorije"));
+        if (showFloors && !floorKey) {
+          if (lastFloor !== "unassigned") nodes.push(heading("floor:unassigned", "dc-grid-heading-floor", "Bez prostorije"));
+          lastFloor = "unassigned";
+        } else {
+          if (showFloors && floorKey !== lastFloor) nodes.push(heading(`floor:${floorKey}`, "dc-grid-heading-floor", floorLabel(floorKey)));
+          lastFloor = floorKey;
+          if (showRooms && key !== lastRoom) nodes.push(heading(key, "dc-grid-heading-room", device.room?.label || "Bez prostorije"));
+        }
         lastRoom = key;
         nodes.push(cards.get(device.key).node);
       }

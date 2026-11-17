@@ -1087,3 +1087,13 @@ test("unassigned devices follow the rooms under their own heading", (t) => {
   const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
   assert.deepEqual(gridSequence(container), ["R:Ured 1", "ES/A", "R:Bez prostorije", "ES/N"]);
 });
+
+test("across floors, unassigned devices get a floor-level heading of their own", (t) => {
+  const devices = [
+    placed("light", "ES/N", "N", undefined),
+    placed("light", "ES/A", "A", { id: "r1", label: "Ured 1", floorId: "f1" }),
+    placed("light", "ES/B", "B", { id: "r2", label: "Hodnik", floorId: "f2" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridSequence(container), ["F:1. kat", "R:Ured 1", "ES/A", "F:2. kat", "R:Hodnik", "ES/B", "F:Bez prostorije", "ES/N"]);
+});
