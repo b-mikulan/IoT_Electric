@@ -16,6 +16,7 @@ const { sendEvent, sendHeartbeat } = require("./lib/http/eventStream");
 const { createStaticAssets } = require("./lib/http/staticAssets");
 const { trackDashboardStream } = require("./lib/auth/dashboardAuth");
 const { createRoomIndex, scopeRooms } = require("./lib/auth/roomAccess");
+const { proposeOrganization, applyOrganizationSelection } = require("./lib/devices/organizationProposal");
 
 function publicWidget(widget) {
   const { id, label, description, unit, precision, writable, visible } = widget;
@@ -185,8 +186,17 @@ function createApp({
   if (dashboardAuth) {
     const { users, revoke, listSessions } = dashboardAuth;
     app.use("/api/admin", (request, response, next) => {
-      if (response.locals.dashboardSession?.role === "admin") return next();
-      return response.status(403).json({ code: "ADMIN_REQUIRED" });
+      if (response.locals.dashboardSession?.role !== "admin") return response.status(403).json({ code: "ADMIN_REQUIRED" });
+      // User grants affect organization previews. These routes precede the
+      // general configuration gate, so account operations participate here.
+      if (!request.path.startsWith("/organization")) {
+        if (transferBusy) return response.status(409).json({ error: "Promjena konfiguracije je u tijeku.", code: "TRANSFER_IN_PROGRESS" });
+        activeConfigurationRequests++;
+        let released = false;
+        const release = () => { if (!released) { released = true; activeConfigurationRequests--; } };
+        response.once("finish", release); response.once("close", release);
+      }
+      return next();
     });
     app.get("/api/admin/users", async (request, response) => {
       const metadata = await prepareRoomState();
@@ -349,6 +359,44 @@ function createApp({
   poller.on("removed", (payload) => broadcast("removed", payload));
 
   app.get("/api/dashboard-transfer/status", (request, response) => response.json({ enabled: dashboardTransfer.enabled && Boolean(widgetStore?.enabled), demoMode: config.demoMode }));
+  const organizationAdmin = (request, response, next) => {
+    if (response.locals.dashboardSession?.role !== "admin" || !response.locals.isSessionActive?.()) {
+      return response.status(403).json({ error: "Potreban je administratorski pristup.", code: "ADMIN_REQUIRED" });
+    }
+    return next();
+  };
+  app.post("/api/admin/organization/preview", organizationAdmin, requireJson, express.json({ limit: "8kb" }), (request, response) => {
+    try {
+      if (!dashboardTransfer.enabled || !deviceWidgetStore.enabled) throw new DeviceWidgetStoreError("Organizacija zahtijeva trajnu pohranu i stvarni način rada.", 409, "ORGANIZATION_UNAVAILABLE");
+      response.set("Cache-Control", "no-store");
+      return response.json(proposeOrganization(dashboardTransfer.current(), dashboardAuth.users.list(), request.body?.scope));
+    } catch (error) { return sendOperationError(response, error, "ORGANIZATION_PREVIEW_FAILED", "Prijedlog nije moguće pripremiti."); }
+  });
+  app.post("/api/admin/organization/apply", organizationAdmin, requireJson, express.json({ limit: "4mb" }), async (request, response) => {
+    // This request is counted by the configuration gate above. Keep the same
+    // global exclusion as imports, including reads that synchronize settings.
+    if (activeConfigurationRequests > 1 || clearingWidgets || autoDiscovery.state === "running") return response.status(409).json({ error: "Pričekaj završetak promjene konfiguracije ili otkrivanja pa pokušaj ponovno.", code: "WIDGET_OPERATION_IN_PROGRESS" });
+    if (!dashboardTransfer.enabled || !deviceWidgetStore.enabled) return response.status(409).json({ error: "Organizacija nije dostupna.", code: "ORGANIZATION_UNAVAILABLE" });
+    transferBusy = true;
+    try {
+      const result = await widgetStore.withExclusive(() => deviceWidgetStore.applyOrganization(document => {
+        if (!response.locals.isSessionActive()) throw new DeviceWidgetStoreError("Prijava je istekla.", 401, "LOGIN_REQUIRED");
+        const configuration = { ...dashboardTransfer.current(), deviceWidgets: document };
+        const planned = applyOrganizationSelection(configuration, dashboardAuth.users.list(), request.body);
+        return { ...planned, backup: { format: "iot-electric-dashboard", version: 2, exportedAt: new Date().toISOString(), ...configuration } };
+      }));
+      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
+      return response.json({ ...result, backupUrl: `/api/admin/organization/backups/${result.backupId}` });
+    } catch (error) { return sendOperationError(response, error, "ORGANIZATION_APPLY_FAILED", "Organizacija nije spremljena. Prethodne postavke su zadržane."); }
+    finally { transferBusy = false; }
+  });
+  app.get("/api/admin/organization/backups/:id", organizationAdmin, async (request, response) => {
+    try {
+      const backup = await deviceWidgetStore.organizationBackup(request.params.id);
+      response.set({ "Cache-Control": "no-store", "Content-Disposition": 'attachment; filename="dashboard-before-organization.json"' });
+      return response.json(backup);
+    } catch (error) { return sendOperationError(response, error, "ORGANIZATION_BACKUP_FAILED", "Sigurnosnu kopiju nije moguće preuzeti."); }
+  });
   app.get("/api/dashboard-transfer/export", (request, response) => {
     try {
       response.set({ "Cache-Control": "no-store", "Content-Disposition": 'attachment; filename="dashboard-backup.json"' });

@@ -13,6 +13,7 @@ function sendAdminPage(response) {
     <script defer src="/adminApi.js"></script>
     <script defer src="/adminUsers.js"></script>
     <script defer src="/adminSystem.js"></script>
+    <script defer src="/adminOrganization.js"></script>
   </head>
   <body class="admin-page">
     <a class="admin-skip" href="#users">Preskoči na upravljanje korisnicima</a>
@@ -42,6 +43,7 @@ function sendAdminPage(response) {
       <nav class="admin-section-nav" aria-label="Administracija">
         <a href="#users">Korisnici i prava</a>
         <a href="#system">Sustav i konfiguracija</a>
+        <a href="#organization">Organizacija zgrade</a>
       </nav>
       <noscript><p class="admin-warning">Za upravljanje korisnicima i postavkama potrebno je omogućiti JavaScript u pregledniku.</p></noscript>
 
@@ -127,6 +129,35 @@ function sendAdminPage(response) {
           <a id="admin-transfer-link" class="admin-card admin-shortcut" href="/transfer.html" hidden><span class="admin-shortcut-heading">Prijenos konfiguracije <span aria-hidden="true">↗</span></span><span>Izvoz, uvoz i sigurnosna kopija konfiguracije.</span><small>Korisnički računi nisu dio izvoza konfiguracije.</small></a>
           <a class="admin-card admin-shortcut" href="/trends.html"><span class="admin-shortcut-heading">Trendovi i alarmi <span aria-hidden="true">↗</span></span><span>Pregledaj povijest mjerenja, promjene i alarme.</span></a>
           <a class="admin-card admin-shortcut" href="/technical.html"><span class="admin-shortcut-heading">Tehnički prikaz <span aria-hidden="true">↗</span></span><span>Provjeri pojedinačne mjerne točke i njihove vrijednosti.</span></a>
+        </div>
+      </section>
+      <section id="organization" class="admin-section" aria-labelledby="admin-organization-title">
+        <div class="admin-section-heading"><div><h2 id="admin-organization-title">Organizacija zgrade</h2><p>Pregledaj prijedloge iz spremljenog kataloga i postavki.</p></div></div>
+        <div class="admin-card admin-system-card">
+          <p class="admin-hint">Obuhvaća konfigurirane, vidljive uređaje. Postojeće ručne dodjele i popisi članova imaju prednost. Katovi se preuzimaju iz odabrane prostorije.</p>
+          <button id="organization-preview" class="admin-button" type="button">Predloži organizaciju</button>
+          <fieldset id="organization-scope" hidden>
+            <legend>Dodjela grane u prostoriju (opcionalno)</legend>
+            <div class="admin-room-filters">
+              <div class="admin-field"><label for="organization-root">Grana / puna putanja uređaja</label><input id="organization-root" list="organization-branches" placeholder="Odaberi granu iz popisa" maxlength="4096"><datalist id="organization-branches"></datalist></div>
+              <div class="admin-field"><label for="organization-room">Ciljna prostorija</label><select id="organization-room"><option value="">Bez dodjele grane</option></select></div>
+            </div>
+            <p class="admin-hint">Odaberi granu i prostoriju pa ponovno pripremi prijedlog. Ručno dodijeljeni uređaji ostaju u svojim prostorijama. Nove prostorije možeš dodati u <a href="/#rooms">Prostorije i katovi</a>.</p>
+          </fieldset>
+          <p id="organization-status" class="admin-status" role="status" aria-live="polite"></p>
+          <div id="organization-result" hidden>
+            <p id="organization-summary" class="admin-hint"></p>
+            <p class="admin-warning">Premještanje može promijeniti tko vidi uređaj i tko njime upravlja. Moguća podgrupiranja zahtijevaju tvoju potvrdu; ista prostorija ne dokazuje stvarno članstvo u grupi.</p>
+            <div class="admin-actions"><button id="organization-select" class="admin-text-button" type="button">Odaberi pouzdane prijedloge bez promjene pristupa</button><button id="organization-clear" class="admin-text-button" type="button">Poništi odabir</button></div>
+            <label class="admin-label" for="organization-search">Pretraži prijedloge</label><input id="organization-search" type="search" placeholder="Uređaj, prostorija ili putanja">
+            <div id="organization-items" class="organization-items"></div>
+            <button id="organization-more" class="admin-button secondary" type="button" hidden>Prikaži još prijedloga</button>
+            <details id="organization-unresolved"><summary id="organization-unresolved-title">Potrebna provjera</summary><ul id="organization-unresolved-items"></ul></details>
+            <p id="organization-selected" class="admin-permission-summary"></p>
+            <label class="admin-checkbox"><input id="organization-confirm" type="checkbox"><span>Pregledao/la sam odabrane promjene i njihov utjecaj na pristup.</span></label>
+            <button id="organization-apply" class="admin-button" type="button" disabled>Primijeni odabrano</button>
+          </div>
+          <p id="organization-backup" class="admin-hint" hidden><a id="organization-backup-link">Preuzmi prethodnu konfiguraciju</a>. Za povrat je uvezi kroz <a href="/transfer.html">Prijenos konfiguracije</a>.</p>
         </div>
       </section>
       <footer class="admin-footer">IoT Electric · Administracija</footer>

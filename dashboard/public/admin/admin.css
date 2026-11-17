@@ -98,6 +98,14 @@
 .admin-shortcut-heading { display: flex; justify-content: space-between; gap: 14px; color: var(--brand-dark); font-size: .9rem; font-weight: 700; }
 .admin-shortcut small { font-size: .7rem; }
 .admin-footer { padding: 6px 0 28px; color: var(--muted); font-size: .75rem; text-align: center; }
+.admin-page #organization-scope { min-width: 0; margin: 20px 0; padding: 16px; border: 1px solid var(--border); border-radius: 10px; }
+.organization-items { display: grid; gap: 10px; margin-block: 14px; }
+.organization-item { min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: 10px; overflow-wrap: anywhere; }
+.organization-item p { margin: 8px 0; }
+.organization-item code { font-size: .72rem; white-space: normal; }
+.organization-item ul, #organization-unresolved-items { padding-left: 20px; font-size: .8rem; overflow-wrap: anywhere; }
+.organization-review { color: #855111; font-size: .76rem; font-weight: 650; }
+#organization-apply { margin-top: 14px; }
 .admin-skip { position: absolute; top: 8px; left: 8px; z-index: 2; transform: translateY(-150%); padding: 12px; background: #fff; color: var(--brand-dark); border: 1px solid var(--brand); border-radius: 8px; }
 .admin-skip:focus { transform: translateY(0); }
 @media (max-width: 950px) {

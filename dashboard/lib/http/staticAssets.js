@@ -12,7 +12,7 @@ const materializeDirectory = path.dirname(
 
 // Keep browser URLs independent of the source folders.
 const assetsByFolder = {
-  admin: ["admin.css", "adminApi.js", "adminUsers.js", "adminSystem.js"],
+  admin: ["admin.css", "adminApi.js", "adminUsers.js", "adminSystem.js", "adminOrganization.js"],
   dashboard: ["app.js", "dashboard.css"],
   devices: ["deviceCards.css", "deviceCards.js", "deviceModel.js", "widgetGrouping.js"],
   shared: ["dashboardSettings.css", "dashboardSettings.js", "dashboardTheme.css", "favicon.svg", "styles.css"],
