@@ -181,6 +181,8 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-group-member-list > .dc-card .dc-metric-main .dc-metric-label { display: none; }
 .dc-group-member-list > .dc-card .dc-metric:not(.dc-metric-main) { display: none; margin-top: 6px; }
 .dc-group-member-list > .dc-card .dc-metric:not(.dc-metric-main) .dc-metric-value { font-size: .78rem; }
+/* A sensor has no controls, so its other readings stay in the row. */
+.dc-group-member-list > .dc-card.dc-type-sensor .dc-metric:not(.dc-metric-main) { display: flex; }
 .dc-group-member-list > .dc-card .dc-card-selection { flex: 0 0 auto; order: 0; padding: 0 0 0 4px; }
 .dc-group-member-list > .dc-card .dc-card-selection > span { display: none; }
 .device-cards-section .dc-group-member-list > .dc-card .dc-member-expand { display: grid; place-items: center; flex: 0 0 26px; order: 1; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #647771; cursor: pointer; }

@@ -36,6 +36,8 @@ function scopeRooms(index, roomIds, writeRoomIds = []) {
       secondaryPointIds: device?.secondaryPointIds?.filter(ownPoint) ?? null,
       // Never reveal members outside the viewer's rooms, not even their count.
       ...(device?.lightMembers && { lightMembers: device.lightMembers.filter(member => devices.has(member)) }),
+      // An emptied sensor list stays a list: without one the zone would pair automatically.
+      ...(device?.sensorMembers && { sensorMembers: device.sensorMembers.filter(member => devices.has(member)) }),
     };
   });
   return {

@@ -339,15 +339,9 @@
     // membership, so live value updates never move a light out of its group.
     // shortcut: a light is shown in its first listed group only; the store
     // rejects a second group, revisit if multi-group membership is needed.
+    // Lights inside their group and sensors inside their zone: member key -> parent key.
     function groupMembership() {
-      const parents = new Map();
-      for (const entry of savedSettings) {
-        if (devicesByKey.get(entry?.key)?.type !== "lightGroup" || !Array.isArray(entry.lightMembers)) continue;
-        for (const member of entry.lightMembers) {
-          if (devicesByKey.get(member)?.type === "light" && !parents.has(member)) parents.set(member, entry.key);
-        }
-      }
-      return parents;
+      return globalThis.IoTDeviceModel?.deviceMembership?.(devices, savedSettings) || new Map();
     }
 
     function reconcileCommand(device) {
@@ -422,7 +416,7 @@
         card.checkbox.checked = selectedKeys.has(device.key);
         card.node.classList.toggle("dc-card-selected", selectedKeys.has(device.key));
         const parent = memberParents.get(device.key);
-        card.setGroupNote(shown && parent && !(nested && filteredKeys.has(parent)) ? devicesByKey.get(parent)?.label : "");
+        card.setGroupNote(shown && parent && !(nested && filteredKeys.has(parent)) ? devicesByKey.get(parent) : null);
       }
       // Moving existing nodes preserves focused controls and their drafts.
       // Only the requested slice belongs to the live grid.
@@ -564,9 +558,9 @@
       const groupNote = el("p", "dc-group-note");
       groupNote.hidden = true;
       identity.append(title, room, groupNote);
-      card.setGroupNote = (label) => {
-        groupNote.hidden = !label;
-        const text = label ? `U grupi: ${label}` : "";
+      card.setGroupNote = (parent) => {
+        groupNote.hidden = !parent;
+        const text = parent ? `${parent.type === "zone" ? "U zoni" : "U grupi"}: ${parent.label}` : "";
         if (groupNote.textContent !== text) groupNote.textContent = text;
       };
       const settings = el("button", "dc-settings-button");
@@ -619,7 +613,7 @@
       membersPanel.hidden = true;
       card.setMembers = (nodes) => {
         membersPanel.hidden = nodes.length === 0;
-        const text = `Svjetla u grupi (${nodes.length})`;
+        const text = `${card.device.type === "zone" ? "Senzori u zoni" : "Svjetla u grupi"} (${nodes.length})`;
         if (membersSummary.textContent !== text) membersSummary.textContent = text;
         for (let index = 0; index < nodes.length; index++) {
           if (membersList.children[index] !== nodes[index]) membersList.insertBefore(nodes[index], membersList.children[index] || null);

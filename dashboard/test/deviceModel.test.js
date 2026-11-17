@@ -489,3 +489,85 @@ test("primary display unit overrides affect only the display clone and retain au
   assert.equal(humidity.metrics.primary.unit, "%RH");
   assert.equal(humidity.roles.humidity.unit, "%RH");
 });
+
+const { automaticZoneMembers } = require("../public/devices/deviceModel");
+const zoneCard = (key, room) => ({ key, type: "zone", room: room ? { id: room, label: room } : null });
+const sensorCard = (key, room) => ({ key, type: "sensor", room: room ? { id: room, label: room } : null });
+const pairs = (devices) => Object.fromEntries(automaticZoneMembers(devices));
+
+test("a sensor joins the one zone card that carries its zone code on the same server", () => {
+  assert.deepEqual(pairs([
+    zoneCard("ES/Zones/Z1"),
+    sensorCard("ES/Net/IP Network/RP1/Application/Zones/Z1/Sensor A"),
+    sensorCard("ES/Net/IP Network/RP1/Application/Zones/Z1/Sensor B"),
+    sensorCard("ES/Net/IP Network/RP1/Application/Zones/Z2/Sensor C"),
+    sensorCard("OTHER/Net/IP Network/RP1/Application/Zones/Z1/Sensor D"),
+    sensorCard("ES/Net/IP Network/RP1/IO Resources/Bus/Module/Sensor E"),
+    { key: "ES/Net/IP Network/RP1/Application/Zones/Z1/Light", type: "light", room: null },
+  ]), {
+    "ES/Net/IP Network/RP1/Application/Zones/Z1/Sensor A": "ES/Zones/Z1",
+    "ES/Net/IP Network/RP1/Application/Zones/Z1/Sensor B": "ES/Zones/Z1",
+  });
+});
+
+test("a zone code shared by several zone cards pairs no sensor", () => {
+  assert.deepEqual(pairs([
+    zoneCard("ES/Zones/Z1"),
+    zoneCard("ES/Net/IP Network/RP1/Application/Zones/Z1"),
+    sensorCard("ES/Net/IP Network/RP1/Application/Zones/Z1/Sensor A"),
+  ]), {});
+});
+
+test("a zone code used under several controllers pairs only sensors whose room is the zone's room", () => {
+  assert.deepEqual(pairs([
+    zoneCard("ES/Zones/Z1", "office"),
+    sensorCard("ES/Net/IP Network/RP1/Application/Zones/Z1/Sensor A", "office"),
+    sensorCard("ES/Net/IP Network/RP2/Application/Zones/Z1/Sensor B", "office"),
+    sensorCard("ES/Net/IP Network/RP2/Application/Zones/Z1/Sensor C"),
+    zoneCard("ES/Zones/Z2"),
+    sensorCard("ES/Net/IP Network/RP1/Application/Zones/Z2/Sensor D", "hall"),
+    sensorCard("ES/Net/IP Network/RP2/Application/Zones/Z2/Sensor E", "hall"),
+  ]), {
+    "ES/Net/IP Network/RP1/Application/Zones/Z1/Sensor A": "ES/Zones/Z1",
+    "ES/Net/IP Network/RP2/Application/Zones/Z1/Sensor B": "ES/Zones/Z1",
+  });
+});
+
+test("a sensor whose room differs from the zone's room is never paired", () => {
+  assert.deepEqual(pairs([
+    zoneCard("ES/Zones/Z1", "office"),
+    sensorCard("ES/Net/IP Network/RP1/Application/Zones/Z1/Sensor A", "hall"),
+    sensorCard("ES/Net/IP Network/RP1/Application/Zones/Z1/Sensor B"),
+  ]), { "ES/Net/IP Network/RP1/Application/Zones/Z1/Sensor B": "ES/Zones/Z1" });
+});
+
+const { deviceMembership } = require("../public/devices/deviceModel");
+const shownInside = (devices, settings) => Object.fromEntries(deviceMembership(devices, settings));
+
+test("saved lists place lights in their group and sensors in their zone, ignoring entries of the wrong kind", () => {
+  const devices = [
+    { key: "GRP", type: "lightGroup" }, { key: "GRP2", type: "lightGroup" }, { key: "L1", type: "light" }, { key: "L2", type: "light" },
+    zoneCard("ES/Zones/Z1"), sensorCard("ES/Other/S1"),
+  ];
+  assert.deepEqual(shownInside(devices, [
+    { key: "GRP", lightMembers: ["L1", "ES/Other/S1", "gone"] },
+    { key: "GRP2", lightMembers: ["L1", "L2"] },
+    { key: "ES/Zones/Z1", sensorMembers: ["ES/Other/S1", "L2"] },
+    { key: "L2", lightMembers: ["L1"], sensorMembers: ["ES/Other/S1"] },
+  ]), { L1: "GRP", L2: "GRP2", "ES/Other/S1": "ES/Zones/Z1" });
+});
+
+test("a zone without a saved list shows its automatically paired sensors; a saved list, even an empty one, replaces them", () => {
+  const first = "ES/Net/IP Network/RP1/Application/Zones/Z1/S1", second = "ES/Net/IP Network/RP1/Application/Zones/Z1/S2";
+  const devices = [zoneCard("ES/Zones/Z1"), sensorCard(first), sensorCard(second)];
+  assert.deepEqual(shownInside(devices, []), { [first]: "ES/Zones/Z1", [second]: "ES/Zones/Z1" });
+  assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z1", label: "Ured" }]), { [first]: "ES/Zones/Z1", [second]: "ES/Zones/Z1" });
+  assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z1", sensorMembers: [second] }]), { [second]: "ES/Zones/Z1" });
+  assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z1", sensorMembers: [] }]), {});
+});
+
+test("a sensor an administrator listed in one zone is not paired automatically with another", () => {
+  const moved = "ES/Net/IP Network/RP1/Application/Zones/Z1/S1", stays = "ES/Net/IP Network/RP1/Application/Zones/Z1/S2";
+  const devices = [zoneCard("ES/Zones/Z1"), zoneCard("ES/Zones/Z2"), sensorCard(moved), sensorCard(stays)];
+  assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z2", sensorMembers: [moved] }]), { [moved]: "ES/Zones/Z2", [stays]: "ES/Zones/Z1" });
+});

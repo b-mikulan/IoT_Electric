@@ -67,6 +67,12 @@ Unutar grupe svjetlo je sažeti red: naziv, očitana svjetlina, prekidač i kliz
 
 Svjetlo može biti u najviše jednoj grupi. Kad filtar vrste, prostorije ili kata ili ovlasti korisnika izostave grupu, svjetlo se prikazuje samostalno s oznakom grupe; tekstualna pretraga uvijek prikazuje pronađena svjetla izravno. Korisnik vidi samo svjetla iz svojih prostorija, a popis mijenja samo administrator. Spremljeni, trenutačno nedostupni članovi ostaju zapisani dok ih administrator ne ukloni. Popis je dio backupa i prijenosa konfiguracije.
 
+### Senzori u zoni
+
+Kartica zone prikazuje svoje senzore u početno zatvorenom dijelu **Senzori u zoni (N)**, kao sažete redove s nazivom i očitanjima; ti senzori tada nisu na glavnom popisu. Dok administrator ne uredi popis, kartica sama prikazuje senzore za koje uparivanje nije upitno: senzor u putanji ima kod zone koji na istom serveru nosi točno jedna kartica zone, a prostorije senzora i zone se ne razlikuju. Ako senzori s istim kodom dolaze s više kontrolera, kod sam nije dovoljan pa se mora poklapati i prostorija. Ostali senzori ostaju na glavnom popisu.
+
+Administrator u **Postavke kartice** zone može dodati ili maknuti senzore. Spremljeni popis, i kad je prazan, zamjenjuje automatski odabir za tu zonu; **Vrati automatski odabir senzora** uklanja spremljeni popis. Senzor može biti na spremljenom popisu samo jedne zone, a senzor koji je administrator dodao nekoj zoni ne uparuje se automatski s drugom. Kao i kod svjetala, popis je samo organizacija prikaza, korisnik vidi samo senzore iz svojih prostorija, a popis je dio backupa i prijenosa konfiguracije.
+
 ## 5. Prostorija
 
 Učitava se Description točne zonske putanje. Za uređaj se bira najduži odgovarajući predak iz poznatih zona. Prazni i placeholder opisi se odbacuju. Rasvjeta pod potvrđenim RP32/Z312 dobiva Kitchen. AC309 i B301 nemaju potvrđenu sobu. Isti kod Z312 na drugom kontroleru ne prenosi naziv sobe automatski.

@@ -154,3 +154,35 @@ test("admins list lights inside a light group; members are validated by type and
   const read = await (await fetch(`${baseUrl}/api/devices/settings`)).json();
   assert.deepEqual(read.devices.find((entry) => entry.key === group.key).lightMembers, ["ES/Hall/L1", light2]);
 });
+
+test("admins choose the sensors a zone card lists; an emptied list is kept and null hands the zone back to automatic pairing", async (t) => {
+  const { config, save, baseUrl, file, rawFile } = await start(t);
+  const sensor = "ES/Net/IP Network/RP1/Application/Zones/Z1/S1";
+  config.widgets = [
+    { id: "01/ES/Zones/Z1/Values/LtLvl", label: "Zone" },
+    { id: `01/${sensor}/Values/LtLvl`, label: "Sensor" },
+    { id: "01/ES/Hall/L1/Values/LtPct", label: "Light" },
+  ];
+  await fs.writeFile(rawFile, JSON.stringify(config.widgets));
+  const types = Object.fromEntries(buildDevices(config.widgets).map((device) => [device.type, device.key]));
+  assert.deepEqual(types, { zone: "ES/Zones/Z1", sensor, light: "ES/Hall/L1" });
+  const zone = { key: types.zone, label: null, room: null, primaryPointId: null, secondaryPointIds: null };
+
+  let response = await save({ ...zone, sensorMembers: [sensor] });
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).device.sensorMembers, [sensor]);
+  const before = await fs.readFile(file, "utf8");
+  for (const sensorMembers of [[types.light], [types.zone], sensor]) {
+    response = await save({ ...zone, sensorMembers });
+    assert.equal(response.status, 400, JSON.stringify(sensorMembers));
+  }
+  assert.equal((await save({ ...zone, key: types.light, sensorMembers: [sensor] })).status, 400);
+  assert.equal(await fs.readFile(file, "utf8"), before);
+
+  response = await save({ ...zone, sensorMembers: [] });
+  assert.deepEqual((await response.json()).device.sensorMembers, []);
+  const read = await (await fetch(`${baseUrl}/api/devices/settings`)).json();
+  assert.deepEqual(read.devices.find((entry) => entry.key === zone.key).sensorMembers, []);
+  response = await save({ ...zone, sensorMembers: null });
+  assert.equal(Object.hasOwn((await response.json()).device, "sensorMembers"), false);
+});

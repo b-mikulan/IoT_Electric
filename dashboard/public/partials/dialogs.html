@@ -193,12 +193,13 @@
             <small id="device-settings-secondary-count">Najviše 12 dodatnih očitanja.</small>
           </div>
           <div id="device-settings-members-field" class="settings-field settings-field-wide" hidden>
-            <h3>Svjetla u grupi</h3>
-            <p class="settings-context">Popis samo organizira prikaz: označena svjetla prikazuju se unutar ove kartice. Grupna naredba i dalje upravlja stvarnom DALI grupom, bez obzira na ovaj popis.</p>
-            <label for="device-settings-members-search">Pronađi svjetlo</label>
+            <h3 id="device-settings-members-title">Svjetla u grupi</h3>
+            <p id="device-settings-members-help" class="settings-context">Popis samo organizira prikaz: označena svjetla prikazuju se unutar ove kartice. Grupna naredba i dalje upravlja stvarnom DALI grupom, bez obzira na ovaj popis.</p>
+            <label id="device-settings-members-search-label" for="device-settings-members-search">Pronađi svjetlo</label>
             <input id="device-settings-members-search" type="search" placeholder="Naziv, prostorija ili putanja" autocomplete="off" />
             <div id="device-settings-members-list" class="device-metric-options" role="group" aria-label="Svjetla u grupi"></div>
             <small id="device-settings-members-count"></small>
+            <button id="device-settings-members-auto" class="btn-flat" type="button" hidden>Vrati automatski odabir senzora</button>
           </div>
           <div class="device-settings-tools settings-field-wide">
             <button id="device-settings-functions" class="btn-flat" type="button">Postavke funkcija uređaja</button>

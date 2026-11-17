@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { create } = require("../public/devices/deviceCards");
+const { deviceMembership } = require("../public/devices/deviceModel");
 
 // A small DOM fixture keeps these interaction tests independent of a browser or controller.
 class Element {
@@ -49,7 +50,8 @@ function setup(t, initialDevices, onWrite, demo = false, initialReadAt, options 
   let devices = initialDevices;
   let readAt = initialReadAt;
   globalThis.document = { createElement: (tag) => new Element(tag), createElementNS: (_, tag) => new Element(tag), activeElement: null };
-  globalThis.IoTDeviceModel = options.model || { buildDevices: () => devices };
+  // Devices are supplied ready-made; which card sits inside which is the real rule.
+  globalThis.IoTDeviceModel = options.model || { buildDevices: () => devices, deviceMembership };
   const container = new Element("section");
   const view = create({ container, onWrite, onSettings: options.onSettings, onRooms: options.onRooms, onMove: options.onMove, onRefresh: options.onRefresh,
     readOnly: options.readOnly, controlDeviceKeys: options.controlDeviceKeys });
@@ -944,4 +946,39 @@ test("a light listed in a group opens its extra actions on request and stays ope
   expand.dispatch("click");
   assert.equal(isOpen(), false);
   assert.equal(expand.attributes["aria-expanded"], "false");
+});
+
+test("a zone card lists its paired sensors, and a saved or emptied list replaces the automatic choice", (t) => {
+  const reading = (owner, value) => point("illuminance", value, { id: `01/${owner}/Values/LtLvl`, controlAvailable: false, writeAllowed: false, liveControlAvailable: false, control: undefined, unit: "lx" });
+  const sensor = (key, label) => ({ ...device("sensor", { illuminance: reading(key, 300) }), key, label });
+  const zone = { ...device("zone", { illuminance: reading("ES/Zones/Z1", 310) }), key: "ES/Zones/Z1", label: "Zona Z1" };
+  const first = sensor("ES/Net/Zones/Z1/S1", "Senzor 1"), second = sensor("ES/Net/Zones/Z1/S2", "Senzor 2"), loose = sensor("ES/Net/IO/S9", "Senzor 9");
+  const { container, update } = setup(t, [zone, first, second, loose], async () => {});
+  const grid = byClass(container, "dc-grid")[0];
+  const keys = (node) => node.children.map((child) => child.dataset.deviceKey);
+  const panel = () => byClass(grid.children[0], "dc-group-members")[0];
+  const listed = () => keys(byClass(panel(), "dc-group-member-list")[0]);
+
+  // No saved list: the sensors the model pairs with the zone are inside it.
+  assert.deepEqual(keys(grid), [zone.key, loose.key]);
+  assert.equal(panel().children[0].textContent, "Senzori u zoni (2)");
+  assert.deepEqual(listed(), [first.key, second.key]);
+
+  // The administrator's list replaces the automatic choice and may add an unpaired sensor.
+  update(undefined, undefined, { deviceSettings: [{ key: zone.key, sensorMembers: [second.key, loose.key] }] });
+  assert.deepEqual(keys(grid), [zone.key, first.key]);
+  assert.deepEqual(listed(), [second.key, loose.key]);
+
+  // An emptied list means no sensors, not a return to the automatic choice.
+  update(undefined, undefined, { deviceSettings: [{ key: zone.key, sensorMembers: [] }] });
+  assert.deepEqual(keys(grid), [zone.key, first.key, second.key, loose.key]);
+  assert.equal(panel().hidden, true);
+
+  // With the zone filtered out, a paired sensor stands alone and names its zone.
+  update(undefined, undefined, { deviceSettings: [] });
+  const typeFilter = byClass(container, "dc-type-filter")[0];
+  typeFilter.value = "sensor";
+  typeFilter.dispatch("change");
+  assert.deepEqual(keys(grid), [first.key, second.key, loose.key]);
+  assert.equal(byClass(grid.children[0], "dc-group-note")[0].textContent, "U zoni: Zona Z1");
 });
