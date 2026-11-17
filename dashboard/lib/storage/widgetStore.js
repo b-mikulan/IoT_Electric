@@ -45,57 +45,14 @@ class WidgetStore {
     return result;
   }
 
-  async add(widget) {
-    const operation = this.#operation.then(() => this.#add(widget));
-    this.#operation = operation.catch(() => {});
-    return operation;
-  }
-
-  async addMany(widgets) {
-    const operation = this.#operation.then(() => this.#addMany(widgets));
-    this.#operation = operation.catch(() => {});
-    return operation;
-  }
-
-  async setVisibility(id, visible) {
-    const operation = this.#operation.then(() =>
-      this.#setVisibility(id, visible)
-    );
-    this.#operation = operation.catch(() => {});
-    return operation;
-  }
-
-  async updateSettings(id, settings) {
-    const operation = this.#operation.then(() =>
-      this.#updateSettings(id, settings)
-    );
-    this.#operation = operation.catch(() => {});
-    return operation;
-  }
-
-  async remove(id) {
-    const operation = this.#operation.then(() => this.#remove(id));
-    this.#operation = operation.catch(() => {});
-    return operation;
-  }
-
-  async clear() {
-    const operation = this.#operation.then(() => this.#clear());
-    this.#operation = operation.catch(() => {});
-    return operation;
-  }
-
-  async removeMany(ids) {
-    const operation = this.#operation.then(() => this.#removeMany(ids));
-    this.#operation = operation.catch(() => {});
-    return operation;
-  }
-
-  async renameGroup(group, name) {
-    const operation = this.#operation.then(() => this.#renameGroup(group, name));
-    this.#operation = operation.catch(() => {});
-    return operation;
-  }
+  add(widget) { return this.withExclusive(() => this.#add(widget)); }
+  addMany(widgets) { return this.withExclusive(() => this.#addMany(widgets)); }
+  setVisibility(id, visible) { return this.withExclusive(() => this.#setVisibility(id, visible)); }
+  updateSettings(id, settings) { return this.withExclusive(() => this.#updateSettings(id, settings)); }
+  remove(id) { return this.withExclusive(() => this.#remove(id)); }
+  clear() { return this.withExclusive(() => this.#clear()); }
+  removeMany(ids) { return this.withExclusive(() => this.#removeMany(ids)); }
+  renameGroup(group, name) { return this.withExclusive(() => this.#renameGroup(group, name)); }
 
   #assertEnabled() {
     if (!this.enabled) {

@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { AsyncLocalStorage } = require("node:async_hooks");
 const { XMLParser } = require("fast-xml-parser");
 
 const DEFAULT_SERVICE_URL =
@@ -57,6 +58,8 @@ const parser = new XMLParser({
   ignoreAttributes: false,
   removeNSPrefix: true,
   trimValues: true,
+  // "0012", "0x1F" and "1e3" are text (codes, serials), not numbers.
+  numberParseOptions: { hex: false, leadingZeros: false, eNotation: false },
 });
 
 // IDs, continuation tokens and metadata values are strings, even when numeric.
@@ -66,6 +69,8 @@ const containerParser = new XMLParser({
   parseTagValue: false,
   trimValues: false,
 });
+// Set per HTTP request by app.js; aborts controller calls whose client has left.
+const requestSignal = new AsyncLocalStorage();
 const MAX_CONTAINER_PAGES = 100;
 const MAX_CONTAINER_ITEMS = 50_000;
 const telemetryResponses = new Set([
@@ -178,6 +183,7 @@ function buildDigestAuthorizationHeader({
   challenge,
   username,
   password,
+  count = 1,
 }) {
   const realm = challenge.realm;
   const nonce = challenge.nonce;
@@ -186,7 +192,7 @@ function buildDigestAuthorizationHeader({
   const hashAlgorithm = resolveHashAlgorithm(algorithmRaw);
 
   const uri = getRequestUri(url);
-  const nc = "00000001";
+  const nc = count.toString(16).padStart(8, "0");
   const cnonce = crypto.randomBytes(16).toString("hex");
 
   const qopOptions = challenge.qop
@@ -240,35 +246,36 @@ function buildDigestAuthorizationHeader({
   return `Digest ${parts.join(", ")}`;
 }
 
+// auth.digest remembers the last server challenge. Later requests answer it
+// directly with a rising counter; a 401 (expired nonce) fetches a new one.
 async function digestFetch(url, options, auth) {
-  const method = options.method || "GET";
-  const body = options.body || "";
+  const authorized = () => fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      Authorization: buildDigestAuthorizationHeader({
+        method: options.method || "GET",
+        url,
+        body: options.body || "",
+        challenge: auth.digest.challenge,
+        username: auth.username,
+        password: auth.password,
+        count: auth.digest.count += 1,
+      }),
+    },
+  });
 
-  const firstResponse = await fetch(url, options);
+  const firstResponse = await (auth.digest ? authorized() : fetch(url, options));
 
   if (firstResponse.status !== 401) {
     return firstResponse;
   }
 
+  auth.digest = null;
   const wwwAuthenticate = firstResponse.headers.get("www-authenticate");
-  const challenge = parseDigestChallenge(wwwAuthenticate);
+  auth.digest = { challenge: parseDigestChallenge(wwwAuthenticate), count: 0 };
 
-  const authorization = buildDigestAuthorizationHeader({
-    method,
-    url,
-    body,
-    challenge,
-    username: auth.username,
-    password: auth.password,
-  });
-
-  return fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      Authorization: authorization,
-    },
-  });
+  return authorized();
 }
 
 function buildSoapEnvelope(innerXml) {
@@ -293,7 +300,7 @@ function buildGetContainerItemsBody(containerId, { metadata = false, moreDataRef
 <GetContainerItemsRequest
   xmlns="${EWS_NAMESPACE}"
   version="1.2"
-  metadata="${metadata}">
+  metadata="${metadata === true || metadata === "true"}">
   <GetContainerItemsIds>
     <Id>${escapeXml(containerId)}</Id>
   </GetContainerItemsIds>
@@ -321,19 +328,19 @@ function buildGetAlarmEventsBody({
 <GetAlarmEventsRequest
   xmlns="${EWS_NAMESPACE}"
   version="1.2"
-  metadata="${metadata}">
+  metadata="${metadata === true || metadata === "true"}">
   <GetAlarmEventsParameter>
     ${moreDataRef ? `<MoreDataRef>${escapeXml(moreDataRef)}</MoreDataRef>` : ""}
   </GetAlarmEventsParameter>
   <GetAlarmEventsFilter>
     ${
       priorityFrom !== undefined
-        ? `<PriorityFrom>${priorityFrom}</PriorityFrom>`
+        ? `<PriorityFrom>${escapeXml(priorityFrom)}</PriorityFrom>`
         : ""
     }
     ${
       priorityTo !== undefined
-        ? `<PriorityTo>${priorityTo}</PriorityTo>`
+        ? `<PriorityTo>${escapeXml(priorityTo)}</PriorityTo>`
         : ""
     }
     ${typesXml}
@@ -364,7 +371,7 @@ function buildGetUpdatedAlarmEventsBody({
 <GetUpdatedAlarmEventsRequest
   xmlns="${EWS_NAMESPACE}"
   version="1.2"
-  metadata="${metadata}">
+  metadata="${metadata === true || metadata === "true"}">
   <GetUpdatedAlarmEventsParameter>
     <LastUpdate>${escapeXml(lastUpdate)}</LastUpdate>
     ${moreDataRef ? `<MoreDataRef>${escapeXml(moreDataRef)}</MoreDataRef>` : ""}
@@ -372,12 +379,12 @@ function buildGetUpdatedAlarmEventsBody({
   <GetUpdatedAlarmEventsFilter>
     ${
       priorityFrom !== undefined
-        ? `<PriorityFrom>${priorityFrom}</PriorityFrom>`
+        ? `<PriorityFrom>${escapeXml(priorityFrom)}</PriorityFrom>`
         : ""
     }
     ${
       priorityTo !== undefined
-        ? `<PriorityTo>${priorityTo}</PriorityTo>`
+        ? `<PriorityTo>${escapeXml(priorityTo)}</PriorityTo>`
         : ""
     }
     ${typesXml}
@@ -422,7 +429,7 @@ function buildGetHistoryBody({
 <GetHistoryRequest
   xmlns="${EWS_NAMESPACE}"
   version="1.2"
-  metadata="${metadata}">
+  metadata="${metadata === true || metadata === "true"}">
   <GetHistoryParameter>
     <Id>${escapeXml(historyItemId)}</Id>
     ${moreDataRef ? `<MoreDataRef>${escapeXml(moreDataRef)}</MoreDataRef>` : ""}
@@ -526,7 +533,7 @@ function buildGetAlarmHistoryBody({
 <GetAlarmHistoryRequest
   xmlns="${EWS_NAMESPACE}"
   version="1.2"
-  metadata="${metadata}">
+  metadata="${metadata === true || metadata === "true"}">
   <GetAlarmHistoryParameter>
     ${alarmItemId ? `<Id>${escapeXml(alarmItemId)}</Id>` : ""}
     ${moreDataRef ? `<MoreDataRef>${escapeXml(moreDataRef)}</MoreDataRef>` : ""}
@@ -536,12 +543,12 @@ function buildGetAlarmHistoryBody({
     ${timeTo ? `<TimeTo>${escapeXml(timeTo)}</TimeTo>` : ""}
     ${
       priorityFrom !== undefined
-        ? `<PriorityFrom>${priorityFrom}</PriorityFrom>`
+        ? `<PriorityFrom>${escapeXml(priorityFrom)}</PriorityFrom>`
         : ""
     }
     ${
       priorityTo !== undefined
-        ? `<PriorityTo>${priorityTo}</PriorityTo>`
+        ? `<PriorityTo>${escapeXml(priorityTo)}</PriorityTo>`
         : ""
     }
     ${typesXml}
@@ -570,7 +577,7 @@ function buildSubscribeBody({
   xmlns="${EWS_NAMESPACE}"
   version="1.2"
   Mode="0"
-  metadata="${metadata}">
+  metadata="${metadata === true || metadata === "true"}">
   <Delivery>
     <NotifyTo>
       <Address>${escapeXml(notifyToAddress)}</Address>
@@ -578,8 +585,8 @@ function buildSubscribeBody({
   </Delivery>
   <Expires>${escapeXml(expires)}</Expires>
   <Filter>
-    <EventType>${eventType}</EventType>
-    <Ids eventMode="${eventMode}">
+    <EventType>${escapeXml(eventType)}</EventType>
+    <Ids eventMode="${escapeXml(eventMode)}">
       ${idsXml}
     </Ids>
   </Filter>
@@ -636,7 +643,7 @@ function buildGetItemsBody(ids, metadata = false) {
 <GetItemsRequest
   xmlns="${EWS_NAMESPACE}"
   version="1.2"
-  metadata="${metadata}">
+  metadata="${metadata === true || metadata === "true"}">
   <GetItemsIds>
     ${idsXml}
   </GetItemsIds>
@@ -1017,28 +1024,46 @@ function createEwsClient(config = {}) {
   if (!Number.isInteger(containerTimeoutMs) || containerTimeoutMs <= 0 || containerTimeoutMs > 2_147_483_647) {
     throw new Error("EWS_CONTAINER_TIMEOUT_MS must be a positive integer timeout in milliseconds.");
   }
+  const requestTimeoutMs = Number(config.requestTimeoutMs ?? process.env.EWS_REQUEST_TIMEOUT_MS ?? 30_000);
+  if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs <= 0 || requestTimeoutMs > 2_147_483_647) {
+    throw new Error("EWS_REQUEST_TIMEOUT_MS must be a positive integer timeout in milliseconds.");
+  }
+
+  const auth = { username, password, digest: null };
 
   async function sendSoapRequest(soapAction, soapBody, { signal } = {}) {
-    const response = await digestFetch(
-      serviceUrl,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            `application/soap+xml; charset=utf-8; action="${soapAction}"`,
-          Accept: "application/soap+xml, text/xml, */*",
+    const timeout = AbortSignal.timeout(requestTimeoutMs);
+    const signals = [timeout, signal, requestSignal.getStore()].filter(Boolean);
+    let response, text;
+    try {
+      response = await digestFetch(
+        serviceUrl,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              `application/soap+xml; charset=utf-8; action="${soapAction}"`,
+            Accept: "application/soap+xml, text/xml, */*",
+          },
+          body: soapBody,
+          signal: AbortSignal.any(signals),
         },
-        body: soapBody,
-        ...(signal ? { signal } : {}),
-      },
-      {
-        username,
-        password,
+        auth
+      );
+      text = await response.text();
+    } catch (error) {
+      if (timeout.aborted) {
+        throw Object.assign(new Error(`EWS request timed out after ${requestTimeoutMs} ms.`), { status: 504 });
       }
-    );
+      throw error;
+    }
 
-    const text = await response.text();
-    const soapFault = extractSoapFault(text);
+    // Parse for a fault only when the reply mentions one. A non-SOAP reply
+    // (an HTML 401 or 502 page) is reported by its HTTP status below.
+    let soapFault = null;
+    if (text.includes("Fault")) {
+      try { soapFault = extractSoapFault(text); } catch { /* not SOAP */ }
+    }
 
     if (soapFault) {
       const error = new Error(
@@ -1367,6 +1392,7 @@ function createEwsClient(config = {}) {
 
 module.exports = {
   createEwsClient,
+  requestSignal,
   escapeXml,
   formatXmlForDisplay,
 

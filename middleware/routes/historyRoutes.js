@@ -13,7 +13,7 @@ function createHistoryRouter(ews) {
         timeTo,
         moreDataRef,
         metadata = false,
-      } = req.body;
+      } = req.body || {};
 
       if (!historyItemId) {
         return res.status(400).json({

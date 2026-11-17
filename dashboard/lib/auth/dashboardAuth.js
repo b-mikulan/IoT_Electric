@@ -10,6 +10,8 @@ const setupDuration = 15 * 60 * 1000;
 const setupPath = "/setup-password";
 const loginWindow = 60_000;
 const maxFailures = 20;
+// Checked for unknown usernames, so they take as long as known ones.
+const dummyHash = `scrypt:${"0".repeat(32)}:${"0".repeat(128)}`;
 
 const viewerEndpoints = new Set(["/api/config", "/api/devices/settings", "/api/devices/metadata", "/api/snapshot", "/api/history/catalog"]);
 const userPostEndpoints = new Set(["/api/devices/write", "/api/dashboard/refresh-scope", "/api/history/query", "/api/history/browse", "/api/alarms/query"]);
@@ -136,11 +138,9 @@ function createDashboardAuth(env, users) {
     const name = normalizeUsername(username);
     const account = users.find(name);
     let verified = false;
-    if (account) {
-      pendingVerifications += 1;
-      try { verified = await verifyPassword(password, account.passwordHash); }
-      finally { pendingVerifications -= 1; }
-    }
+    pendingVerifications += 1;
+    try { verified = await verifyPassword(password, account?.passwordHash ?? dummyHash) && Boolean(account); }
+    finally { pendingVerifications -= 1; }
     if (!verified || users.find(name) !== account) {
       const failures = failuresByIp.get(ip) ?? 0;
       if (failures === 0) setTimeout(() => failuresByIp.delete(ip), loginWindow).unref();

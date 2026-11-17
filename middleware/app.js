@@ -3,6 +3,7 @@ const swaggerUi = require("swagger-ui-express");
 const { createMiddlewareAuth } = require("./middlewareAuth");
 const { errorHandler } = require("./errorHandler");
 const { createApiRouter } = require("./routes");
+const { requestSignal } = require("./ewsClient");
 const defaultSwaggerDocument = require("./swaggerDocument");
 
 function createApp({
@@ -15,8 +16,19 @@ function createApp({
   }
 
   const app = express();
+  // Behind a reverse proxy, set TRUST_PROXY (hop count such as 1, or an address
+  // list) so login throttling sees the real client address, not the proxy's.
+  const trustProxy = process.env.TRUST_PROXY?.trim();
+  if (trustProxy) app.set("trust proxy", /^d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
 
   app.use(express.json());
+  // When the REST client gives up, stop the controller call made on its behalf.
+  // Registered after the body parser, which would drop the async context.
+  app.use((req, res, next) => {
+    const controller = new AbortController();
+    res.once("close", () => { if (!res.writableEnded) controller.abort(); });
+    requestSignal.run(controller.signal, next);
+  });
 
   app.get("/health", (req, res) => {
     res.json({ status: "ok" });

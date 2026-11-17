@@ -17,7 +17,7 @@ function createSubscriptionRouter(ews) {
         expires = "PT30M",
         notifyToAddress = "",
         metadata = false,
-      } = req.body;
+      } = req.body || {};
 
       requireNonEmptyArray(ids, "ids");
 

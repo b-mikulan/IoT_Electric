@@ -9,6 +9,7 @@ const asArray = (value) => value == null || value === "" ? [] : Array.isArray(va
 const scalar = (value) => ["string", "number", "boolean"].includes(typeof value) ? String(value) : "";
 const flag = (value) => value === true || value === 1 || value === "1" || value === "true";
 const { normalizeHistoryItems } = require("../telemetry/historyCatalog");
+const { middlewareRequest } = require("../middlewareClient");
 
 function zonePath(id) {
   if (!/^(?:01|11)\//.test(id)) return "";
@@ -43,7 +44,8 @@ function readCatalog(file) {
 
 class DeviceMetadataClient {
   #middlewareUrl;
-  #authorization;
+  #username;
+  #password;
   #timeoutMs;
   #fetch;
   #demoMode;
@@ -60,7 +62,8 @@ class DeviceMetadataClient {
     if (!this.#demoMode && typeof fetchImpl !== "function") throw new TypeError("fetchImpl must be a function");
     this.#fetch = fetchImpl;
     this.#middlewareUrl = String(config.middlewareUrl || "").replace(/\/+$/, "");
-    this.#authorization = `Basic ${Buffer.from(`${config.username || ""}:${config.password || ""}`, "utf8").toString("base64")}`;
+    this.#username = config.username || "";
+    this.#password = config.password || "";
     this.#timeoutMs = Number.isFinite(config.timeoutMs) && config.timeoutMs > 0 ? config.timeoutMs : 10_000;
   }
 
@@ -156,19 +159,11 @@ class DeviceMetadataClient {
   }
 
   async #request(endpoint, body) {
-    const response = await this.#fetch(`${this.#middlewareUrl}${endpoint}`, {
-      method: body === undefined ? "GET" : "POST",
-      redirect: "error",
-      headers: {
-        Accept: "application/json",
-        Authorization: this.#authorization,
-        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-      },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(this.#timeoutMs),
-    });
-    if (!response?.ok) throw new Error("Metadata request failed");
-    const payload = await response.json();
+    const { ok, payload } = await middlewareRequest({
+      fetchImpl: this.#fetch, middlewareUrl: this.#middlewareUrl, username: this.#username,
+      password: this.#password, timeoutMs: this.#timeoutMs,
+    }, endpoint, body);
+    if (!ok) throw new Error("Metadata request failed");
     if (!payload || typeof payload !== "object" || payload.soapFault || payload.error) throw new Error("Invalid metadata response");
     return payload;
   }
