@@ -1,0 +1,29 @@
+{{! Item templates for the shared dialogs in dialogs.html. }}
+    <template id="discovery-item-template">
+      <article class="discovery-item">
+        <div class="discovery-item-copy">
+          <div class="discovery-item-heading">
+            <span class="discovery-kind"></span>
+            <strong class="discovery-name"></strong>
+          </div>
+          <code class="discovery-id"></code>
+          <p class="discovery-item-description"></p>
+        </div>
+        <button class="discovery-action btn-small{{#appTheme}} tonal{{/appTheme}} waves-effect" type="button"></button>
+      </article>
+    </template>
+
+    <template id="visibility-item-template">
+      <article class="visibility-item">
+        <div class="visibility-copy">
+          <strong class="visibility-name"></strong>
+          <code class="visibility-id"></code>
+        </div>
+        <label class="visibility-switch">
+          <input class="visibility-checkbox" type="checkbox" />
+          <span class="visibility-track" aria-hidden="true">
+            <span class="visibility-thumb"></span>
+          </span>
+        </label>
+      </article>
+    </template>

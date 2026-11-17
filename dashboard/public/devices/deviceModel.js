@@ -422,6 +422,88 @@
     };
   }
 
+  // Which sensors a zone card lists without anyone choosing them. A sensor is
+  // paired only when the match is not in doubt: exactly one zone card on the
+  // same server carries the zone code from the sensor's path, and their rooms
+  // do not disagree. When sensors with that code sit under more than one
+  // controller the code alone is not trusted, so the sensor's room must also
+  // be the zone's room. Returns sensor key -> zone key.
+  function automaticZoneMembers(devices) {
+    const place = (device) => {
+      const parts = String(device.key).split("/");
+      const index = parts.lastIndexOf("Zones");
+      return index > 0 && parts[index + 1] ? { id: `${parts[0]}\u0000${parts[index + 1]}`, branch: parts.slice(0, index).join("/") } : null;
+    };
+    const roomOf = (device) => device.room?.id || device.room?.label || null;
+    const zones = new Map();
+    const branches = new Map();
+    for (const device of devices) {
+      const at = place(device);
+      if (!at) continue;
+      // A code carried by a second zone card is ambiguous and pairs nothing.
+      if (device.type === "zone") zones.set(at.id, zones.has(at.id) ? null : device);
+      else if (device.type === "sensor") branches.set(at.id, (branches.get(at.id) || new Set()).add(at.branch));
+    }
+    const members = new Map();
+    for (const device of devices) {
+      if (device.type !== "sensor") continue;
+      const at = place(device);
+      const zone = at && zones.get(at.id);
+      if (!zone) continue;
+      const sameRoom = roomOf(device) !== null && roomOf(device) === roomOf(zone);
+      const otherRoom = roomOf(device) !== null && roomOf(zone) !== null && !sameRoom;
+      if (otherRoom || branches.get(at.id).size > 1 && !sameRoom) continue;
+      members.set(device.key, zone.key);
+    }
+    return members;
+  }
+
+  // Which card each listed card is shown inside: member key -> parent key.
+  // Saved lists come first: lights in a light group, sensors in a zone. A zone
+  // with no saved list then takes the sensors automaticZoneMembers pairs with
+  // it; a saved list, even an empty one, replaces that. A sensor that an
+  // administrator listed in any zone is never paired with another.
+  const memberLists = { lightGroup: ["lightMembers", "light"], zone: ["sensorMembers", "sensor"] };
+  function deviceMembership(devices, deviceSettings = []) {
+    const types = new Map(devices.map((device) => [device.key, device.type]));
+    const parents = new Map();
+    const decided = new Set();
+    for (const entry of Array.isArray(deviceSettings) ? deviceSettings : []) {
+      const [field, memberType] = memberLists[types.get(entry?.key)] || [];
+      if (!field || !Array.isArray(entry[field])) continue;
+      if (field === "sensorMembers") decided.add(entry.key);
+      for (const member of entry[field]) {
+        if (types.get(member) === memberType && !parents.has(member)) parents.set(member, entry.key);
+      }
+    }
+    for (const [sensor, zone] of automaticZoneMembers(devices)) {
+      if (!decided.has(zone) && !parents.has(sensor)) parents.set(sensor, zone);
+    }
+    return parents;
+  }
+
+  // Cards are shown floor by floor (saved floor order), room by room, and
+  // within a room by kind of device. Unlisted floors follow the saved ones;
+  // devices without a room come last.
+  const DEVICE_TYPE_ORDER = ["zone", "lightGroup", "light", "blind", "climate", "sensor", "generic"];
+  function sortDevicesForDisplay(devices, floors = []) {
+    const floorRanks = new Map((Array.isArray(floors) ? floors : []).map((floor, index) => [floor?.id, index]));
+    const unknownFloor = floorRanks.size;
+    const floorRank = (device) => !device.room?.label ? unknownFloor + 1
+      : floorRanks.has(device.room.floorId) ? floorRanks.get(device.room.floorId) : unknownFloor;
+    const typeRank = (device) => {
+      const index = DEVICE_TYPE_ORDER.indexOf(device.type);
+      return index < 0 ? DEVICE_TYPE_ORDER.indexOf("generic") : index;
+    };
+    const text = (left = "", right = "") => String(left).localeCompare(String(right), "hr", { numeric: true });
+    return [...devices].sort((a, b) => floorRank(a) - floorRank(b)
+      || text(a.room?.label, b.room?.label)
+      || text(a.room?.id, b.room?.id)
+      || typeRank(a) - typeRank(b)
+      || text(a.label, b.label)
+      || text(a.key, b.key));
+  }
+
   function validateDeviceCommand(point, value) {
     const denied = (reason, code = "INVALID_DEVICE_VALUE") => ({ allowed: false, reason, code });
     if (!point?.writeAllowed || !point.liveControlAvailable || point.roleAmbiguous) {
@@ -440,7 +522,7 @@
     return { allowed: true, value };
   }
 
-  const api = { buildDevices, createDeviceIndex, classifyPoint, normalizePoint, validateDeviceCommand };
+  const api = { buildDevices, createDeviceIndex, classifyPoint, normalizePoint, validateDeviceCommand, automaticZoneMembers, deviceMembership, sortDevicesForDisplay };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.IoTDeviceModel = api;
 })();

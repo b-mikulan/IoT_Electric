@@ -941,3 +941,66 @@ test("device removal requires confirmation and removes only the confirmed card's
   assert.equal(fixture.models().some((device) => device.key === owner), false);
   assert.equal(fixture.models().some((device) => device.key === foreignOwner), true);
 });
+
+test("a zone card's settings start from its paired sensors, save a list only when it changes, and can return to automatic pairing", async () => {
+  const fixture = setup();
+  const zoneKey = "ES/Application/Zones/Kitchen";
+  fixture.context.zoneReading = { id: `01/${zoneKey}/Values/LtLvl`, label: "LtLvl", value: 170, unit: "lx", state: 0, writable: false, visible: true };
+  fixture.run("configById.set(zoneReading.id, zoneReading); refreshDeviceCards();");
+  const open = () => fixture.run(`openDeviceCardSettingsDialog(cardSettingsDevices().find((device) => device.key === ${JSON.stringify(zoneKey)}))`);
+  const choices = () => fixture.cardNode("members-list").children.map((label) => ({ box: label.children[0], text: label.children[1].textContent, hint: label.children[1].children[0].textContent }));
+  const lastPost = () => JSON.parse(fixture.posts().at(-1).options.body);
+
+  open();
+  assert.equal(fixture.cardNode("members-field").hidden, false);
+  assert.equal(fixture.cardNode("members-title").textContent, "Senzori u zoni");
+  assert.equal(fixture.cardNode("members-auto").hidden, true);
+  assert.deepEqual(choices().map((choice) => [choice.text, choice.box.checked]), [["Sensor", true]]);
+  assert.match(choices()[0].hint, /automatski uparen/);
+  assert.equal(fixture.cardNode("members-count").textContent, "1 senzor u zoni");
+
+  // Opening and saving the card must not turn the automatic choice into a saved list.
+  await fixture.cardNode("form").dispatch("submit");
+  assert.equal(Object.hasOwn(lastPost(), "sensorMembers"), false);
+  assert.equal(Object.hasOwn(lastPost(), "lightMembers"), false);
+
+  // Removing the sensor saves an empty list, and only then is there something to return from.
+  const [choice] = choices();
+  choice.box.checked = false;
+  choice.box.dispatch("change");
+  await fixture.cardNode("form").dispatch("submit");
+  assert.deepEqual(lastPost().sensorMembers, []);
+  assert.equal(fixture.cardNode("members-auto").hidden, false);
+  assert.deepEqual(choices().map((entry) => entry.box.checked), [false]);
+
+  fixture.cardNode("members-auto").dispatch("click");
+  assert.deepEqual(choices().map((entry) => entry.box.checked), [true]);
+  await fixture.cardNode("form").dispatch("submit");
+  assert.equal(lastPost().sensorMembers, null);
+  assert.equal(fixture.cardNode("members-auto").hidden, true);
+});
+
+test("a light group's settings still save its list of lights and offer no automatic choice", async () => {
+  const fixture = setup();
+  const groupKey = "ES/Application/Items/GRP", lightKey = "ES/Application/Items/L1";
+  fixture.context.extra = [
+    { id: `01/${groupKey}/Values/GrpPct`, label: "GrpPct", value: 50, unit: "%", state: 0, writable: false, visible: true },
+    { id: `01/${lightKey}/Values/LtPct`, label: "LtPct", value: 20, unit: "%", state: 0, writable: false, visible: true },
+  ];
+  fixture.run("for (const widget of extra) configById.set(widget.id, widget); refreshDeviceCards();");
+  fixture.run(`openDeviceCardSettingsDialog(cardSettingsDevices().find((device) => device.key === ${JSON.stringify(groupKey)}))`);
+  assert.equal(fixture.cardNode("members-field").hidden, false);
+  assert.equal(fixture.cardNode("members-title").textContent, "Svjetla u grupi");
+  assert.equal(fixture.cardNode("members-auto").hidden, true);
+  const [choice] = fixture.cardNode("members-list").children;
+  assert.equal(fixture.cardNode("members-list").children.length, 1);
+  assert.equal(choice.children[0].checked, false);
+  choice.children[0].checked = true;
+  choice.children[0].dispatch("change");
+  assert.equal(fixture.cardNode("members-count").textContent, "1 svjetlo u grupi");
+  await fixture.cardNode("form").dispatch("submit");
+  const body = JSON.parse(fixture.posts().at(-1).options.body);
+  assert.deepEqual(body.lightMembers, [lightKey]);
+  assert.equal(Object.hasOwn(body, "sensorMembers"), false);
+  assert.equal(fixture.cardNode("members-auto").hidden, true);
+});

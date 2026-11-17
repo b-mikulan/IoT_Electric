@@ -274,3 +274,76 @@ test("disabled persistence never writes and reports an explicit save error", asy
   assert.deepEqual(await store.synchronize(context.deviceKeys), []);
   await assert.rejects(store.save(automatic(context.deviceKeys[0]), context), { status: 409, code: "DEVICE_WIDGET_FILE_UNAVAILABLE" });
 });
+
+test("light group members persist, survive other saves and restart, and are validated only on change", async (t) => {
+  const { file } = await fixture(t);
+  const keys = ["ES/Room/GRP", "ES/Room/GRP2", "ES/Room/L1", "ES/Room/L2", "ES/Room/Sensor"];
+  const lights = { deviceKeys: keys, pointIds: [], lightKeys: new Set(["ES/Room/L1", "ES/Room/L2"]), lightGroupKeys: new Set(["ES/Room/GRP", "ES/Room/GRP2"]) };
+  const card = (key, extra = {}) => ({ ...automatic(key), ...extra });
+  const store = new DeviceWidgetStore(file);
+  await store.synchronize(keys);
+
+  const saved = await store.save(card("ES/Room/GRP", { lightMembers: ["ES/Room/L1"] }), lights);
+  assert.deepEqual(saved.lightMembers, ["ES/Room/L1"]);
+  // Older clients and ordinary card saves omit the field; that is not a request to clear it.
+  await store.save(card("ES/Room/GRP", { label: "Hodnik" }), lights);
+  assert.deepEqual(store.devices.find((d) => d.key === "ES/Room/GRP").lightMembers, ["ES/Room/L1"]);
+  const restarted = new DeviceWidgetStore(file);
+  await restarted.synchronize(keys);
+  assert.deepEqual(restarted.devices.find((d) => d.key === "ES/Room/GRP"), { ...card("ES/Room/GRP", { label: "Hodnik" }), lightMembers: ["ES/Room/L1"] });
+
+  const before = await fs.readFile(file, "utf8");
+  await assert.rejects(store.save(card("ES/Room/GRP2", { lightMembers: ["ES/Room/L1"] }), lights), { code: "LIGHT_ALREADY_GROUPED" });
+  await assert.rejects(store.save(card("ES/Room/L2", { lightMembers: ["ES/Room/L1"] }), lights), { code: "INVALID_DEVICE_SETTINGS" });
+  await assert.rejects(store.save(card("ES/Room/GRP", { lightMembers: ["ES/Room/L1", "ES/Room/Sensor"] }), lights), { code: "INVALID_DEVICE_SETTINGS" });
+  await assert.rejects(store.save(card("ES/Room/GRP", { lightMembers: ["ES/Room/GRP"] }), lights), { code: "INVALID_DEVICE_SETTINGS" });
+  await assert.rejects(store.save(card("ES/Room/GRP", { lightMembers: ["ES/Room/L2", "ES/Room/L2"] }), lights), { code: "INVALID_DEVICE_SETTINGS" });
+  await assert.rejects(store.save(card("ES/Room/GRP", { lightMembers: ["ES/Room/L2"] }), { ...lights, authorizeCardEdit() {} }), { code: "ADMIN_REQUIRED" });
+  assert.equal(await fs.readFile(file, "utf8"), before);
+
+  // A saved member that is temporarily absent stays valid; only new members are checked.
+  const absent = { ...lights, deviceKeys: keys.filter((key) => key !== "ES/Room/L1"), lightKeys: new Set(["ES/Room/L2"]) };
+  await store.save(card("ES/Room/GRP", { lightMembers: ["ES/Room/L1", "ES/Room/L2"] }), absent);
+  // A group that is no longer on the dashboard does not block its lights elsewhere.
+  await store.save(card("ES/Room/GRP2", { lightMembers: ["ES/Room/L1"] }), { ...lights, deviceKeys: keys.filter((key) => key !== "ES/Room/GRP") });
+  await store.save(card("ES/Room/GRP2", { lightMembers: null }), lights);
+  await store.save(card("ES/Room/GRP", { lightMembers: [] }), lights);
+  assert.ok(store.devices.every((device) => !Object.hasOwn(device, "lightMembers")));
+});
+
+test("a zone's sensor list persists, keeps an emptied list apart from no list, and is validated only on change", async (t) => {
+  const { file } = await fixture(t);
+  const keys = ["ES/Zones/Z1", "ES/Zones/Z2", "ES/Net/Zones/Z1/S1", "ES/Net/Zones/Z1/S2", "ES/Net/Zones/Z1/Light"];
+  const sensors = { deviceKeys: keys, pointIds: [], sensorKeys: new Set(["ES/Net/Zones/Z1/S1", "ES/Net/Zones/Z1/S2"]), zoneKeys: new Set(["ES/Zones/Z1", "ES/Zones/Z2"]) };
+  const card = (key, extra = {}) => ({ ...automatic(key), ...extra });
+  const store = new DeviceWidgetStore(file);
+  await store.synchronize(keys);
+
+  const saved = await store.save(card("ES/Zones/Z1", { sensorMembers: ["ES/Net/Zones/Z1/S1"] }), sensors);
+  assert.deepEqual(saved.sensorMembers, ["ES/Net/Zones/Z1/S1"]);
+  // An ordinary card save omits the field; that is not a request to change the list.
+  await store.save(card("ES/Zones/Z1", { label: "Ured" }), sensors);
+  assert.deepEqual(store.devices.find((d) => d.key === "ES/Zones/Z1").sensorMembers, ["ES/Net/Zones/Z1/S1"]);
+
+  const before = await fs.readFile(file, "utf8");
+  await assert.rejects(store.save(card("ES/Zones/Z2", { sensorMembers: ["ES/Net/Zones/Z1/S1"] }), sensors), { status: 409, code: "SENSOR_ALREADY_IN_ZONE" });
+  await assert.rejects(store.save(card("ES/Net/Zones/Z1/S2", { sensorMembers: ["ES/Net/Zones/Z1/S1"] }), sensors), { code: "INVALID_DEVICE_SETTINGS" });
+  await assert.rejects(store.save(card("ES/Net/Zones/Z1/S2", { sensorMembers: [] }), sensors), { code: "INVALID_DEVICE_SETTINGS" });
+  await assert.rejects(store.save(card("ES/Zones/Z1", { sensorMembers: ["ES/Net/Zones/Z1/Light"] }), sensors), { code: "INVALID_DEVICE_SETTINGS" });
+  await assert.rejects(store.save(card("ES/Zones/Z1", { sensorMembers: ["ES/Zones/Z1"] }), sensors), { code: "INVALID_DEVICE_SETTINGS" });
+  await assert.rejects(store.save(card("ES/Zones/Z1", { sensorMembers: ["ES/Net/Zones/Z1/S2", "ES/Net/Zones/Z1/S2"] }), sensors), { code: "INVALID_DEVICE_SETTINGS" });
+  await assert.rejects(store.save(card("ES/Zones/Z1", { sensorMembers: ["ES/Net/Zones/Z1/S2"] }), { ...sensors, authorizeCardEdit() {} }), { code: "ADMIN_REQUIRED" });
+  assert.equal(await fs.readFile(file, "utf8"), before);
+
+  // An emptied list records that the administrator wants no sensors here. It
+  // must survive a restart, because no list at all means automatic pairing.
+  await store.save(card("ES/Zones/Z1", { sensorMembers: [] }), sensors);
+  const restarted = new DeviceWidgetStore(file);
+  await restarted.synchronize(keys);
+  assert.deepEqual(restarted.devices.find((d) => d.key === "ES/Zones/Z1").sensorMembers, []);
+  // A sensor released by one zone can be listed by another.
+  await store.save(card("ES/Zones/Z2", { sensorMembers: ["ES/Net/Zones/Z1/S1"] }), sensors);
+  await store.save(card("ES/Zones/Z2", { sensorMembers: null }), sensors);
+  await store.save(card("ES/Zones/Z1", { sensorMembers: null }), sensors);
+  assert.ok(store.devices.every((device) => !Object.hasOwn(device, "sensorMembers")));
+});

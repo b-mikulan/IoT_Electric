@@ -6,6 +6,30 @@ const organization = require("../devices/roomOrganization");
 
 const fields = ["label", "room", "primaryPointId", "secondaryPointIds"];
 
+// Cards that list other cards inside them. This is dashboard organization
+// only and changes nothing on the controller. An omitted field keeps the
+// stored list and null removes it. An empty light list also removes it. An
+// empty sensor list is kept: it records that the administrator wants no
+// sensors in the zone, where no list at all means automatic pairing.
+const memberLists = {
+  lightMembers: {
+    ownerKeys: "lightGroupKeys", memberKeys: "lightKeys", keepEmpty: false,
+    limit: "A light group can list at most 500 lights.", keys: "Light group members must be device keys.",
+    duplicate: "A light can be listed only once in a group.", self: "A light group cannot contain itself.",
+    owner: "Svjetla se mogu dodati samo grupi rasvjete.", member: "U grupu se mogu dodati samo postojeća pojedinačna svjetla.",
+    taken: "Svjetlo je već prikazano u drugoj grupi rasvjete. Najprije ga ukloni iz te grupe.", takenCode: "LIGHT_ALREADY_GROUPED",
+    admin: "Uređivanje svjetala u grupi zahtijeva administratorski pristup.",
+  },
+  sensorMembers: {
+    ownerKeys: "zoneKeys", memberKeys: "sensorKeys", keepEmpty: true,
+    limit: "A zone can list at most 500 sensors.", keys: "Zone members must be device keys.",
+    duplicate: "A sensor can be listed only once in a zone.", self: "A zone cannot contain itself.",
+    owner: "Senzori se mogu dodati samo kartici zone.", member: "U zonu se mogu dodati samo postojeći senzori.",
+    taken: "Senzor je već dodan drugoj zoni. Najprije ga ukloni iz te zone.", takenCode: "SENSOR_ALREADY_IN_ZONE",
+    admin: "Uređivanje senzora u zoni zahtijeva administratorski pristup.",
+  },
+};
+
 class DeviceWidgetStoreError extends Error {
   constructor(message, status, code) {
     super(message);
@@ -66,7 +90,38 @@ function normalizeSettings(value, { requireFields = false } = {}) {
     new Set(result.secondaryPointIds).size !== result.secondaryPointIds.length ||
     result.secondaryPointIds.includes(result.primaryPointId)
   )) throw invalidSettings("Primary and secondary readings must be distinct.");
+  for (const [field, list] of Object.entries(memberLists)) {
+    if (Object.hasOwn(value, field)) result[field] = normalizeMembers(value[field], key, list);
+  }
   return result;
+}
+
+function normalizeMembers(value, ownerKey, list) {
+  if (value === null || value === undefined) return null;
+  if (!Array.isArray(value) || value.length > 500) throw invalidSettings(list.limit);
+  const members = value.map((member) => {
+    if (typeof member !== "string" || !member.trim() || member.trim().length > 4_096) throw invalidSettings(list.keys);
+    return member.trim();
+  });
+  if (new Set(members).size !== members.length) throw invalidSettings(list.duplicate);
+  if (members.includes(ownerKey)) throw invalidSettings(list.self);
+  return members.length || list.keepEmpty ? members : null;
+}
+
+function checkMembers(document, entry, previous, field, context) {
+  const list = memberLists[field];
+  if (!entry[field]) return;
+  if (!context[list.ownerKeys]?.has(entry.key)) throw invalidSettings(list.owner);
+  const present = new Set(context.deviceKeys);
+  const kept = new Set(previous?.[field] || []);
+  for (const member of entry[field]) {
+    // Previously saved references may be temporarily absent; keep them.
+    if (kept.has(member)) continue;
+    if (!context[list.memberKeys]?.has(member)) throw invalidSettings(list.member);
+    const other = document.devices.find((device) => device.key !== entry.key && present.has(device.key)
+      && Array.isArray(device[field]) && device[field].includes(member));
+    if (other) throw new DeviceWidgetStoreError(list.taken, 409, list.takenCode);
+  }
 }
 
 function parseDocument(raw) {
@@ -154,7 +209,7 @@ class DeviceWidgetStore {
     });
   }
 
-  save(settings, { deviceKeys, pointIds, roomNames = [], authorizeCardEdit }) {
+  save(settings, { deviceKeys, pointIds, roomNames = [], authorizeCardEdit, lightKeys, lightGroupKeys, sensorKeys, zoneKeys }) {
     return this.#enqueue(async () => {
       if (!this.enabled) throw new DeviceWidgetStoreError("Device card settings require a writable DEVICE_WIDGETS_FILE or WIDGETS_FILE directory.", 409, "DEVICE_WIDGET_FILE_UNAVAILABLE");
       const entry = normalizeSettings(authorizeCardEdit ? { ...settings, room: null } : settings, { requireFields: true });
@@ -168,6 +223,12 @@ class DeviceWidgetStore {
         throw invalidSettings("All readings must belong to this device.");
       }
       const { document } = await this.#read();
+      for (const [field, list] of Object.entries(memberLists)) {
+        if (!Object.hasOwn(entry, field)) continue;
+        if (authorizeCardEdit) throw new DeviceWidgetStoreError(list.admin, 403, "ADMIN_REQUIRED");
+        const previous = document.devices.find((device) => device.key === entry.key);
+        checkMembers(document, entry, previous && normalizeSettings(previous), field, { deviceKeys, lightKeys, lightGroupKeys, sensorKeys, zoneKeys });
+      }
       if (authorizeCardEdit) {
         authorizeCardEdit(entry.key);
         entry.room = document.devices.find(device => normalizeSettings(device).key === entry.key)?.room ?? null;
@@ -186,9 +247,11 @@ class DeviceWidgetStore {
       const index = document.devices.findIndex((device) => normalizeSettings(device).key === entry.key);
       if (index < 0) document.devices.push(entry);
       else document.devices[index] = { ...document.devices[index], ...entry };
+      const saved = document.devices[index < 0 ? document.devices.length - 1 : index];
+      for (const field of Object.keys(memberLists)) if (saved[field] === null) delete saved[field];
       await this.#write(document);
       this.#publish(document);
-      return structuredClone(entry);
+      return normalizeSettings(saved);
     });
   }
 

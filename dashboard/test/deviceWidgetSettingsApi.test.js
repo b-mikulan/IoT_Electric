@@ -123,3 +123,66 @@ test("malformed settings are reported explicitly and retained while inline mode 
   assert.equal(response.status, 409);
   assert.equal((await response.json()).code, "DEVICE_WIDGET_FILE_UNAVAILABLE");
 });
+
+test("admins list lights inside a light group; members are validated by type and kept by ordinary saves", async (t) => {
+  const { config, save, baseUrl, file, rawFile } = await start(t);
+  config.widgets = [
+    { id: "01/ES/Hall/GRP1/Values/GrpPct", label: "Group" },
+    { id: "01/ES/Hall/L1/Values/LtPct", label: "Light 1" },
+    { id: "01/ES/Hall/L2/Values/LtPct", label: "Light 2" },
+    { id: "01/ES/Hall/S1/Values/RmTmp", label: "Sensor" },
+  ];
+  await fs.writeFile(rawFile, JSON.stringify(config.widgets));
+  const types = Object.fromEntries(buildDevices(config.widgets).map((device) => [device.type, device.key]));
+  assert.ok(types.lightGroup && types.light && types.sensor);
+  const group = { key: types.lightGroup, label: null, room: null, primaryPointId: null, secondaryPointIds: null };
+  const light2 = "ES/Hall/L2";
+
+  let response = await save({ ...group, lightMembers: ["ES/Hall/L1", light2] });
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).device.lightMembers, ["ES/Hall/L1", light2]);
+  const before = await fs.readFile(file, "utf8");
+  for (const lightMembers of [[types.sensor], [types.lightGroup], "ES/Hall/L1"]) {
+    response = await save({ ...group, lightMembers });
+    assert.equal(response.status, 400, JSON.stringify(lightMembers));
+  }
+  response = await save({ key: "ES/Hall/L1", label: null, room: null, primaryPointId: null, secondaryPointIds: null, lightMembers: [light2] });
+  assert.equal(response.status, 400);
+  assert.equal(await fs.readFile(file, "utf8"), before);
+
+  assert.equal((await save({ ...group, label: "Hodnik" })).status, 200);
+  const read = await (await fetch(`${baseUrl}/api/devices/settings`)).json();
+  assert.deepEqual(read.devices.find((entry) => entry.key === group.key).lightMembers, ["ES/Hall/L1", light2]);
+});
+
+test("admins choose the sensors a zone card lists; an emptied list is kept and null hands the zone back to automatic pairing", async (t) => {
+  const { config, save, baseUrl, file, rawFile } = await start(t);
+  const sensor = "ES/Net/IP Network/RP1/Application/Zones/Z1/S1";
+  config.widgets = [
+    { id: "01/ES/Zones/Z1/Values/LtLvl", label: "Zone" },
+    { id: `01/${sensor}/Values/LtLvl`, label: "Sensor" },
+    { id: "01/ES/Hall/L1/Values/LtPct", label: "Light" },
+  ];
+  await fs.writeFile(rawFile, JSON.stringify(config.widgets));
+  const types = Object.fromEntries(buildDevices(config.widgets).map((device) => [device.type, device.key]));
+  assert.deepEqual(types, { zone: "ES/Zones/Z1", sensor, light: "ES/Hall/L1" });
+  const zone = { key: types.zone, label: null, room: null, primaryPointId: null, secondaryPointIds: null };
+
+  let response = await save({ ...zone, sensorMembers: [sensor] });
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).device.sensorMembers, [sensor]);
+  const before = await fs.readFile(file, "utf8");
+  for (const sensorMembers of [[types.light], [types.zone], sensor]) {
+    response = await save({ ...zone, sensorMembers });
+    assert.equal(response.status, 400, JSON.stringify(sensorMembers));
+  }
+  assert.equal((await save({ ...zone, key: types.light, sensorMembers: [sensor] })).status, 400);
+  assert.equal(await fs.readFile(file, "utf8"), before);
+
+  response = await save({ ...zone, sensorMembers: [] });
+  assert.deepEqual((await response.json()).device.sensorMembers, []);
+  const read = await (await fetch(`${baseUrl}/api/devices/settings`)).json();
+  assert.deepEqual(read.devices.find((entry) => entry.key === zone.key).sensorMembers, []);
+  response = await save({ ...zone, sensorMembers: null });
+  assert.equal(Object.hasOwn((await response.json()).device, "sensorMembers"), false);
+});

@@ -10,6 +10,7 @@
     generic: ["M5 5h14v14H5zM9 9h6v6H9zM9 2v3m6-3v3M9 19v3m6-3v3M2 9h3m-3 6h3m14-6h3m-3 6h3"],
     settings: ["M10 3h4l.5 2.2 1.5.9 2.2-.6 2 3.5-1.7 1.6v1.8l1.7 1.6-2 3.5-2.2-.6-1.5.9-.5 2.2h-4l-.5-2.2-1.5-.9-2.2.6-2-3.5 1.7-1.6v-1.8L3.8 9l2-3.5 2.2.6 1.5-.9L10 3Z", "M15 11.7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"],
     refresh: ["M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5", "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5"],
+    chevron: ["m9 6 6 6-6 6"],
   };
   const roleLabels = {
     brightnessSet: "Zadana svjetlina", brightnessStatus: "Očitana svjetlina",
@@ -138,6 +139,12 @@
     let filterSignature = "";
     let deviceIndex = null;
     let devicePositions = new Map();
+    // Device keys in display order: floor, room, then kind of device.
+    let displayOrder = [];
+    const headings = new Map();
+    let savedSettings = [];
+    let memberParents = new Map();
+    let pageDevices = [];
 
     container.classList.add("device-cards-section");
     const headerActions = el("div", "dc-header-actions");
@@ -327,8 +334,17 @@
 
     function updateSummary() {
       const count = filteredDevices.length;
-      const shown = Math.min(count, displayLimit);
-      summary.textContent = devices.length ? `${count === devices.length ? count : `${count} od ${devices.length}`} kartica uređaja${shown < count ? ` · prikazano ${shown}` : ""}${connection !== "connected" ? " · Očitanja se trenutačno ne osvježavaju" : ""}` : "";
+      const shown = Math.min(pageDevices.length, displayLimit);
+      summary.textContent = devices.length ? `${count === devices.length ? count : `${count} od ${devices.length}`} kartica uređaja${shown < pageDevices.length ? ` · prikazano ${shown}` : ""}${connection !== "connected" ? " · Očitanja se trenutačno ne osvježavaju" : ""}` : "";
+    }
+
+    // Light key → light-group key. Saved settings, not device objects, carry
+    // membership, so live value updates never move a light out of its group.
+    // shortcut: a light is shown in its first listed group only; the store
+    // rejects a second group, revisit if multi-group membership is needed.
+    // Lights inside their group and sensors inside their zone: member key -> parent key.
+    function groupMembership() {
+      return globalThis.IoTDeviceModel?.deviceMembership?.(devices, savedSettings) || new Map();
     }
 
     function reconcileCommand(device) {
@@ -362,22 +378,74 @@
     }
 
     function showMore() {
-      if (destroyed || displayLimit >= filteredDevices.length) return;
+      if (destroyed || displayLimit >= pageDevices.length) return;
       displayLimit += CARD_BATCH_SIZE;
       applyFilter();
+    }
+
+    // Recomputed on a full update or when a label, type or room changes, so
+    // live readings never move a card.
+    function computeDisplayOrder() {
+      const sort = globalThis.IoTDeviceModel?.sortDevicesForDisplay;
+      displayOrder = (typeof sort === "function" ? sort(devices, registeredFloors) : devices).map((device) => device.key);
+    }
+
+    // A heading opens each floor and room in the shown slice, but only when
+    // the whole result spans more than one of them; a room continued after
+    // "Prikaži još uređaja" keeps its single heading. Devices without a room
+    // have no floor heading.
+    function headingFloorKey(device) { return device.room?.label ? device.room.floorId || "unknown" : null; }
+
+    function heading(key, className, text) {
+      let node = headings.get(key);
+      if (!node) { node = el("h3", `dc-grid-heading ${className}`); headings.set(key, node); }
+      if (node.textContent !== text) node.textContent = text;
+      return node;
+    }
+
+    function withHeadings(shown, page) {
+      const floorKeys = new Set(page.map(headingFloorKey).filter(Boolean));
+      const showFloors = floorKeys.size > 1;
+      const showRooms = new Set(page.map(roomKey)).size > 1;
+      const nodes = [];
+      let lastFloor, lastRoom;
+      for (const device of shown) {
+        const floorKey = headingFloorKey(device);
+        if (showFloors && floorKey && floorKey !== lastFloor) nodes.push(heading(`floor:${floorKey}`, "dc-grid-heading-floor", floorLabel(floorKey)));
+        lastFloor = floorKey;
+        const key = roomKey(device);
+        if (showRooms && key !== lastRoom) nodes.push(heading(key, "dc-grid-heading-room", device.room?.label || "Bez prostorije"));
+        lastRoom = key;
+        nodes.push(cards.get(device.key).node);
+      }
+      const used = new Set(nodes);
+      for (const node of headings.values()) if (!used.has(node)) node.remove();
+      return nodes;
     }
 
     function applyFilter() {
       const query = searchText(search.value.trim());
       const signature = JSON.stringify([query, selectedFloor, selectedRoom, typeFilter.value]);
       if (signature !== filterSignature) { filterSignature = signature; displayLimit = CARD_BATCH_SIZE; }
-      filteredDevices = devices.filter((device) => (selectedRoom === "all" || roomKey(device) === selectedRoom)
+      filteredDevices = displayOrder.map((key) => devicesByKey.get(key)).filter((device) => device && (selectedRoom === "all" || roomKey(device) === selectedRoom)
         && (selectedFloor === "all" || device.room && (device.room.floorId || "unknown") === selectedFloor)
         && (typeFilter.value === "all" || device.type === typeFilter.value) && searchIndex.get(device.key)?.includes(query));
       const count = filteredDevices.length;
-      const shownDevices = filteredDevices.slice(0, displayLimit);
-      const shownKeys = new Set(shownDevices.map((device) => device.key));
-      for (const device of shownDevices) {
+      // A text search lists matching lights on their own, captioned with their
+      // group. Otherwise a shown group holds all of its accessible lights,
+      // and only lights whose group is filtered out stay on the main list.
+      const nested = query === "";
+      const filteredKeys = new Set(filteredDevices.map((device) => device.key));
+      pageDevices = nested ? filteredDevices.filter((device) => !filteredKeys.has(memberParents.get(device.key))) : filteredDevices;
+      const shownDevices = pageDevices.slice(0, displayLimit);
+      const members = new Map();
+      if (nested) for (const device of devices) {
+        const parent = memberParents.get(device.key);
+        if (parent) members.set(parent, [...(members.get(parent) || []), device]);
+      }
+      const groupedDevices = shownDevices.flatMap((device) => [device, ...(members.get(device.key) || [])]);
+      const shownKeys = new Set(groupedDevices.map((device) => device.key));
+      for (const device of groupedDevices) {
         if (!cards.has(device.key)) cards.set(device.key, makeCard(device));
         const card = cards.get(device.key);
         if (card.needsRefresh) { card.update(device); card.needsRefresh = false; }
@@ -390,15 +458,21 @@
         card.selection.hidden = !selectionMode;
         card.checkbox.checked = selectedKeys.has(device.key);
         card.node.classList.toggle("dc-card-selected", selectedKeys.has(device.key));
+        const parent = memberParents.get(device.key);
+        card.setGroupNote(shown && parent && !(nested && filteredKeys.has(parent)) ? devicesByKey.get(parent) : null);
       }
       // Moving existing nodes preserves focused controls and their drafts.
-      // Only the requested slice belongs to the live grid.
-      for (let index = 0; index < shownDevices.length; index++) {
-        const node = cards.get(shownDevices[index].key).node;
-        if (grid.children[index] !== node) grid.insertBefore(node, grid.children[index] || null);
+      // Only the requested slice, with its headings, belongs to the live grid.
+      const nodes = withHeadings(shownDevices, pageDevices);
+      for (let index = 0; index < nodes.length; index++) {
+        if (grid.children[index] !== nodes[index]) grid.insertBefore(nodes[index], grid.children[index] || null);
       }
-      loadMore.hidden = shownDevices.length >= count;
-      loadCount.textContent = `Prikazano ${shownDevices.length} od ${count} uređaja`;
+      for (const device of shownDevices) {
+        const card = cards.get(device.key);
+        card.setMembers((members.get(card.device.key) || []).map((member) => cards.get(member.key).node));
+      }
+      loadMore.hidden = shownDevices.length >= pageDevices.length;
+      loadCount.textContent = `Prikazano ${shownDevices.length} od ${pageDevices.length} uređaja`;
       loadButton.disabled = loadMore.hidden;
       selectShown.title = `Odaberi sve uređaje koji odgovaraju filtrima (${count}), uključujući one niže na popisu.`;
       selectShown.textContent = `Odaberi sve rezultate (${count})`;
@@ -527,7 +601,14 @@
       const identity = el("div", "dc-identity");
       const title = el("h3", "dc-card-title", initial.label);
       const room = el("p", "dc-room");
-      identity.append(title, room);
+      const groupNote = el("p", "dc-group-note");
+      groupNote.hidden = true;
+      identity.append(title, room, groupNote);
+      card.setGroupNote = (parent) => {
+        groupNote.hidden = !parent;
+        const text = parent ? `${parent.type === "zone" ? "U zoni" : "U grupi"}: ${parent.label}` : "";
+        if (groupNote.textContent !== text) groupNote.textContent = text;
+      };
       const settings = el("button", "dc-settings-button");
       settings.type = "button";
       settings.hidden = true;
@@ -548,7 +629,18 @@
       const cardActions = el("div", "dc-card-actions");
       cardActions.append(refresh, settings);
       const type = el("span", "dc-type-label", typeLabels[initial.type] || "Uređaj");
-      top.append(deviceIcon, identity, cardActions, type);
+      // Shown only while the card is a row inside a light group, where it
+      // opens the room, refresh, settings and details (see deviceCards.css).
+      let memberOpen = false;
+      const expand = el("button", "dc-member-expand");
+      expand.type = "button";
+      expand.append(icon("chevron"));
+      const syncMemberOpen = () => {
+        node.classList.toggle("dc-member-open", memberOpen);
+        expand.setAttribute("aria-expanded", String(memberOpen));
+      };
+      expand.addEventListener("click", () => { memberOpen = !memberOpen; syncMemberOpen(); });
+      top.append(expand, deviceIcon, identity, cardActions, type);
       const body = el("div", "dc-card-body");
       const states = el("div", "dc-state-line");
       const details = el("details", "dc-details");
@@ -559,7 +651,22 @@
       commandStatus.setAttribute("role", "status");
       commandStatus.setAttribute("aria-live", "polite");
       commandStatus.hidden = true;
-      node.append(selectionLabel, top, body, states, commandStatus, refreshStatus, details);
+      // Starts closed; the same element survives updates, so its open state does too.
+      const membersPanel = el("details", "dc-group-members");
+      const membersSummary = el("summary", "");
+      const membersList = el("div", "dc-group-member-list");
+      membersPanel.append(membersSummary, membersList);
+      membersPanel.hidden = true;
+      card.setMembers = (nodes) => {
+        membersPanel.hidden = nodes.length === 0;
+        const text = `${card.device.type === "zone" ? "Senzori u zoni" : "Svjetla u grupi"} (${nodes.length})`;
+        if (membersSummary.textContent !== text) membersSummary.textContent = text;
+        for (let index = 0; index < nodes.length; index++) {
+          if (membersList.children[index] !== nodes[index]) membersList.insertBefore(nodes[index], membersList.children[index] || null);
+        }
+        while (membersList.children.length > nodes.length) membersList.children[nodes.length].remove();
+      };
+      node.append(selectionLabel, top, body, states, commandStatus, refreshStatus, details, membersPanel);
 
       const pointFor = (role) => card.device.roles?.[role];
       const draftKey = (role) => `${card.device.key}\u0000${role}`;
@@ -901,6 +1008,9 @@
           deviceIcon.replaceChildren(icon(device.type));
           type.textContent = typeLabels[device.type] || "Uređaj";
         }
+        syncMemberOpen();
+        expand.setAttribute("aria-label", `Više o uređaju ${device.label}`);
+        expand.title = `Više o uređaju ${device.label}`;
         title.textContent = device.label;
         checkbox.setAttribute("aria-label", `Odaberi uređaj ${device.label} · ${device.key}`);
         settings.hidden = !settingsEnabled || typeof onSettings !== "function";
@@ -970,6 +1080,9 @@
       devices = Array.isArray(result) ? result : result?.devices || [];
       devicePositions = new Map(devices.map((device, index) => [device.key, index]));
       devicesByKey = new Map(devices.map((device) => [device.key, device]));
+      computeDisplayOrder();
+      savedSettings = Array.isArray(deviceSettings) ? deviceSettings : [];
+      memberParents = groupMembership();
       searchIndex = new Map(devices.map((device) => [device.key, searchText([device.label, device.key, device.context, roomCaption(device.room)].filter(Boolean).join(" "))]));
       const present = new Set(devices.map((device) => device.key));
       for (const key of selectedKeys) if (!present.has(key)) selectedKeys.delete(key);
@@ -1016,7 +1129,7 @@
       }
       let updatedCards = 0;
       for (const key of dirty) if (updateCard(devicesByKey.get(key))) updatedCards++;
-      if (filtersChanged) { updateFilters(); applyFilter(); }
+      if (filtersChanged) { memberParents = groupMembership(); computeDisplayOrder(); updateFilters(); applyFilter(); }
       else if (connectionChanged) updateSummary();
       return { changedDevices: changed.length, updatedCards };
     }
@@ -1027,7 +1140,7 @@
         selectedKeys.clear(); selectionMode = false; applyFilter();
         managementStatus.textContent = message; managementStatus.hidden = !message;
       },
-      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); selectedKeys.clear(); devices = []; deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
+      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); selectedKeys.clear(); devices = []; displayOrder = []; headings.clear(); deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
   }
 
   const api = { create };

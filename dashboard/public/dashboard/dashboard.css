@@ -34,10 +34,10 @@
 .dashboard-page .dc-type-label { font-size: .65rem; }
 .dashboard-page .dc-muted { font-size: .75rem; color: #6a7d73; }
 .dashboard-page .dc-room { font-size: .75rem; }
-.dashboard-page .dc-details > summary { display: flex; align-items: center; justify-content: space-between; width: 100%; list-style: none; font-size: .75rem; padding-block: 3px; }
-.dashboard-page .dc-details > summary::-webkit-details-marker { display: none; }
-.dashboard-page .dc-details > summary::after { content: ""; width: 7px; height: 7px; margin: 0 3px 3px 10px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); }
-.dashboard-page .dc-details[open] > summary::after { transform: rotate(225deg); margin-bottom: -3px; }
+.dashboard-page :is(.dc-details, .dc-group-members) > summary { display: flex; align-items: center; justify-content: space-between; width: 100%; list-style: none; font-size: .75rem; padding-block: 3px; }
+.dashboard-page :is(.dc-details, .dc-group-members) > summary::-webkit-details-marker { display: none; }
+.dashboard-page :is(.dc-details, .dc-group-members) > summary::after { content: ""; width: 7px; height: 7px; margin: 0 3px 3px 10px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); }
+.dashboard-page :is(.dc-details, .dc-group-members)[open] > summary::after { transform: rotate(225deg); margin-bottom: -3px; }
 .dashboard-page .dc-load-button { height: 44px; }
 .dashboard-page .app-footer { font-size: .78rem; gap: 12px; padding-bottom: 26px; }
 

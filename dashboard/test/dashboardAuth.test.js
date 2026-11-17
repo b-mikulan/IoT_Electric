@@ -316,6 +316,9 @@ test("admin manages persistent users and room permissions apply to all dashboard
   assert.equal((await post("/api/devices/settings", card, viewer)).status, 403);
   assert.equal((await post("/api/devices/settings", { ...card, key: `${firstZone}/S1` }, second)).status, 403);
   assert.equal((await post("/api/devices/settings", { ...card, room: rooms[0].id }, second)).status, 403);
+  // Card editing rights do not include dashboard organization such as light groups.
+  assert.equal((await post("/api/devices/settings", { ...card, lightMembers: [] }, second)).status, 403);
+  assert.equal((await post("/api/devices/settings", { ...card, sensorMembers: [] }, second)).status, 403);
   assert.equal((await post("/api/devices/settings", { ...card, primaryPointId: widgets[0].id }, second)).status, 400);
   const saved = await post("/api/devices/settings", card, second);
   assert.equal(saved.status, 200);

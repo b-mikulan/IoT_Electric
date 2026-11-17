@@ -86,7 +86,8 @@ const settingsDeleteCancel = document.querySelector("#settings-delete-cancel");
 const cardSettings = Object.fromEntries([
   "dialog", "title", "close", "form", "label", "label-hint", "room", "new-room-field", "new-room", "new-room-floor",
   "primary", "unit-mode", "unit", "unit-field", "unit-hint", "secondary-mode", "secondary-hint", "secondary-field", "search", "secondary-list",
-  "secondary-count", "functions", "reset", "cancel", "save", "status",
+  "secondary-count", "members-field", "members-title", "members-help", "members-search-label", "members-search", "members-list", "members-count", "members-auto",
+  "functions", "reset", "cancel", "save", "status",
   "remove", "remove-confirmation", "remove-message", "remove-confirm", "remove-cancel",
 ].map((name) => [name, document.querySelector(`#device-settings-${name}`)]));
 
@@ -1918,6 +1919,19 @@ function openDeviceCardSettingsDialog(device) {
   cardSettingsContext = { key: device.key, device, secondaryIds: new Set(), choices: [] };
   cardSettings.title.textContent = `Postavke kartice ${device.label}`;
   populateCardSettings(deviceSettingsByKey.get(device.key));
+  // Kept outside populateCardSettings so "Vrati automatski odabir" leaves membership alone.
+  const memberKind = deviceSettingsEnabled ? memberKinds[device.type] || null : null;
+  cardSettingsContext.memberKind = memberKind;
+  cardSettings["members-field"].hidden = !memberKind;
+  cardSettings["members-search"].value = "";
+  if (memberKind) {
+    cardSettings["members-title"].textContent = memberKind.title;
+    cardSettings["members-help"].textContent = memberKind.help;
+    cardSettings["members-search-label"].textContent = memberKind.search;
+    cardSettings["members-list"].setAttribute("aria-label", memberKind.title);
+  }
+  resetCardMembers();
+  renderCardMemberChoices();
   showCardSettingsStatus("");
   if (!cardSettings.dialog.open) cardSettings.dialog.showModal();
   requestAnimationFrame(() => cardSettings.label.focus());
@@ -1929,6 +1943,109 @@ function setCardSettingsBusy(busy) {
   cardSettings.close.disabled = busy;
   cardSettings.functions.disabled = busy || !widgetEditingEnabled;
   renderCardSecondaryChoices();
+  renderCardMemberChoices();
+}
+
+const MEMBER_CHOICE_LIMIT = 150;
+
+// Cards that list other cards inside them, and the words for each case. A
+// zone without a saved list shows the sensors the model pairs with it.
+const memberKinds = {
+  lightGroup: {
+    field: "lightMembers", member: "light", automatic: false, title: "Svjetla u grupi", search: "Pronađi svjetlo",
+    help: "Popis samo organizira prikaz: označena svjetla prikazuju se unutar ove kartice. Grupna naredba i dalje upravlja stvarnom DALI grupom, bez obzira na ovaj popis.",
+    missing: "Nedostupno svjetlo", elsewhere: "već u grupi", nouns: ["svjetlo", "svjetla", "svjetala"], where: "u grupi",
+    saved: "Postavke kartice i popis svjetala u grupi su spremljeni.",
+  },
+  zone: {
+    field: "sensorMembers", member: "sensor", automatic: true, title: "Senzori u zoni", search: "Pronađi senzor",
+    help: "Popis samo organizira prikaz: označeni senzori prikazuju se unutar ove kartice umjesto na glavnom popisu. Dok popis ne promijeniš, kartica sama prikazuje senzore koji joj sigurno pripadaju.",
+    missing: "Nedostupan senzor", elsewhere: "već u zoni", nouns: ["senzor", "senzora", "senzora"], where: "u zoni",
+    saved: "Postavke kartice i popis senzora u zoni su spremljeni.",
+  },
+};
+
+// Members the card shows with the given settings: saved lists first, then
+// automatic pairing where the model allows it.
+function shownMembers(parentKey, settings) {
+  return [...globalThis.IoTDeviceModel.deviceMembership(cardSettingsDevices(), settings)].filter(([, parent]) => parent === parentKey).map(([member]) => member);
+}
+
+// Start the list from what the card shows now, so opening and saving a zone
+// does not turn its automatic choice into a saved list.
+function resetCardMembers() {
+  const { key, memberKind } = cardSettingsContext;
+  const saved = memberKind && deviceSettingsByKey.get(key)?.[memberKind.field];
+  cardSettingsContext.membersAutomatic = false;
+  cardSettingsContext.initialMembers = !memberKind ? null : Array.isArray(saved) ? [...saved] : shownMembers(key, [...deviceSettingsByKey.values()]);
+  cardSettingsContext.members = memberKind ? new Set(cardSettingsContext.initialMembers) : null;
+  cardSettings["members-auto"].hidden = !(memberKind?.automatic && Array.isArray(saved));
+}
+
+function renderCardMemberChoices() {
+  const list = cardSettings["members-list"];
+  if (!cardSettingsContext?.members) { list.replaceChildren(); return; }
+  const { members, key: groupKey, device: group, memberKind: kind } = cardSettingsContext;
+  const devices = cardSettingsDevices();
+  const byKey = new Map(devices.map((device) => [device.key, device]));
+  // The store allows a member in one saved list only; show where else it is listed.
+  const otherGroup = new Map();
+  for (const entry of deviceSettingsByKey.values()) {
+    if (entry.key === groupKey || !byKey.has(entry.key)) continue;
+    for (const member of entry[kind.field] || []) if (!otherGroup.has(member)) otherGroup.set(member, byKey.get(entry.key).label);
+  }
+  // Sensors paired with a zone on their own can still be listed here; that moves them.
+  const paired = kind.automatic ? globalThis.IoTDeviceModel.automaticZoneMembers(devices) : new Map();
+  const shown = kind.automatic ? globalThis.IoTDeviceModel.deviceMembership(devices, [...deviceSettingsByKey.values()]) : new Map();
+  const roomId = (device) => device?.room?.id || device?.room?.label || "";
+  const fold = (value) => value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("hr");
+  const query = fold(cardSettings["members-search"].value.trim());
+  const candidates = [
+    ...[...members].filter((key) => byKey.get(key)?.type !== kind.member).map((key) => ({ key, label: kind.missing, room: null, missing: true })),
+    ...devices.filter((device) => device.type === kind.member),
+  ].filter((device) => !query || fold(`${device.label} ${device.room?.label || ""} ${device.key}`).includes(query));
+  const rank = (device) => members.has(device.key) ? 0 : paired.get(device.key) === groupKey ? 1 : roomId(device) && roomId(device) === roomId(group) ? 2 : 3;
+  candidates.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label, "hr", { numeric: true }));
+  list.replaceChildren();
+  for (const device of candidates.slice(0, MEMBER_CHOICE_LIMIT)) {
+    const label = document.createElement("label");
+    label.className = "device-metric-option";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "browser-default";
+    checkbox.checked = members.has(device.key);
+    const elsewhere = !checkbox.checked && otherGroup.get(device.key);
+    checkbox.disabled = cardSettingsBusy || Boolean(elsewhere);
+    checkbox.setAttribute("aria-label", `${device.label} · ${device.key}`);
+    checkbox.addEventListener("change", () => {
+      if (cardSettingsBusy) return;
+      if (checkbox.checked) members.add(device.key); else members.delete(device.key);
+      // Any manual change makes this a saved list again.
+      cardSettingsContext.membersAutomatic = false;
+      cardSettings["members-count"].textContent = memberCountText(candidates.length);
+      showCardSettingsStatus("");
+    });
+    const copy = document.createElement("span");
+    copy.textContent = device.label;
+    const source = document.createElement("small");
+    const automaticParent = !elsewhere && shown.get(device.key) !== groupKey && byKey.get(shown.get(device.key));
+    source.textContent = [device.room?.label || (device.missing ? null : "Bez prostorije"), elsewhere ? `${kind.elsewhere} ${elsewhere}` : null,
+      paired.get(device.key) === groupKey ? "automatski uparen s ovom zonom" : automaticParent ? `sada automatski u zoni ${automaticParent.label}` : null,
+      device.missing ? "trenutačno nije na dashboardu; odznači za uklanjanje" : null, device.key].filter(Boolean).join(" · ");
+    copy.appendChild(source);
+    label.append(checkbox, copy);
+    list.appendChild(label);
+  }
+  cardSettings["members-count"].textContent = memberCountText(candidates.length);
+}
+
+function memberCountText(found) {
+  const selected = cardSettingsContext?.members?.size || 0;
+  const more = found > MEMBER_CHOICE_LIMIT ? ` · prikazano prvih ${MEMBER_CHOICE_LIMIT} od ${found}, suzi pretragu` : "";
+  const tens = selected % 100, ones = selected % 10;
+  const { nouns: [one, few, many], where } = cardSettingsContext.memberKind;
+  const noun = ones === 1 && tens !== 11 ? one : ones >= 2 && ones <= 4 && (tens < 12 || tens > 14) ? few : many;
+  return `${selected} ${noun} ${where}${more}`;
 }
 
 cardSettings.room.addEventListener("change", updateCardRoomMode);
@@ -1939,6 +2056,17 @@ cardSettings.primary.addEventListener("change", () => {
 cardSettings["unit-mode"].addEventListener("change", updateCardUnitMode);
 cardSettings["secondary-mode"].addEventListener("change", updateCardSecondaryMode);
 cardSettings.search.addEventListener("input", renderCardSecondaryChoices);
+cardSettings["members-search"].addEventListener("input", renderCardMemberChoices);
+cardSettings["members-auto"].addEventListener("click", () => {
+  if (!cardSettingsContext?.memberKind?.automatic || cardSettingsBusy) return;
+  // Show what the zone would list without its saved list; saving then removes that list.
+  const { key, memberKind } = cardSettingsContext;
+  const withoutList = [...deviceSettingsByKey.values()].map((entry) => entry.key === key ? { ...entry, [memberKind.field]: null } : entry);
+  cardSettingsContext.members = new Set(shownMembers(key, withoutList));
+  cardSettingsContext.membersAutomatic = true;
+  renderCardMemberChoices();
+  showCardSettingsStatus("Odabrani su senzori koji automatski pripadaju ovoj zoni. Spremi karticu za potvrdu.");
+});
 cardSettings.close.addEventListener("click", () => { if (!cardSettingsBusy) cardSettings.dialog.close(); });
 cardSettings.cancel.addEventListener("click", () => { if (!cardSettingsBusy) cardSettings.dialog.close(); });
 cardSettings.dialog.addEventListener("click", (event) => {
@@ -1983,6 +2111,10 @@ cardSettings.form.addEventListener("submit", async (event) => {
   const settings = { key: cardSettingsContext.key, label: cardSettings.label.value.trim() || null, primaryPointId, primaryUnit, secondaryPointIds };
   if (deviceSettingsEnabled) settings.room = room;
   if (needsRoom) { settings.room = ""; settings.newRoom = { name: newRoom, floorId: cardSettings["new-room-floor"].value || null }; }
+  // Sent only when changed, so a dialog left open cannot overwrite a newer list.
+  const { members, initialMembers, memberKind, membersAutomatic } = cardSettingsContext;
+  if (membersAutomatic) settings[memberKind.field] = null;
+  else if (members && (members.size !== initialMembers.length || initialMembers.some((key) => !members.has(key)))) settings[memberKind.field] = [...members];
   // Older reconnect reads must not replace the result of this user save.
   const saveRequest = ++deviceSettingsRequest;
   setCardSettingsBusy(true);
@@ -2010,9 +2142,13 @@ cardSettings.form.addEventListener("submit", async (event) => {
       cardSettingsContext.device = current;
       cardSettings.title.textContent = `Postavke kartice ${current.label}`;
     }
-    showCardSettingsStatus(deviceSettingsEnabled
-      ? "Naziv, prostorija, očitanja i jedinica kartice su spremljeni."
-      : "Postavke kartice su spremljene.", "success");
+    if (cardSettingsContext.members) {
+      resetCardMembers();
+      renderCardMemberChoices();
+    }
+    showCardSettingsStatus(memberKind && Object.hasOwn(settings, memberKind.field) ? memberKind.saved
+      : deviceSettingsEnabled ? "Naziv, prostorija, očitanja i jedinica kartice su spremljeni."
+        : "Postavke kartice su spremljene.", "success");
   } catch (error) {
     showCardSettingsStatus(error.message || "Postavke kartice nisu spremljene.", "error");
   } finally {

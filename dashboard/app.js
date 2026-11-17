@@ -525,7 +525,7 @@ function createApp({
       const scoped = dashboardSession?.role === "user";
       const context = deviceSettingsContext();
       if (scoped) {
-        if (["room", "newRoom"].some(field => Object.hasOwn(request.body || {}, field))) {
+        if (["room", "newRoom", "lightMembers", "sensorMembers"].some(field => Object.hasOwn(request.body || {}, field))) {
           throw new DeviceWidgetStoreError("Premještanje uređaja zahtijeva administratorski pristup.", 403, "ADMIN_REQUIRED");
         }
         context.authorizeCardEdit = key => {
@@ -537,6 +537,11 @@ function createApp({
             throw new DeviceWidgetStoreError("Nemaš pravo uređivanja ove kartice.", 403, "DEVICE_SETTINGS_FORBIDDEN");
           }
         };
+      } else if (["lightMembers", "sensorMembers"].some(field => Object.hasOwn(request.body || {}, field))) {
+        // Same classification as the cards, including cached point metadata.
+        const types = buildDevices(config.widgets, deviceMetadata.groupingMetadata?.() || {});
+        const keysOf = type => new Set(types.filter(device => device.type === type).map(device => device.key));
+        Object.assign(context, { lightKeys: keysOf("light"), lightGroupKeys: keysOf("lightGroup"), sensorKeys: keysOf("sensor"), zoneKeys: keysOf("zone") });
       }
       const device = await deviceWidgetStore.save(request.body, context);
       broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() }, { cardOnly: scoped });

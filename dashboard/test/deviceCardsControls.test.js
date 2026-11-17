@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { create } = require("../public/devices/deviceCards");
+const { deviceMembership, sortDevicesForDisplay } = require("../public/devices/deviceModel");
 
 // A small DOM fixture keeps these interaction tests independent of a browser or controller.
 class Element {
@@ -49,7 +50,8 @@ function setup(t, initialDevices, onWrite, demo = false, initialReadAt, options 
   let devices = initialDevices;
   let readAt = initialReadAt;
   globalThis.document = { createElement: (tag) => new Element(tag), createElementNS: (_, tag) => new Element(tag), activeElement: null };
-  globalThis.IoTDeviceModel = options.model || { buildDevices: () => devices };
+  // Devices are supplied ready-made; which card sits inside which is the real rule.
+  globalThis.IoTDeviceModel = options.model || { buildDevices: () => devices, deviceMembership, sortDevicesForDisplay };
   const container = new Element("section");
   const view = create({ container, onWrite, onSettings: options.onSettings, onRooms: options.onRooms, onMove: options.onMove, onRefresh: options.onRefresh,
     readOnly: options.readOnly, controlDeviceKeys: options.controlDeviceKeys });
@@ -503,7 +505,8 @@ test("progressive cards mount 24 at a time and retain the loaded slice and fresh
   update(next);
   assert.equal(byClass(container, "dc-card").length, 48);
   assert.equal(byClass(container, "dc-card")[0], originalFirstCard);
-  assert.equal(byClass(byClass(container, "dc-card")[40], "dc-metric-value")[0].textContent, "99 °C");
+  // Cards follow room order: Kitchen (even sensors) first, so sensor 40 is the 21st card.
+  assert.equal(byClass(byClass(container, "dc-card")[20], "dc-metric-value")[0].textContent, "99 °C");
   more.dispatch("click");
   more.dispatch("click");
   assert.equal(byClass(container, "dc-card").length, 73);
@@ -542,7 +545,7 @@ test("bulk selection includes all filtered devices before scrolling and preserve
   search.dispatch("input");
   assert.equal(byClass(container, "dc-device-checkbox")[0].checked, true);
   byClass(container, "dc-move-selection")[0].dispatch("click");
-  assert.deepEqual(moves[0], devices.map((entry) => entry.key));
+  assert.deepEqual([...moves[0]].sort(), devices.map((entry) => entry.key).sort());
   update(devices.slice(1), undefined, { roomEditingEnabled: true });
   assert.equal(byClass(container, "dc-selection-count")[0].textContent, "Odabrano: 641");
 });
@@ -733,7 +736,7 @@ test("floor filtering combines with search, type, paging and selection across un
   update(devices, undefined, { roomEditingEnabled: true });
   assert.equal(byClass(container, "dc-card").length, 1);
   byClass(container, "dc-move-selection")[0].dispatch("click");
-  assert.deepEqual(moves, [devices.slice(0, 60).map(d => d.key)]);
+  assert.deepEqual(moves.map(keys => [...keys].sort()), [devices.slice(0, 60).map(d => d.key).sort()]);
 });
 
 test("incremental readings retain floor selection and button identity, and removed floors reset safely", t => {
@@ -860,4 +863,227 @@ test("only the command's own fresh point can confirm a partial read, including a
   assert.match(byClass(container, "dc-command-status")[0].textContent, /Čekam novo očitanje/);
   view.updateValues({ widgets: [{ id: a.id, readAt: "own-room" }] });
   assert.match(byClass(container, "dc-command-status")[0].textContent, /potvrđena je novim očitanjem/);
+});
+
+test("light group cards hold their listed lights in a closed disclosure and release them when the group is filtered out", (t) => {
+  const group = { ...device("lightGroup", { brightnessSet: point("brightnessSet", 50) }), key: "ES/GRP", label: "Grupa hodnik" };
+  const member = { ...device("light", { brightnessSet: point("brightnessSet", 20, { id: "01/ES/L1/Values/LtPct" }) }), key: "ES/L1", label: "Svjetlo 1" };
+  const loose = { ...device("light", { brightnessSet: point("brightnessSet", 30, { id: "01/ES/L2/Values/LtPct" }) }), key: "ES/L2", label: "Svjetlo 2" };
+  const calls = [];
+  const { container, update } = setup(t, [group, member, loose], async (body) => { calls.push(body); });
+  const settings = { deviceSettings: [{ key: group.key, lightMembers: [member.key, "ES/absent"] }] };
+  update(undefined, undefined, settings);
+  const grid = byClass(container, "dc-grid")[0];
+  const keys = (node) => node.children.map((child) => child.dataset.deviceKey);
+  assert.deepEqual(keys(grid), [group.key, loose.key]);
+  const panel = byClass(container, "dc-group-members")[0];
+  assert.equal(panel.open, undefined);
+  assert.equal(panel.hidden, false);
+  assert.equal(panel.children[0].textContent, "Svjetla u grupi (1)");
+  assert.deepEqual(keys(byClass(panel, "dc-group-member-list")[0]), [member.key]);
+  assert.equal(byClass(container, "dc-load-count")[0].textContent, "Prikazano 2 od 2 uređaja");
+
+  // The nested light keeps its own controls and command identity.
+  const nestedNode = byClass(panel, "dc-group-member-list")[0].children[0];
+  const slider = byClass(nestedNode, "dc-range")[0];
+  slider.value = "70";
+  slider.dispatch("change");
+  assert.deepEqual(calls, [{ widgetId: member.roles.brightnessSet.id, value: 70 }]);
+
+  // Open state and node identity survive a settings refresh.
+  panel.open = true;
+  update(undefined, undefined, settings);
+  assert.equal(byClass(container, "dc-group-members")[0], panel);
+  assert.equal(panel.open, true);
+  assert.equal(byClass(panel, "dc-group-member-list")[0].children[0], nestedNode);
+
+  // A type filter that hides the group shows the light on its own, captioned with its group.
+  const typeFilter = byClass(container, "dc-type-filter")[0];
+  typeFilter.value = "light";
+  typeFilter.dispatch("change");
+  assert.deepEqual(keys(grid), [member.key, loose.key]);
+  assert.equal(byClass(nestedNode, "dc-group-note")[0].textContent, "U grupi: Grupa hodnik");
+  typeFilter.value = "all";
+  typeFilter.dispatch("change");
+
+  // A text search lists matching lights flat instead of hiding them in a closed group.
+  const search = byClass(container, "dc-search")[0];
+  search.value = "svjetlo 1";
+  search.dispatch("input");
+  assert.deepEqual(keys(grid), [member.key]);
+  search.value = "";
+  search.dispatch("input");
+
+  // Removing membership returns the light to the main list.
+  update(undefined, undefined, { deviceSettings: [] });
+  assert.deepEqual(keys(grid), [group.key, member.key, loose.key]);
+  assert.equal(panel.hidden, true);
+  assert.equal(byClass(nestedNode, "dc-group-note")[0].hidden, true);
+});
+
+test("a light listed in a group opens its extra actions on request and stays open across updates", (t) => {
+  const group = { ...device("lightGroup", { brightnessSet: point("brightnessSet", 50) }), key: "ES/GRP", label: "Grupa hodnik" };
+  const member = { ...device("light", { brightnessSet: point("brightnessSet", 20, { id: "01/ES/L1/Values/LtPct" }) }), key: "ES/L1", label: "Svjetlo 1" };
+  const { container, update } = setup(t, [group, member], async () => {});
+  const settings = { deviceSettings: [{ key: group.key, lightMembers: [member.key] }] };
+  update(undefined, undefined, settings);
+  const row = byClass(container, "dc-group-member-list")[0].children[0];
+  const expand = byClass(row, "dc-member-expand")[0];
+  assert.ok(expand, "the listed light has no control for its extra actions");
+  const isOpen = () => row.className.split(" ").includes("dc-member-open");
+  assert.equal(isOpen(), false);
+  assert.equal(expand.attributes["aria-expanded"], "false");
+  assert.equal(expand.attributes["aria-label"], "Više o uređaju Svjetlo 1");
+
+  expand.dispatch("click");
+  assert.equal(isOpen(), true);
+  assert.equal(expand.attributes["aria-expanded"], "true");
+
+  // New readings must not close what the user opened.
+  update([group, { ...member, roles: { brightnessSet: point("brightnessSet", 45, { id: "01/ES/L1/Values/LtPct" }) } }], undefined, settings);
+  assert.equal(isOpen(), true);
+  assert.equal(expand.attributes["aria-expanded"], "true");
+
+  expand.dispatch("click");
+  assert.equal(isOpen(), false);
+  assert.equal(expand.attributes["aria-expanded"], "false");
+});
+
+test("a zone card lists its paired sensors, and a saved or emptied list replaces the automatic choice", (t) => {
+  const reading = (owner, value) => point("illuminance", value, { id: `01/${owner}/Values/LtLvl`, controlAvailable: false, writeAllowed: false, liveControlAvailable: false, control: undefined, unit: "lx" });
+  const sensor = (key, label) => ({ ...device("sensor", { illuminance: reading(key, 300) }), key, label });
+  const zone = { ...device("zone", { illuminance: reading("ES/Zones/Z1", 310) }), key: "ES/Zones/Z1", label: "Zona Z1" };
+  const first = sensor("ES/Net/Zones/Z1/S1", "Senzor 1"), second = sensor("ES/Net/Zones/Z1/S2", "Senzor 2"), loose = sensor("ES/Net/IO/S9", "Senzor 9");
+  const { container, update } = setup(t, [zone, first, second, loose], async () => {});
+  const grid = byClass(container, "dc-grid")[0];
+  const keys = (node) => node.children.map((child) => child.dataset.deviceKey);
+  const panel = () => byClass(grid.children[0], "dc-group-members")[0];
+  const listed = () => keys(byClass(panel(), "dc-group-member-list")[0]);
+
+  // No saved list: the sensors the model pairs with the zone are inside it.
+  assert.deepEqual(keys(grid), [zone.key, loose.key]);
+  assert.equal(panel().children[0].textContent, "Senzori u zoni (2)");
+  assert.deepEqual(listed(), [first.key, second.key]);
+
+  // The administrator's list replaces the automatic choice and may add an unpaired sensor.
+  update(undefined, undefined, { deviceSettings: [{ key: zone.key, sensorMembers: [second.key, loose.key] }] });
+  assert.deepEqual(keys(grid), [zone.key, first.key]);
+  assert.deepEqual(listed(), [second.key, loose.key]);
+
+  // An emptied list means no sensors, not a return to the automatic choice.
+  update(undefined, undefined, { deviceSettings: [{ key: zone.key, sensorMembers: [] }] });
+  assert.deepEqual(keys(grid), [zone.key, first.key, second.key, loose.key]);
+  assert.equal(panel().hidden, true);
+
+  // With the zone filtered out, a paired sensor stands alone and names its zone.
+  update(undefined, undefined, { deviceSettings: [] });
+  const typeFilter = byClass(container, "dc-type-filter")[0];
+  typeFilter.value = "sensor";
+  typeFilter.dispatch("change");
+  assert.deepEqual(keys(grid), [first.key, second.key, loose.key]);
+  assert.equal(byClass(grid.children[0], "dc-group-note")[0].textContent, "U zoni: Zona Z1");
+});
+
+const gridCardKeys = (container) => byClass(container, "dc-grid")[0].children.filter((node) => node.dataset.deviceKey).map((node) => node.dataset.deviceKey);
+const officeRoom = (id, label) => ({ id, label, floorId: "f1" });
+
+test("cards are ordered by room and type, and a repeated update keeps that order", (t) => {
+  const climate = { ...device("climate", {}), key: "ES/C", label: "Klima", room: officeRoom("r1", "Ured 1") };
+  const zone = { ...device("zone", {}), key: "ES/Z", label: "Zona", room: officeRoom("r1", "Ured 1") };
+  const other = { ...device("light", {}), key: "ES/L", label: "Svjetlo", room: officeRoom("r0", "Arhiva") };
+  const { container, update } = setup(t, [climate, zone, other], undefined, false, undefined, { floors: [{ id: "f1", name: "1. kat" }] });
+  assert.deepEqual(gridCardKeys(container), ["ES/L", "ES/Z", "ES/C"]);
+  update([{ ...climate }, zone, other]);
+  assert.deepEqual(gridCardKeys(container), ["ES/L", "ES/Z", "ES/C"]);
+});
+
+test("a room change delivered through updateValues moves the card, a value-only change moves nothing", (t) => {
+  const climate = { ...device("climate", {}), key: "ES/C", label: "Klima", room: officeRoom("r1", "Ured 1") };
+  const zone = { ...device("zone", {}), key: "ES/Z", label: "Zona", room: officeRoom("r1", "Ured 1") };
+  const other = { ...device("light", {}), key: "ES/L", label: "Svjetlo", room: officeRoom("r0", "Arhiva") };
+  let changed = [];
+  const model = {
+    createDeviceIndex: () => ({ getDevices: () => [climate, zone, other], updateValues: () => changed }),
+    deviceMembership, sortDevicesForDisplay,
+  };
+  const { container, view } = setup(t, [], undefined, false, undefined, { model, floors: [{ id: "f1", name: "1. kat" }] });
+  assert.deepEqual(gridCardKeys(container), ["ES/L", "ES/Z", "ES/C"]);
+  changed = [{ ...other, label: "Svjetlo" }];
+  view.updateValues({ widgets: [] });
+  assert.deepEqual(gridCardKeys(container), ["ES/L", "ES/Z", "ES/C"]);
+  changed = [{ ...other, room: officeRoom("r9", "Zzz") }];
+  view.updateValues({ widgets: [] });
+  assert.deepEqual(gridCardKeys(container), ["ES/Z", "ES/C", "ES/L"]);
+});
+
+const twoFloors = [{ id: "f1", name: "1. kat" }, { id: "f2", name: "2. kat" }];
+const placed = (type, key, label, room) => ({ ...device(type, {}), key, label, room });
+const gridHeadings = (container) => byClass(byClass(container, "dc-grid")[0], "dc-grid-heading")
+  .map((node) => `${node.className.includes("dc-grid-heading-floor") ? "F" : "R"}:${node.textContent}`);
+const gridSequence = (container) => byClass(container, "dc-grid")[0].children
+  .map((node) => node.dataset.deviceKey || `${node.className.includes("dc-grid-heading-floor") ? "F" : "R"}:${node.textContent}`);
+
+test("a floor view heads each room before its cards", (t) => {
+  const devices = [
+    placed("climate", "ES/C10", "Klima", { id: "r10", label: "Ured 10", floorId: "f1" }),
+    placed("light", "ES/L2", "Svjetlo", { id: "r2", label: "Ured 2", floorId: "f1" }),
+    placed("zone", "ES/Z2", "Zona", { id: "r2", label: "Ured 2", floorId: "f1" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  selectFloor(container, "f1");
+  assert.deepEqual(gridSequence(container), ["R:Ured 2", "ES/Z2", "ES/L2", "R:Ured 10", "ES/C10"]);
+});
+
+test("all floors adds floor headings; one selected room shows none", (t) => {
+  const devices = [
+    placed("light", "ES/A", "A", { id: "r1", label: "Ured 1", floorId: "f1" }),
+    placed("light", "ES/B", "B", { id: "r2", label: "Hodnik", floorId: "f2" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridSequence(container), ["F:1. kat", "R:Ured 1", "ES/A", "F:2. kat", "R:Hodnik", "ES/B"]);
+  selectFloor(container, "f1");
+  byClass(container, "dc-room-filter").find((button) => button.dataset.room === "room:r1").dispatch("click");
+  assert.deepEqual(gridHeadings(container), []);
+  assert.deepEqual(gridSequence(container), ["ES/A"]);
+});
+
+test("a room split by load more keeps a single heading", (t) => {
+  const devices = [
+    ...Array.from({ length: 30 }, (_, index) => placed("light", `ES/L${index}`, `Svjetlo ${index}`, { id: "big", label: "Dvorana", floorId: "f1" })),
+    placed("light", "ES/X", "Svjetlo", { id: "small", label: "Ured", floorId: "f1" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridHeadings(container), ["R:Dvorana"]);
+  assert.equal(byClass(container, "dc-card").length, 24);
+  byClass(container, "dc-load-button")[0].dispatch("click");
+  assert.deepEqual(gridHeadings(container), ["R:Dvorana", "R:Ured"]);
+  assert.equal(byClass(container, "dc-card").length, 31);
+  assert.equal(byClass(container, "dc-load-count")[0].textContent, "Prikazano 31 od 31 uređaja");
+});
+
+test("devices without rooms produce no headings", (t) => {
+  const devices = ["A", "B", "C"].map((name) => placed("light", `ES/${name}`, name, undefined));
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridHeadings(container), []);
+  assert.deepEqual(gridSequence(container), ["ES/A", "ES/B", "ES/C"]);
+});
+
+test("two rooms with the same name get separate headings", (t) => {
+  const devices = [
+    placed("light", "ES/B1", "1", { id: "b", label: "Kuhinja", floorId: "f1" }),
+    placed("light", "ES/A1", "1", { id: "a", label: "Kuhinja", floorId: "f1" }),
+    placed("zone", "ES/A0", "0", { id: "a", label: "Kuhinja", floorId: "f1" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  selectFloor(container, "f1");
+  assert.deepEqual(gridSequence(container), ["R:Kuhinja", "ES/A0", "ES/A1", "R:Kuhinja", "ES/B1"]);
+});
+
+test("unassigned devices follow the rooms under their own heading", (t) => {
+  const devices = [
+    placed("light", "ES/N", "N", undefined),
+    placed("light", "ES/A", "A", { id: "r1", label: "Ured 1", floorId: "f1" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridSequence(container), ["R:Ured 1", "ES/A", "R:Bez prostorije", "ES/N"]);
 });
