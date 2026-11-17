@@ -482,6 +482,28 @@
     return parents;
   }
 
+  // Cards are shown floor by floor (saved floor order), room by room, and
+  // within a room by kind of device. Unlisted floors follow the saved ones;
+  // devices without a room come last.
+  const DEVICE_TYPE_ORDER = ["zone", "lightGroup", "light", "blind", "climate", "sensor", "generic"];
+  function sortDevicesForDisplay(devices, floors = []) {
+    const floorRanks = new Map((Array.isArray(floors) ? floors : []).map((floor, index) => [floor?.id, index]));
+    const unknownFloor = floorRanks.size;
+    const floorRank = (device) => !device.room?.label ? unknownFloor + 1
+      : floorRanks.has(device.room.floorId) ? floorRanks.get(device.room.floorId) : unknownFloor;
+    const typeRank = (device) => {
+      const index = DEVICE_TYPE_ORDER.indexOf(device.type);
+      return index < 0 ? DEVICE_TYPE_ORDER.indexOf("generic") : index;
+    };
+    const text = (left = "", right = "") => String(left).localeCompare(String(right), "hr", { numeric: true });
+    return [...devices].sort((a, b) => floorRank(a) - floorRank(b)
+      || text(a.room?.label, b.room?.label)
+      || text(a.room?.id, b.room?.id)
+      || typeRank(a) - typeRank(b)
+      || text(a.label, b.label)
+      || text(a.key, b.key));
+  }
+
   function validateDeviceCommand(point, value) {
     const denied = (reason, code = "INVALID_DEVICE_VALUE") => ({ allowed: false, reason, code });
     if (!point?.writeAllowed || !point.liveControlAvailable || point.roleAmbiguous) {
@@ -500,7 +522,7 @@
     return { allowed: true, value };
   }
 
-  const api = { buildDevices, createDeviceIndex, classifyPoint, normalizePoint, validateDeviceCommand, automaticZoneMembers, deviceMembership };
+  const api = { buildDevices, createDeviceIndex, classifyPoint, normalizePoint, validateDeviceCommand, automaticZoneMembers, deviceMembership, sortDevicesForDisplay };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else globalThis.IoTDeviceModel = api;
 })();

@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-const { buildDevices, normalizePoint, validateDeviceCommand } = require("../public/devices/deviceModel");
+const { buildDevices, normalizePoint, validateDeviceCommand, sortDevicesForDisplay } = require("../public/devices/deviceModel");
 
 const rp = (controller) => `03AS001/[BACnet Interface]/IP Network/${controller}`;
 const zone = `${rp("RP32")}/Application/Zones/Z312`;
@@ -570,4 +570,43 @@ test("a sensor an administrator listed in one zone is not paired automatically w
   const moved = "ES/Net/IP Network/RP1/Application/Zones/Z1/S1", stays = "ES/Net/IP Network/RP1/Application/Zones/Z1/S2";
   const devices = [zoneCard("ES/Zones/Z1"), zoneCard("ES/Zones/Z2"), sensorCard(moved), sensorCard(stays)];
   assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z2", sensorMembers: [moved] }]), { [moved]: "ES/Zones/Z2", [stays]: "ES/Zones/Z1" });
+});
+
+const displayDevice = (key, type, label, room) => ({ key, type, label, room });
+const displayFloors = [{ id: "f2", name: "2. kat" }, { id: "f1", name: "1. kat" }];
+
+test("display order is saved floor order, then room name, then device type, then label", () => {
+  const input = [
+    displayDevice("k1", "climate", "Klima", { id: "r10", label: "Ured 10", floorId: "f1" }),
+    displayDevice("k2", "light", "Svjetlo", { id: "r2", label: "Ured 2", floorId: "f1" }),
+    displayDevice("k3", "zone", "Zona", { id: "r2", label: "Ured 2", floorId: "f1" }),
+    displayDevice("k4", "blind", "Roleta B", { id: "r2", label: "Ured 2", floorId: "f1" }),
+    displayDevice("k5", "blind", "Roleta A", { id: "r2", label: "Ured 2", floorId: "f1" }),
+    displayDevice("k6", "sensor", "Senzor", { id: "r9", label: "Hodnik", floorId: "f2" }),
+    displayDevice("k7", "lightGroup", "Grupa", { id: "r2", label: "Ured 2", floorId: "f1" }),
+  ];
+  const snapshot = input.map((device) => device.key);
+  assert.deepEqual(sortDevicesForDisplay(input, displayFloors).map((device) => device.key), ["k6", "k3", "k7", "k2", "k5", "k4", "k1"]);
+  assert.deepEqual(input.map((device) => device.key), snapshot, "input is not mutated");
+});
+
+test("unknown floors follow known floors, devices without a room come last, unknown types rank as generic", () => {
+  const input = [
+    displayDevice("none", "light", "A", undefined),
+    displayDevice("unknownFloor", "light", "A", { id: "x", label: "A", floorId: "f9" }),
+    displayDevice("nullFloor", "light", "A", { id: "y", label: "B", floorId: null }),
+    displayDevice("known", "light", "A", { id: "z", label: "Z", floorId: "f1" }),
+    displayDevice("odd", "pump", "A", { id: "z", label: "Z", floorId: "f1" }),
+    displayDevice("generic", "generic", "B", { id: "z", label: "Z", floorId: "f1" }),
+  ];
+  assert.deepEqual(sortDevicesForDisplay(input, displayFloors).map((device) => device.key), ["known", "odd", "generic", "unknownFloor", "nullFloor", "none"]);
+});
+
+test("equally named rooms on one floor stay separate, ordered by room id", () => {
+  const input = [
+    displayDevice("b1", "light", "1", { id: "kitchen-b", label: "Kuhinja", floorId: "f1" }),
+    displayDevice("a1", "light", "1", { id: "kitchen-a", label: "Kuhinja", floorId: "f1" }),
+    displayDevice("b0", "zone", "0", { id: "kitchen-b", label: "Kuhinja", floorId: "f1" }),
+  ];
+  assert.deepEqual(sortDevicesForDisplay(input, displayFloors).map((device) => device.key), ["a1", "b0", "b1"]);
 });
