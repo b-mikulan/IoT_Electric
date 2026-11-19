@@ -46,6 +46,13 @@ function composedPageFor(request) {
   }
 }
 
+// Send each file relative to its own folder: with an absolute path, send
+// treats any dot-folder above it (for example ~/.local or a .claude worktree)
+// as a hidden file and answers 404.
+function sendFrom(response, file) {
+  return response.sendFile(path.basename(file), { root: path.dirname(file) });
+}
+
 function createStaticAssets() {
   const router = express.Router({ strict: true });
   router.use("/vendor/materialize", express.static(materializeDirectory, {
@@ -53,12 +60,12 @@ function createStaticAssets() {
     maxAge: "7d",
   }));
   for (const [url, file] of Object.entries(vendorFiles)) {
-    router.get(url, (request, response) => response.sendFile(file));
+    router.get(url, (request, response) => sendFrom(response, file));
   }
   for (const [folder, names] of Object.entries(assetsByFolder)) {
     for (const name of names) {
       const file = path.join(publicDirectory, folder, name);
-      router.get(`/${name}`, (request, response) => response.sendFile(file));
+      router.get(`/${name}`, (request, response) => sendFrom(response, file));
     }
   }
   router.use((request, response, next) => {
