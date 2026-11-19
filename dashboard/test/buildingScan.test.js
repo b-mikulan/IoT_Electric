@@ -230,6 +230,42 @@ test("a controller read keeps the scan from starting after its browser disconnec
   await runtime.buildingScan.active?.done;
 });
 
+test("a request that reaches the controller only after a scan started is refused", async t => {
+  let runtime, releaseRooms;
+  const dir = directory(t, async () => { if (runtime) { runtime.buildingScan.active = null; runtime.poller.stop(); runtime.database.close(); } });
+  const browsed = [];
+  const upstream = await listen(t, http.createServer((req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    if (new URL(req.url, "http://fixture").searchParams.get("id") === "trend-probe") browsed.push(req.url);
+    res.end(JSON.stringify({ containers: [], errors: [] }));
+  }));
+  runtime = createRuntime({ DEMO_MODE: "false", MIDDLEWARE_URL: upstream, MIDDLEWARE_USER: config.username, MIDDLEWARE_PASSWORD: config.password,
+    DASHBOARD_ADMIN_USER: "admin", DASHBOARD_ADMIN_PASSWORD: "fixture-admin", DASHBOARD_LOGIN_USER: "user", DASHBOARD_LOGIN_PASSWORD: "fixture-user-password",
+    DASHBOARD_USERS_FILE: path.join(dir, "users.json"), DASHBOARD_DB_FILE: path.join(dir, "dashboard.sqlite"), WIDGETS_JSON: "[]" });
+  runtime.poller.setPaused(true);
+  // Hold the user's room preparation, which runs after the scan gate and
+  // before the trend handler calls the controller.
+  let roomsHeld;
+  const held = new Promise(resolve => { roomsHeld = resolve; });
+  const synchronize = runtime.deviceWidgetStore.synchronize.bind(runtime.deviceWidgetStore);
+  runtime.deviceWidgetStore.synchronize = async (...args) => {
+    roomsHeld();
+    await new Promise(resolve => { releaseRooms = resolve; });
+    return synchronize(...args);
+  };
+  const base = await listen(t, http.createServer(runtime.app));
+  const user = (await fetch(`${base}/login`, { method: "POST", redirect: "manual", body: new URLSearchParams({ username: "user", password: "fixture-user-password" }) })).headers.get("set-cookie").split(";")[0];
+  const browse = fetch(`${base}/api/history/browse`, { method: "POST", headers: { cookie: user, "Content-Type": "application/json" }, body: JSON.stringify({ containerId: "trend-probe" }) });
+  await held;
+  // A scan becomes active meanwhile, as it can after an earlier client disconnected.
+  runtime.buildingScan.active = { job: { id: "fixture" } };
+  releaseRooms();
+  const response = await browse;
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).code, "CATALOG_SCAN_ACTIVE");
+  assert.deepEqual(browsed, [], "the trend handler must not reach the middleware during the scan");
+});
+
 test("dashboard image ships every local Python module the scan worker imports", () => {
   const root = path.resolve(__dirname, "../..");
   const mapper = path.join(root, "tools/ews-topology");

@@ -247,3 +247,43 @@ test("without a stored catalog, preview uses the live rooms that decide access a
   const backup = await (await fetch(base + (await applied.json()).backupUrl, { headers: { cookie } })).json();
   assert.equal(backup.metadata, null, "the backup keeps the stored configuration");
 });
+
+test("applying an organization blocks automatic discovery while it reads room metadata", async t => {
+  let runtime, server, upstream, releaseRooms;
+  const dir = directory(t, async () => {
+    releaseRooms?.();
+    runtime?.poller.stop();
+    for (const item of [server, upstream]) if (item) await new Promise(resolve => { item.close(resolve); item.closeAllConnections(); });
+    runtime?.database.close();
+  });
+  let roomsRequested;
+  const requested = new Promise(resolve => { roomsRequested = resolve; });
+  upstream = require("node:http").createServer((request, response) => {
+    response.setHeader("Content-Type", "application/json");
+    if (request.url.startsWith("/api/containers?id=00%2FES%2FZones%2FZ1")) {
+      roomsRequested();
+      releaseRooms = () => response.end(JSON.stringify({ containers: [{ id: "00/ES/Zones/Z1", name: "Z1", description: "Soba A" }], errors: [] }));
+      return;
+    }
+    return response.end(JSON.stringify({ containers: [], errors: [] }));
+  }).listen(0, "127.0.0.1");
+  await once(upstream, "listening");
+  const write = (name, data) => { const file = path.join(dir, name); fs.writeFileSync(file, JSON.stringify(data)); return file; };
+  runtime = createRuntime({ DEMO_MODE: "false", WIDGETS_FILE: write("widgets.json", [point("ES/Zones/Z1/L1")]),
+    DEVICE_WIDGETS_FILE: write("devices.json", { version: 1, organizationVersion: 1, devices: [], rooms: [], roomRules: [], floors: [], roomDetails: [] }),
+    DASHBOARD_DB_FILE: path.join(dir, "dashboard.sqlite"), MIDDLEWARE_URL: `http://127.0.0.1:${upstream.address().port}`,
+    MIDDLEWARE_USER: "fixture", MIDDLEWARE_PASSWORD: "fixture-password", DASHBOARD_ADMIN_USER: "admin", DASHBOARD_ADMIN_PASSWORD: "fixture-password" });
+  runtime.poller.setPaused(true);
+  server = runtime.app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const cookie = (await fetch(`${base}/login`, { method: "POST", redirect: "manual", body: new URLSearchParams({ username: "admin", password: "fixture-password" }) })).headers.get("set-cookie").split(";")[0];
+  const post = (route, body) => fetch(base + route, { method: "POST", headers: { cookie, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const apply = post("/api/admin/organization/apply", { token: "stale", scope: {}, selectedIds: ["stale"] });
+  await requested;
+  const discovery = await post("/api/discovery/auto", { containerId: "" });
+  assert.equal(discovery.status, 409);
+  assert.equal((await discovery.json()).code, "TRANSFER_IN_PROGRESS");
+  releaseRooms();
+  assert.equal((await (await apply).json()).code, "ORGANIZATION_PREVIEW_CHANGED");
+});

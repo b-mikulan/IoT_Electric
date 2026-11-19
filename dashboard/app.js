@@ -167,8 +167,10 @@ function createApp({
 
   // Count controller work for as long as it runs, not for as long as the
   // browser stays connected: an aborted request must not let a scan start
-  // while its middleware read is still in flight.
+  // while its middleware read is still in flight. A handler that reaches the
+  // controller only after a scan started is refused instead of overlapping it.
   async function controllerWork(operation) {
+    if (buildingScan?.busy) throw new DeviceWidgetStoreError("Skeniranje kataloga je u tijeku. Pokušaj ponovno nakon pauze ili završetka.", 409, "CATALOG_SCAN_ACTIVE");
     activeScanConflicts++;
     try { return await operation(); } finally { activeScanConflicts--; }
   }
@@ -436,11 +438,11 @@ function createApp({
     // global exclusion as imports, including reads that synchronize settings.
     if (activeConfigurationRequests > 1 || clearingWidgets || autoDiscovery.state === "running") return response.status(409).json({ error: "Pričekaj završetak promjene konfiguracije ili otkrivanja pa pokušaj ponovno.", code: "WIDGET_OPERATION_IN_PROGRESS" });
     if (!dashboardTransfer.enabled || !deviceWidgetStore.enabled || !widgetStore?.enabled) return response.status(409).json({ error: "Organizacija nije dostupna.", code: "ORGANIZATION_UNAVAILABLE" });
-    let metadata;
-    try { metadata = await organizationMetadata(); }
-    catch (error) { return sendOperationError(response, error, "ORGANIZATION_APPLY_FAILED", "Organizacija nije spremljena. Prethodne postavke su zadržane."); }
+    // Hold other configuration changes, including automatic discovery, while
+    // the room metadata is read too, not only while the result is saved.
     transferBusy = true;
     try {
+      const metadata = await organizationMetadata();
       const result = await widgetStore.withExclusive(() => deviceWidgetStore.applyOrganization(document => {
         if (!response.locals.isSessionActive()) throw new DeviceWidgetStoreError("Prijava je istekla.", 401, "LOGIN_REQUIRED");
         // The backup below keeps the stored configuration, including its metadata.
