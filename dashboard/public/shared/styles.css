@@ -506,14 +506,20 @@ h1 {
 }
 
 /* A bare .btn (the technical page leaves out "filled") is a primary button. */
-:is(.btn, .btn-small):not(.outlined):not(.tonal):not(.text):not(.filled) {
+/* Kept at one class of specificity so danger and disabled states still win. */
+.btn:where(:not(.outlined, .tonal, .text, .filled, .btn-flat)),
+.btn-small:where(:not(.outlined, .tonal, .text, .filled, .btn-flat)) {
   color: var(--on-action);
   background: var(--action);
   border: 1px solid var(--action);
 }
-:is(.btn, .btn-small):not(.outlined):not(.tonal):not(.text):hover {
+.btn:where(:not(.outlined, .tonal, .text, .filled, .btn-flat, .danger-action, :disabled)):hover,
+.btn-small:where(:not(.outlined, .tonal, .text, .filled, .btn-flat, .danger-action, :disabled)):hover {
   color: var(--on-action);
   background: var(--action-strong);
+}
+:is(.btn, .btn-small):disabled {
+  opacity: .5;
 }
 
 :is(.btn, .btn-small).tonal {
@@ -818,6 +824,33 @@ h1 {
   border: 0;
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-dialog);
+}
+
+/* Dialog fields on every page, including the technical page without the app theme. */
+.discovery-dialog :is(input[type="text"], input[type="search"], input[type="number"], select:not([multiple])) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: var(--control-h);
+  margin: 0;
+  padding: 0 var(--sp-3);
+  color: var(--ink);
+  background-color: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  box-shadow: none;
+  font: inherit;
+  font-size: var(--fs-base);
+}
+.discovery-dialog :is(input, select):focus-visible {
+  border-color: var(--action);
+  box-shadow: none;
+  outline-offset: 1px;
+}
+.discovery-dialog input[readonly] {
+  color: var(--muted);
+  background-color: var(--surface-sunken);
+  border-color: var(--line);
 }
 
 .discovery-dialog::backdrop {
@@ -1262,6 +1295,7 @@ h1 {
 .settings-delete-actions .btn {
   color: var(--on-action);
   background: var(--alarm);
+  border-color: var(--alarm);
 }
 
 .widget-column {

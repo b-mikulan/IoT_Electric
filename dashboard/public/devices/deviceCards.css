@@ -217,7 +217,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-point-list dt { margin-top: 10px; color: var(--muted, #5A646A); font-weight: 600; }
 .dc-point-list dd { margin: 1px 0 0; }
 .dc-detail-value { color: var(--muted, #5A646A); }
-.dc-point-id { display: block; color: var(--muted-2, #7A8489); font-size: var(--fs-xs, .75rem); margin: 3px 0; overflow-wrap: anywhere; }
+.dc-point-id { display: block; color: var(--muted, #5A646A); font-size: var(--fs-xs, .75rem); margin: 3px 0; overflow-wrap: anywhere; }
 .dc-detail-note { display: block; color: var(--muted, #5A646A); font-size: var(--fs-xs, .75rem); line-height: 1.5; }
 .dc-generic-readings { display: flex; flex-direction: column; gap: 12px; }
 .dc-generic-reading { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-xs, .75rem); color: var(--muted, #5A646A); }
