@@ -31,17 +31,11 @@ nav.general-shortcuts { height: auto; line-height: normal; color: var(--ink); ba
 .general-shortcuts > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
 .general-shortcuts a, .general-shortcuts button { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 12px; min-width: 0; font: inherit; font-size: var(--fs-sm); text-decoration: none; text-align: left; color: var(--action); border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); cursor: pointer; }
 .general-shortcuts a:hover, .general-shortcuts button:hover { color: var(--action-strong); background: var(--action-tint); border-color: var(--action-line); }
-.app-header :is(.general-settings-open, .refresh-pause, .btn.outlined) { color: #fff; background: transparent; border-color: rgba(255, 255, 255, .4); }
-.app-header :is(.general-settings-open, .refresh-pause, .btn.outlined):hover { color: #fff; background: rgba(255, 255, 255, .1); border-color: #fff; }
-.app-header .refresh-pause.is-paused { color: var(--anthracite); background: #F2B33D; border-color: #F2B33D; }
-.app-header .header-page-actions { display: flex; gap: 12px; align-items: center; }
 @media (max-width: 600px) {
   .general-settings-shell { --settings-padding: 20px; }
   .general-settings-fields, .general-shortcuts > div { grid-template-columns: 1fr; }
   .general-settings-footer { align-items: stretch; flex-direction: column; }
   .refresh-pause { padding-inline: var(--sp-3); }
-  .app-header .refresh-pause span { display: none; }
-  .app-header .general-settings-open span { display: none; }
-  .app-header .header-content { flex-wrap: wrap; gap: var(--sp-3); padding-block: var(--sp-2); }
-  .app-header .header-page-actions { margin-left: auto; }
+  .page-header :is(.refresh-pause, .general-settings-open) span { display: none; }
+  .page-header :is(.refresh-pause, .general-settings-open) { width: var(--control-h); padding: 0; }
 }

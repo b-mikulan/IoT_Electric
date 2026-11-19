@@ -1,9 +1,6 @@
 /* Device-page adaptations of the shared Materialize theme. */
 .dashboard-page:has(dialog[open]) { overflow: hidden; }
-.dashboard-page :is(.dashboard-shell, .header-content, .app-footer) { width: min(var(--page-max), calc(100% - 48px)); max-width: var(--page-max); }
-.dashboard-page .intro { flex-wrap: wrap; align-items: flex-end; gap: var(--sp-4) var(--sp-5); }
-.dashboard-page .intro-actions { flex-wrap: wrap; gap: 8px; }
-.dashboard-page .intro-actions :is(.btn, .trends-open) { height: var(--control-h); min-height: var(--control-h); padding-inline: var(--sp-4); white-space: nowrap; }
+.dashboard-page :is(.dashboard-shell, .page-header-inner, .app-footer) { width: min(var(--page-max), calc(100% - 48px)); max-width: var(--page-max); }
 .dashboard-page .error-banner { border-radius: var(--r-md); font-size: var(--fs-base); }
 
 .dashboard-page .dc-search-tools { gap: 16px; align-items: center; }
@@ -84,13 +81,9 @@
   .dashboard-page .dc-header-actions { flex-basis: 100%; align-items: flex-start; }
 }
 @media (max-width: 650px) {
-  .dashboard-page :is(.dashboard-shell, .header-content, .app-footer) { width: calc(100% - 32px); }
+  .dashboard-page :is(.dashboard-shell, .page-header-inner, .app-footer) { width: calc(100% - 32px); }
   .dashboard-page .dashboard-shell { padding-top: 30px; }
-  .dashboard-page .intro { align-items: flex-start; margin-bottom: var(--sp-5); }
-  .dashboard-page .intro-actions { width: 100%; justify-content: flex-start; }
-  .dashboard-page .intro-actions :is(.btn, .trends-open) { padding-inline: var(--sp-3); font-size: var(--fs-sm); }
-  .dashboard-page .intro-actions .general-settings-open span { display: none; }
-  .dashboard-page .intro-actions .general-settings-open { width: var(--control-h); padding: 0; }
+  .dashboard-page .page-header-actions :is(.btn, .trends-open) { padding-inline: var(--sp-3); font-size: var(--fs-sm); }
   .dashboard-page .dc-search-tools { align-items: stretch; gap: 14px; }
   .dashboard-page .dc-type-field { width: 100%; flex-basis: auto; }
   .dashboard-page .dc-search-field { flex: 0 0 auto; }
@@ -107,7 +100,4 @@
   .dashboard-page .room-registry-list small { white-space: normal; flex-shrink: 0; }
   .dashboard-page .dc-selection-actions .dc-selection-count { width: 100%; }
 }
-@media (max-width: 360px) {
-  .dashboard-page .intro-actions .refresh-pause span { display: none; }
-  .dashboard-page .intro-actions .refresh-pause { width: var(--control-h); padding: 0; }
-}
+

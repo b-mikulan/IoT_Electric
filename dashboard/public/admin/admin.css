@@ -1,17 +1,5 @@
 .admin-page { line-height: 1.5; }
 .admin-container { width: min(var(--page-max), calc(100% - 48px)); margin-inline: auto; }
-.admin-header { color: #fff; background: var(--anthracite); border-bottom: 3px solid var(--idle); }
-.admin-header-inner { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-6); padding-block: var(--sp-5); }
-.admin-header .eyebrow { color: rgba(255, 255, 255, .7); }
-.admin-header h1 { color: #fff; font-size: var(--fs-title); }
-.admin-header-description { margin: var(--sp-1) 0 0; color: rgba(255, 255, 255, .75); font-size: var(--fs-base); }
-.admin-header :focus-visible { outline-color: #fff; }
-.admin-header .admin-button.secondary { color: #fff; background: transparent; border-color: rgba(255, 255, 255, .4); }
-.admin-header .admin-button.secondary:hover { color: #fff; background: rgba(255, 255, 255, .1); border-color: #fff; }
-.admin-header-actions { display: grid; gap: 12px; justify-items: end; }
-.admin-account { display: flex; gap: 10px; flex-wrap: wrap; justify-content: end; margin: 0; color: rgba(255, 255, 255, .7); font-size: var(--fs-sm); }
-.admin-account strong { color: #fff; overflow-wrap: anywhere; }
-.admin-header-actions form { margin: 0; }
 .admin-main { padding-top: var(--sp-5); }
 .admin-page h2, .admin-page h3, .admin-page h4 { margin: 0; line-height: 1.3; }
 .admin-page h2 { font-size: var(--fs-xl); font-weight: 600; letter-spacing: 0; }
@@ -114,7 +102,6 @@
 .catalog-search .admin-field { flex: 1 1 240px; }
 #catalog-scope { overflow-wrap: anywhere; }
 @media (max-width: 950px) {
-  .admin-header-inner { align-items: start; }
   .admin-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-users-layout { grid-template-columns: minmax(220px, .8fr) minmax(0, 1.6fr); }
   .admin-account-fields, .admin-room-filters, .admin-rooms { grid-template-columns: 1fr; }
@@ -124,9 +111,6 @@
 }
 @media (max-width: 700px) {
   .admin-container { width: min(100% - 32px, var(--page-max)); }
-  .admin-header-inner { flex-direction: column; align-items: stretch; gap: var(--sp-4); padding-block: var(--sp-5); }
-  .admin-header-actions { justify-items: start; gap: 10px; }
-  .admin-account { justify-content: start; }
   .admin-main { padding-top: 18px; }
   .admin-overview { gap: 10px; }
   .admin-overview > div { padding: 16px; }

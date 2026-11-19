@@ -18,16 +18,16 @@ function sendAdminPage(response) {
   </head>
   <body class="admin-page">
     <a class="admin-skip" href="#users">Preskoči na upravljanje korisnicima</a>
-    <header class="admin-header">
-      <div class="admin-container admin-header-inner">
-        <div>
-          <p class="eyebrow">IoT Electric</p>
+    <header class="app-header page-header admin-header">
+      <div class="admin-container page-header-inner">
+        <div class="page-header-copy">
+          <a class="brand" href="/" aria-label="IoT Electric"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span class="brand-name">IoT Electric</span></a>
           <h1>Administracija</h1>
-          <p class="admin-header-description">Korisnici, pristup prostorijama i postavke sustava.</p>
+          <p class="page-header-description">Korisnici, pristup prostorijama i postavke sustava.</p>
         </div>
-        <div class="admin-header-actions">
-          <p class="admin-account">Administrator <strong id="admin-current-user">—</strong></p>
-          <div class="admin-actions">
+        <div class="page-header-side">
+          <p class="page-header-status admin-account">Administrator <strong id="admin-current-user">—</strong></p>
+          <div class="admin-actions page-header-actions">
             <a class="admin-button secondary" href="/">Natrag na dashboard</a>
             <form action="/logout" method="post"><button class="admin-button secondary" type="submit">Odjava</button></form>
           </div>
