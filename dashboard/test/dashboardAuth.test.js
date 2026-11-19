@@ -93,7 +93,7 @@ test("dashboard sign-in protects pages, API, live streams and the admin role", a
   assert.equal(adminPage.status, 200);
   const adminHtml = await adminPage.text();
   assert.match(adminHtml, /<h1>Administracija<\/h1>/);
-  for (const asset of ["admin.css", "adminApi.js", "adminUsers.js", "adminSystem.js", "dashboardSettings.js"]) {
+  for (const asset of ["admin.css", "adminApi.js", "adminUsers.js", "adminSystem.js", "adminOrganization.js", "adminCatalog.js", "dashboardSettings.js"]) {
     assert.ok(adminHtml.includes(`/${asset}`));
     const response = await request(`/${asset}`, adminSession);
     assert.equal(response.status, 200, asset);

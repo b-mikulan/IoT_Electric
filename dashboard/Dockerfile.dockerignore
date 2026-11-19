@@ -1,0 +1,18 @@
+# Build from repository root; only application code enters the context.
+**
+!dashboard/
+!dashboard/package.json
+!dashboard/package-lock.json
+!dashboard/app.js
+!dashboard/server.js
+!dashboard/lib/
+!dashboard/lib/**
+!dashboard/public/
+!dashboard/public/**
+!catalog/
+!catalog/*.js
+!tools/
+!tools/ews-topology/
+!tools/ews-topology/map_topology.py
+!tools/ews-topology/pruning.py
+!tools/ews-topology/admin_scan.py

@@ -63,3 +63,58 @@ option and is created atomically with the device move using `newRoom.floorId`.
 **Bez prostorije** removes the room and its inherited floor; **Automatski prema
 serveru** restores automatic assignment. Floor filtering does not change the
 meaning of those two actions or modify the room itself.
+
+## Admin organization proposals
+
+The **Organizacija zgrade** section on `/admin` works offline with the saved
+dashboard catalog metadata and configured visible devices. This first phase
+does not launch the topology mapper, read the separate offline catalog database,
+import unconfigured points, or increase polling. The separate **Skeniranje zgrade**
+section creates offline catalog snapshots; it does not feed those snapshots into
+organization proposals or import points automatically. Persistent storage and non-demo mode are required.
+
+**Predloži organizaciju** displays proposed changes, their full device paths and
+reasons. Missing room assignments can inherit an explicitly assigned ancestor
+zone using its complete path, or map an automatic catalog label to exactly one
+registered room with that name. Ambiguous labels remain unchanged. The optional
+branch/room selection applies to exact path descendants and does not override
+explicit per-device rooms, including `room: ""`. Automatic inference also respects
+suppressed catalog room names. Applying a selected room creates a saved assignment;
+use the existing card setting to return it to automatic mode later. The branch
+selection is a one-time operation, not a rule for future devices.
+
+Existing automatic sensor grouping is reported without saving a redundant list.
+A single light group or zone in the same room can be proposed for display grouping,
+but every such suggestion requires individual selection. Same-room membership
+does not establish DALI bindings or a controller relationship. Saved member lists,
+including empty sensor lists and references to temporarily absent members, are
+preserved. When a new explicit sensor list is confirmed, already automatically
+paired sensors are retained. Devices proposed for room moves are grouped only on
+a subsequent preview, after their placement is settled. Floors are inherited from
+room definitions and never inferred from device names.
+
+The preview identifies users whose room-based read/control grants would change.
+The bulk selection button excludes those changes and all speculative grouping.
+Actual writeability and controller validation still apply. Admin checks, preview
+fingerprints (including user grants), the configuration operation gate and device
+store queue protect application. Any stale preview requires another review.
+Updates preserve point flags, manual labels, absent-device preferences and other
+configuration. No controller command or discovery call is made.
+
+SQLite saves the configuration backup and new device document in one transaction.
+In file mode a complete backup is written before the atomic device-file replacement;
+a failed backup aborts application. File backups use
+`<device-file>.organization-<uuid>.json` and have no automatic retention. SQLite
+backups share the existing newest-ten retention. Download the previous configuration
+from the success message and import it through **Prijenos konfiguracije** to restore.
+
+Admin-only API:
+
+- `POST /api/admin/organization/preview` with `{scope?: {root, roomId}}` returns
+  a token, selectable suggestions, access effects, unresolved devices and scope choices.
+- `POST /api/admin/organization/apply` with `{token, scope, selectedIds}` revalidates
+  the proposal and saves only the selected changes. Returns `count`, `backupId`, `backupUrl`.
+- `GET /api/admin/organization/backups/:id` downloads a portable configuration backup.
+
+The browser renders proposals in batches of 50 and keeps selections across search.
+The unresolved list displays the first 100 items with the total count.

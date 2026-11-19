@@ -15,68 +15,62 @@
     <link rel="stylesheet" href="/deviceCards.css" />
   </head>
   <body>
-    <header class="app-header">
-      <div class="container header-content">
-        <div class="brand" aria-label="IoT Electric">
-          <span class="brand-mark" aria-hidden="true">
-            <span></span><span></span><span></span>
-          </span>
-          <span class="brand-name">IoT Electric</span>
+    <header class="app-header page-header">
+      <div class="container page-header-inner">
+        <div class="page-header-copy">
+          <div class="brand" aria-label="IoT Electric"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span class="brand-name">IoT Electric</span></div>
+          <h1 id="page-title">Tehnički prikaz vrijednosti</h1>
+          <p
+            id="last-sync"
+            class="last-sync page-header-description"
+            title="Vrijeme posljednje uspješne provjere svih konfiguriranih točaka."
+          >Čekam prvu uspješnu provjeru servera.</p>
         </div>
-
-        <div class="connection" aria-live="polite">
-          <span id="connection-dot" class="connection-dot is-connecting"></span>
-          <span id="connection-label">Povezivanje…</span>
+        <div class="page-header-side">
+          <div class="page-header-status">
+            <div class="connection" aria-live="polite">
+              <span id="connection-dot" class="connection-dot is-connecting"></span>
+              <span id="connection-label">Povezivanje…</span>
+            </div>
+            <div id="demo-badge" class="demo-badge" hidden>Demo podaci</div>
+          </div>
+          <div class="intro-actions page-header-actions">
+            <a class="btn outlined" href="/">Natrag na uređaje</a>
+            <button id="refresh-pause" class="refresh-pause" type="button" aria-label="Pauziraj osvježavanje" aria-pressed="false" disabled>
+              <svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14" stroke-width="3" stroke-linecap="round" /></svg>
+              <svg class="resume-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 10 7-10 7Z" fill="currentColor" stroke-linejoin="round" /></svg><span>Pauziraj</span>
+            </button>
+            <button id="general-settings-open" class="general-settings-open" type="button" aria-haspopup="dialog" aria-label="Postavke stranice" title="Postavke stranice">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 3-.7 2.3-2 .9L5 5.7 3 9l1.8 1.7v2.6L3 15l2 3.3 2.3-.5 2 .9L10 21h4l.7-2.3 2-.9 2.3.5 2-3.3-1.8-1.7v-2.6L21 9l-2-3.3-2.3.5-2-.9L14 3Z" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" /></svg><span>Postavke</span>
+            </button>
+            <button
+              id="visibility-open"
+              class="dashboard-menu-open general-settings-shortcut"
+              type="button"
+              title="Uredi prikaz dashboarda"
+              aria-label="Uredi prikaz dashboarda"
+              hidden
+            >
+              <span aria-hidden="true"></span>
+              <span aria-hidden="true"></span>
+              <span aria-hidden="true"></span>
+            </button>
+            <button
+              id="discovery-open"
+              class="discovery-open general-settings-shortcut"
+              type="button"
+              title="Pronađi nove objekte"
+              aria-label="Pronađi nove objekte"
+              hidden
+            >
+              <span class="discovery-icon" aria-hidden="true">↻</span>
+            </button>
+          </div>
         </div>
       </div>
     </header>
 
     <main class="container dashboard-shell">
-      <section class="intro" aria-labelledby="page-title">
-        <div>
-          <p class="eyebrow">Nadzor sustava</p>
-          <h1 id="page-title">Tehnički prikaz vrijednosti</h1>
-          <p
-            id="last-sync"
-            class="last-sync"
-            title="Vrijeme posljednje uspješne provjere svih konfiguriranih točaka."
-          >Čekam prvu uspješnu provjeru servera.</p>
-        </div>
-        <div class="intro-actions">
-          <a class="btn" href="/">Natrag na uređaje</a>
-          <button id="refresh-pause" class="refresh-pause" type="button" aria-label="Pauziraj osvježavanje" aria-pressed="false" disabled>
-            <svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14" stroke-width="3" stroke-linecap="round" /></svg>
-            <svg class="resume-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 10 7-10 7Z" fill="currentColor" stroke-linejoin="round" /></svg><span>Pauziraj</span>
-          </button>
-          <button id="general-settings-open" class="general-settings-open" type="button" aria-haspopup="dialog" aria-label="Postavke stranice" title="Postavke stranice">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 3-.7 2.3-2 .9L5 5.7 3 9l1.8 1.7v2.6L3 15l2 3.3 2.3-.5 2 .9L10 21h4l.7-2.3 2-.9 2.3.5 2-3.3-1.8-1.7v-2.6L21 9l-2-3.3-2.3.5-2-.9L14 3Z" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" /></svg><span>Postavke</span>
-          </button>
-          <div id="demo-badge" class="demo-badge" hidden>Demo podaci</div>
-          <button
-            id="visibility-open"
-            class="dashboard-menu-open general-settings-shortcut"
-            type="button"
-            title="Uredi prikaz dashboarda"
-            aria-label="Uredi prikaz dashboarda"
-            hidden
-          >
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
-          </button>
-          <button
-            id="discovery-open"
-            class="discovery-open general-settings-shortcut"
-            type="button"
-            title="Pronađi nove objekte"
-            aria-label="Pronađi nove objekte"
-            hidden
-          >
-            <span class="discovery-icon" aria-hidden="true">↻</span>
-          </button>
-        </div>
-      </section>
-
       <div id="error-banner" class="error-banner" role="alert" hidden>
         <strong>Osvježavanje podataka nije uspjelo.</strong>
         <span id="error-message">Prikazane su zadnje dostupne vrijednosti. Servis će pokušati ponovno.</span>

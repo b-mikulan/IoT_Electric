@@ -6,6 +6,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import threading
@@ -120,6 +122,73 @@ class TopologyTests(unittest.TestCase):
         store = mapper.Store(self.directory / "checkpoint.sqlite", {"url": "http://middleware", "rootId": root, "metadata": False})
         self.addCleanup(store.db.close)
         return store
+
+    def test_admin_pause_commits_active_page_and_keeps_pending_work(self):
+        store = self.store()
+        stopped = threading.Event()
+        progress = []
+
+        class Client:
+            stop = threading.Event()
+
+            def page(self, container_id, token, metadata):
+                return page(["00/next"], ["01/temperature"]), 0.01
+
+        def report(summary, requests):
+            progress.append((summary, requests))
+            stopped.set()
+
+        with redirect_stdout(io.StringIO()):
+            code = mapper.crawl(store, Client(), on_progress=report, should_stop=stopped.is_set)
+        self.assertEqual(code, 130)
+        self.assertEqual(len(progress), 1)
+        self.assertEqual(progress[0][1], 1)
+        self.assertEqual(store.summary()["pages"], 1)
+        self.assertEqual(store.summary()["states"]["pending"], 1)
+        self.assertFalse(store.summary()["traversalFinished"])
+
+    def test_pause_cancels_a_request_waiting_for_its_turn_and_keeps_it_pending(self):
+        fixture = self.fixture()
+        store = self.store()
+        client = mapper.Client(fixture.url, "user", PASSWORD, delay=0.5)
+        stopped = threading.Event()
+
+        def pause_after_first_page():
+            # The next page is submitted at once and then waits for its paced turn.
+            while not fixture.calls:
+                time.sleep(0.01)
+            time.sleep(0.1)
+            stopped.set()
+
+        threading.Thread(target=pause_after_first_page, daemon=True).start()
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            code = mapper.crawl(store, client, should_stop=stopped.is_set)
+        self.assertEqual(code, 130)
+        self.assertEqual(fixture.calls, [("", "")])
+        summary = store.summary()
+        self.assertEqual(summary["pages"], 1)
+        self.assertNotIn("error", summary["states"])
+        self.assertGreater(summary["states"]["pending"], 0)
+
+    def test_admin_worker_paused_before_its_first_turn_sends_nothing(self):
+        fixture = self.fixture()
+        output = self.directory / "job"
+        output.mkdir()
+        config = {"output": str(output), "url": fixture.url, "username": "user", "password": PASSWORD, "root": "", "profile": "catalog",
+                  "resume": False, "maxRequests": 10, "timeout": 5, "delay": 1}
+        worker = subprocess.Popen([sys.executable, "-u", str(Path(mapper.__file__).with_name("admin_scan.py"))],
+                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        worker.stdin.write(json.dumps(config) + "\n")
+        worker.stdin.flush()
+        # The first event comes before the health check waits for its one-second turn.
+        self.assertEqual(json.loads(worker.stdout.readline())["event"], "progress")
+        time.sleep(0.2)
+        stdout, _ = worker.communicate("stop\n", timeout=30)
+        events = [json.loads(line) for line in stdout.splitlines() if line.startswith("{")]
+        self.assertEqual(worker.returncode, 130)
+        self.assertEqual(events[-1]["event"], "finished")
+        self.assertEqual(events[-1]["code"], 130)
+        self.assertEqual(fixture.calls, [])
 
     def test_budget_resume_parallel_traversal_exports_and_offline_export(self):
         fixture = self.fixture()

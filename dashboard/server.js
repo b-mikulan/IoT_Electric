@@ -12,6 +12,7 @@ const { DashboardSettingsStore, settingsFromConfig } = require("./lib/storage/da
 const { DeviceMetadataClient, readCatalog } = require("./lib/devices/deviceMetadata");
 const { createDashboardAuth } = require("./lib/auth/dashboardAuth");
 const { DashboardUsers } = require("./lib/auth/dashboardUsers");
+const { BuildingScan } = require("./lib/catalog/buildingScan");
 
 const configDirectory = path.join(__dirname, "config");
 
@@ -74,14 +75,14 @@ function createRuntime(env = process.env, { databaseFile = env.DASHBOARD_DB_FILE
     const { config, users } = database
       ? database.transaction(() => loadRuntimeState(env, database, usersFile))
       : loadRuntimeState(env, undefined, usersFile);
-    return startRuntime(env, config, users, database);
+    return startRuntime(env, config, users, database, databaseFile ? path.dirname(path.resolve(databaseFile)) : root);
   } catch (error) {
     database?.close();
     throw error;
   }
 }
 
-function startRuntime(env, config, users, database) {
+function startRuntime(env, config, users, database, storageRoot) {
   const dashboardAuth = createDashboardAuth(env, users);
   const poller = new PointPoller({
     middlewareUrl: config.middlewareUrl,
@@ -102,25 +103,28 @@ function startRuntime(env, config, users, database) {
   const dashboardSettings = new DashboardSettingsStore(config, { database });
   const dashboardTransfer = new DashboardTransfer(config, { database });
   const deviceMetadata = new DeviceMetadataClient(config, { catalog: database?.readDocument("metadata") });
-  const app = createApp({ poller, config, dashboardAuth, widgetStore, deviceWidgetStore, dashboardSettings, dashboardTransfer, deviceMetadata });
+  const buildingScan = new BuildingScan({ directory: path.join(storageRoot, "building-scans"), config, poller,
+    ...(env.DASHBOARD_SCAN_PYTHON && { python: env.DASHBOARD_SCAN_PYTHON }), caFile: env.DASHBOARD_SCAN_CA_FILE || undefined });
+  const app = createApp({ poller, config, dashboardAuth, widgetStore, deviceWidgetStore, dashboardSettings, dashboardTransfer, deviceMetadata, buildingScan });
 
-  return { app, config, poller, widgetStore, deviceWidgetStore, database };
+  return { app, config, poller, widgetStore, deviceWidgetStore, database, buildingScan };
 }
 
 if (require.main === module) {
   const widgetsFile = legacyWidgetFile(process.env);
   const databaseFile = process.env.DASHBOARD_DB_FILE?.trim() || path.join(widgetsFile ? path.dirname(path.resolve(widgetsFile)) : configDirectory, "dashboard.sqlite");
-  const { app, config, poller, database } = createRuntime(process.env, { databaseFile });
+  const { app, config, poller, database, buildingScan } = createRuntime(process.env, { databaseFile });
   let shuttingDown = false;
   const server = app.listen(config.port, "0.0.0.0", () => {
     console.log(`PLC dashboard listening on port ${config.port}`);
     poller.start();
   });
 
-  function shutdown() {
+  async function shutdown() {
     if (shuttingDown) return;
     shuttingDown = true;
     poller.stop();
+    await buildingScan.shutdown();
     server.close(() => {
       database.close();
       process.exit(0);

@@ -40,6 +40,10 @@ class RequestFailure(Exception):
         self.transient = transient
 
 
+class ScanStopped(RequestFailure):
+    """The request was cancelled before it was sent; its page stays pending."""
+
+
 class NoRedirects(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None  # Do not forward middleware credentials to a redirected host.
@@ -62,7 +66,7 @@ class Client:
         # worker, the upstream gets at least --delay seconds idle between reads.
         with self.pacing_lock:
             if self.stop.wait(max(self.delay, self.next_start - time.monotonic())):
-                raise RequestFailure("Scan stopped.")
+                raise ScanStopped("Scan stopped.")
             self.next_start = time.monotonic() + self.delay
 
     def get(self, path, authenticated=True, container_id=None):
@@ -73,7 +77,7 @@ class Client:
         opener = build_opener(NoRedirects(), HTTPSHandler(context=self.context))
         for attempt in range(self.retries + 1):
             if attempt and self.stop.wait(min(5 * 2 ** (attempt - 1), 60)):
-                raise RequestFailure("Scan stopped.")
+                raise ScanStopped("Scan stopped.")
             self.wait_turn()
             started_at, started = now(), time.monotonic()
             status, failure = None, None
@@ -375,7 +379,8 @@ class Store:
         return summary
 
 
-def crawl(store, client, workers=1, metadata=False, max_pages=10000, max_requests=0, progress_every=20, max_consecutive_failures=3):
+def crawl(store, client, workers=1, metadata=False, max_pages=10000, max_requests=0, progress_every=20, max_consecutive_failures=3,
+          on_progress=None, should_stop=None):
     active = {}
     submitted = finished = 0
     interrupted = fatal = stopped_for_failures = False
@@ -383,7 +388,10 @@ def crawl(store, client, workers=1, metadata=False, max_pages=10000, max_request
     executor = ThreadPoolExecutor(max_workers=workers)
     try:
         while True:
-            room = workers - len(active)
+            if should_stop and should_stop():
+                interrupted = True
+                client.stop.set()  # Cancel a request still waiting for its turn; a sent one completes.
+            room = 0 if interrupted else workers - len(active)
             if max_requests:
                 room = min(room, max_requests - submitted)
             for row in store.pending(room, {value[0] for value in active.values()}):
@@ -401,12 +409,16 @@ def crawl(store, client, workers=1, metadata=False, max_pages=10000, max_request
                     timed_out = any("TIMEOUT" in str(error.get("message", "")).upper() or "TIMED OUT" in str(error.get("message", "")).upper()
                                     for error in payload.get("errors", []) if isinstance(error, dict))
                     consecutive_failures = consecutive_failures + 1 if timed_out else 0
+                except ScanStopped:
+                    continue  # Never sent: leave the page pending and uncounted.
                 except RequestFailure as error:
                     store.fail(container_id, str(error))
                     print(f"Warning: {container_id or '(root)'}: {error}", file=sys.stderr)
                     fatal = fatal or error.fatal
                     consecutive_failures = consecutive_failures + 1 if error.transient else 0
                 finished += 1
+                if on_progress:
+                    on_progress(store.summary(), finished)
                 if finished == 1 or finished % progress_every == 0:
                     summary = store.summary()
                     print(f"Requests: {finished}; containers: {summary['containers']}; pending: {summary['states'].get('pending', 0)}; pruned: {summary['states'].get('pruned', 0)}; values: {summary['items'].get('value', 0)}", flush=True)

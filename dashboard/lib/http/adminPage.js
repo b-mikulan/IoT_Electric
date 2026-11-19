@@ -13,19 +13,21 @@ function sendAdminPage(response) {
     <script defer src="/adminApi.js"></script>
     <script defer src="/adminUsers.js"></script>
     <script defer src="/adminSystem.js"></script>
+    <script defer src="/adminOrganization.js"></script>
+    <script defer src="/adminCatalog.js"></script>
   </head>
   <body class="admin-page">
     <a class="admin-skip" href="#users">Preskoči na upravljanje korisnicima</a>
-    <header class="admin-header">
-      <div class="admin-container admin-header-inner">
-        <div>
-          <p class="eyebrow">IoT Electric</p>
+    <header class="app-header page-header admin-header">
+      <div class="admin-container page-header-inner">
+        <div class="page-header-copy">
+          <a class="brand" href="/" aria-label="IoT Electric"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span class="brand-name">IoT Electric</span></a>
           <h1>Administracija</h1>
-          <p class="admin-header-description">Korisnici, pristup prostorijama i postavke sustava.</p>
+          <p class="page-header-description">Korisnici, pristup prostorijama i postavke sustava.</p>
         </div>
-        <div class="admin-header-actions">
-          <p class="admin-account">Administrator <strong id="admin-current-user">—</strong></p>
-          <div class="admin-actions">
+        <div class="page-header-side">
+          <p class="page-header-status admin-account">Administrator <strong id="admin-current-user">—</strong></p>
+          <div class="admin-actions page-header-actions">
             <a class="admin-button secondary" href="/">Natrag na dashboard</a>
             <form action="/logout" method="post"><button class="admin-button secondary" type="submit">Odjava</button></form>
           </div>
@@ -42,6 +44,8 @@ function sendAdminPage(response) {
       <nav class="admin-section-nav" aria-label="Administracija">
         <a href="#users">Korisnici i prava</a>
         <a href="#system">Sustav i konfiguracija</a>
+        <a href="#organization">Organizacija zgrade</a>
+        <a href="#catalog">Skeniranje zgrade</a>
       </nav>
       <noscript><p class="admin-warning">Za upravljanje korisnicima i postavkama potrebno je omogućiti JavaScript u pregledniku.</p></noscript>
 
@@ -127,6 +131,68 @@ function sendAdminPage(response) {
           <a id="admin-transfer-link" class="admin-card admin-shortcut" href="/transfer.html" hidden><span class="admin-shortcut-heading">Prijenos konfiguracije <span aria-hidden="true">↗</span></span><span>Izvoz, uvoz i sigurnosna kopija konfiguracije.</span><small>Korisnički računi nisu dio izvoza konfiguracije.</small></a>
           <a class="admin-card admin-shortcut" href="/trends.html"><span class="admin-shortcut-heading">Trendovi i alarmi <span aria-hidden="true">↗</span></span><span>Pregledaj povijest mjerenja, promjene i alarme.</span></a>
           <a class="admin-card admin-shortcut" href="/technical.html"><span class="admin-shortcut-heading">Tehnički prikaz <span aria-hidden="true">↗</span></span><span>Provjeri pojedinačne mjerne točke i njihove vrijednosti.</span></a>
+        </div>
+      </section>
+      <section id="organization" class="admin-section" aria-labelledby="admin-organization-title">
+        <div class="admin-section-heading"><div><h2 id="admin-organization-title">Organizacija zgrade</h2><p>Pregledaj prijedloge iz spremljenog kataloga i postavki.</p></div></div>
+        <div class="admin-card admin-system-card">
+          <p class="admin-hint">Obuhvaća konfigurirane, vidljive uređaje. Postojeće ručne dodjele i popisi članova imaju prednost. Katovi se preuzimaju iz odabrane prostorije.</p>
+          <button id="organization-preview" class="admin-button" type="button">Predloži organizaciju</button>
+          <fieldset id="organization-scope" hidden>
+            <legend>Dodjela grane u prostoriju (opcionalno)</legend>
+            <div class="admin-room-filters">
+              <div class="admin-field"><label for="organization-root">Grana / puna putanja uređaja</label><input id="organization-root" list="organization-branches" placeholder="Odaberi granu iz popisa" maxlength="4096"><datalist id="organization-branches"></datalist></div>
+              <div class="admin-field"><label for="organization-room">Ciljna prostorija</label><select id="organization-room"><option value="">Bez dodjele grane</option></select></div>
+            </div>
+            <p class="admin-hint">Odaberi granu i prostoriju pa ponovno pripremi prijedlog. Ručno dodijeljeni uređaji ostaju u svojim prostorijama. Nove prostorije možeš dodati u <a href="/#rooms">Prostorije i katovi</a>.</p>
+          </fieldset>
+          <p id="organization-status" class="admin-status" role="status" aria-live="polite"></p>
+          <div id="organization-result" hidden>
+            <p id="organization-summary" class="admin-hint"></p>
+            <p class="admin-warning">Premještanje može promijeniti tko vidi uređaj i tko njime upravlja. Moguća podgrupiranja zahtijevaju tvoju potvrdu; ista prostorija ne dokazuje stvarno članstvo u grupi.</p>
+            <div class="admin-actions"><button id="organization-select" class="admin-text-button" type="button">Odaberi pouzdane prijedloge bez promjene pristupa</button><button id="organization-clear" class="admin-text-button" type="button">Poništi odabir</button></div>
+            <label class="admin-label" for="organization-search">Pretraži prijedloge</label><input id="organization-search" type="search" placeholder="Uređaj, prostorija ili putanja">
+            <div id="organization-items" class="organization-items"></div>
+            <button id="organization-more" class="admin-button secondary" type="button" hidden>Prikaži još prijedloga</button>
+            <details id="organization-unresolved"><summary id="organization-unresolved-title">Potrebna provjera</summary><ul id="organization-unresolved-items"></ul></details>
+            <p id="organization-selected" class="admin-permission-summary"></p>
+            <label class="admin-checkbox"><input id="organization-confirm" type="checkbox"><span>Pregledao/la sam odabrane promjene i njihov utjecaj na pristup.</span></label>
+            <button id="organization-apply" class="admin-button" type="button" disabled>Primijeni odabrano</button>
+          </div>
+          <p id="organization-backup" class="admin-hint" hidden><a id="organization-backup-link">Preuzmi prethodnu konfiguraciju</a>. Za povrat je uvezi kroz <a href="/transfer.html">Prijenos konfiguracije</a>.</p>
+        </div>
+      </section>
+      <section id="catalog" class="admin-section" aria-labelledby="catalog-title">
+        <div class="admin-section-heading"><div><h2 id="catalog-title">Skeniranje zgrade</h2><p>Izradi katalog dostupnih uređaja i točaka iz kontrolera.</p></div></div>
+        <div class="admin-card admin-system-card">
+          <p class="admin-warning">Skeniranje privremeno pauzira očitanja i upravljanje za sve korisnike ovog dashboarda. Nakon pauze ili završetka skena vraća se prethodno stanje osvježavanja. Zatvaranje stranice ne prekida skeniranje.</p>
+          <p class="admin-hint">Rezultat je zasebna snimka kataloga. Dodavanje točaka na dashboard i organizacija postojećih uređaja ostaju zasebni koraci.</p>
+          <div class="admin-account-fields">
+            <div class="admin-field"><label class="admin-label" for="catalog-profile">Obuhvat novog skena</label><select id="catalog-profile"><option value="catalog">Uređaji i točke (preporučeno)</option><option value="full">Sve dostupne grane</option></select><p class="admin-hint">Preporučeni obuhvat preskače programe, grafike i druge tehničke grane.</p></div>
+            <div class="admin-field"><label class="admin-label" for="catalog-limit">Zahtjevi po pokretanju / nastavku</label><select id="catalog-limit"><option value="500">Do 500 zahtjeva</option><option value="2000">Do 2000 zahtjeva</option><option value="0">Bez ograničenja</option></select><p class="admin-hint">Jedan zahtjev u trenutku, uz najmanje 3 sekunde razmaka. Na limitu se napredak sprema za nastavak.</p></div>
+            <div class="admin-field"><label class="admin-label" for="catalog-root">Početna grana (opcionalno)</label><input id="catalog-root" maxlength="4096" placeholder="Prazno za cijelu dostupnu zgradu" autocomplete="off"><p class="admin-hint">Za uži obuhvat unesi točan EWS ID grane.</p></div>
+          </div>
+          <div class="admin-form-footer">
+            <label class="admin-checkbox"><input id="catalog-confirm" type="checkbox"><span>Potvrđujem privremenu pauzu očitanja i upravljanja.</span></label>
+            <div class="admin-actions catalog-actions"><button id="catalog-start" class="admin-button" type="button" disabled>Pokreni novi sken</button><button id="catalog-pause" class="admin-button secondary" type="button" disabled>Pauziraj aktivni sken</button><button id="catalog-refresh" class="admin-text-button" type="button">Osvježi stanje</button></div>
+          </div>
+          <p id="catalog-status" class="admin-status" role="status" aria-live="polite">Učitavam stanje skeniranja…</p>
+          <div id="catalog-history" class="admin-form-footer" hidden>
+            <label class="admin-label" for="catalog-job">Spremljene snimke (posljednjih 30)</label><select id="catalog-job"></select>
+            <p id="catalog-message" class="admin-status" role="status" aria-live="polite"></p>
+            <p id="catalog-scope" class="admin-hint"></p>
+            <dl id="catalog-counts" class="admin-system-details" aria-label="Napredak skeniranja"></dl>
+            <p id="catalog-coverage" class="admin-hint"></p>
+            <div class="admin-actions catalog-actions"><button id="catalog-resume" class="admin-button secondary" type="button" disabled>Nastavi odabrani sken</button><label class="admin-checkbox"><input id="catalog-retry" type="checkbox"><span>Ponovi i neuspjele grane</span></label></div>
+            <div id="catalog-downloads" class="admin-actions catalog-actions" aria-label="Preuzimanje snimke"></div>
+            <div id="catalog-browser" class="admin-form-footer" hidden>
+              <h3>Uređaji u snimci</h3>
+              <form id="catalog-search-form" class="catalog-search"><div class="admin-field"><label class="admin-label" for="catalog-search">Naziv, prostorija ili putanja</label><input id="catalog-search" type="search" maxlength="200" autocomplete="off"></div><button class="admin-button secondary" type="submit">Pretraži</button></form>
+              <p id="catalog-devices-status" class="admin-status" role="status"></p>
+              <div id="catalog-devices" class="organization-items"></div>
+              <div class="admin-actions"><button id="catalog-prev" class="admin-button secondary" type="button" disabled>Prethodnih 50</button><button id="catalog-next" class="admin-button secondary" type="button" disabled>Sljedećih 50</button></div>
+            </div>
+          </div>
         </div>
       </section>
       <footer class="admin-footer">IoT Electric · Administracija</footer>

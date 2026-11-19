@@ -179,6 +179,44 @@ class DeviceWidgetStore {
 
   withExclusive(operation) { return this.#enqueue(operation); }
 
+  // The callback plans against the document read inside the existing write
+  // queue. A backup must succeed before any settings become visible.
+  applyOrganization(plan) {
+    return this.#enqueue(async () => {
+      this.#assertEnabled();
+      const { document: previous } = await this.#read();
+      const { document, backup, count } = plan(structuredClone(previous));
+      parseDocument(JSON.stringify(document));
+      let backupId;
+      if (this.#database) {
+        backupId = this.#database.transaction(() => {
+          const current = this.#database.readConfiguration();
+          return this.#database.replaceConfiguration({ ...current, deviceWidgets: document }, backup.dashboardSettings);
+        });
+      } else {
+        backupId = randomUUID();
+        try {
+          await this.#fs.writeFile(`${this.#filePath}.organization-${backupId}.json`, JSON.stringify(backup, null, 2), { flag: "wx", mode: 0o600 });
+        } catch { throw new DeviceWidgetStoreError("Sigurnosna kopija nije spremljena. Postavke nisu promijenjene.", 500, "ORGANIZATION_BACKUP_FAILED"); }
+        await this.#write(document);
+      }
+      this.#publish(document);
+      return { backupId, count };
+    });
+  }
+
+  async organizationBackup(id) {
+    if (typeof id !== "string" || !/^[a-f0-9-]{36}$/.test(id)) throw new DeviceWidgetStoreError("Sigurnosna kopija nije pronađena.", 404, "BACKUP_NOT_FOUND");
+    if (this.#database) {
+      const backup = this.#database.readBackup(id);
+      if (backup) return { format: "iot-electric-dashboard", version: 2, ...backup };
+    } else if (this.#filePath) {
+      try { return JSON.parse(await this.#fs.readFile(`${this.#filePath}.organization-${id}.json`, "utf8")); }
+      catch (error) { if (error.code !== "ENOENT") throw error; }
+    }
+    throw new DeviceWidgetStoreError("Sigurnosna kopija nije pronađena.", 404, "BACKUP_NOT_FOUND");
+  }
+
   adoptDocument(document) { this.#publish(parseDocument(JSON.stringify(document))); }
 
   #publish(document) {

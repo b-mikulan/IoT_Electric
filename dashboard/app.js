@@ -16,6 +16,7 @@ const { sendEvent, sendHeartbeat } = require("./lib/http/eventStream");
 const { createStaticAssets } = require("./lib/http/staticAssets");
 const { trackDashboardStream } = require("./lib/auth/dashboardAuth");
 const { createRoomIndex, scopeRooms } = require("./lib/auth/roomAccess");
+const { proposeOrganization, applyOrganizationSelection } = require("./lib/devices/organizationProposal");
 
 function publicWidget(widget) {
   const { id, label, description, unit, precision, writable, visible } = widget;
@@ -120,6 +121,7 @@ function createApp({
   deviceCommands = new DeviceCommandService({ poller, config, deviceMetadata }),
   dashboardTransfer = new DashboardTransfer(config),
   dashboardSettings = new DashboardSettingsStore(config),
+  buildingScan,
 }) {
   if (!poller) throw new Error("A point poller is required.");
   if (!config) throw new Error("Dashboard configuration is required.");
@@ -134,6 +136,7 @@ function createApp({
   let transferBusy = false;
   let activeConfigurationRequests = 0;
   let roomStateReady;
+  let activeScanConflicts = 0;
   const demo = config.demoMode ? createDeviceDemo() : null;
   Object.assign(config, dashboardSettings.values);
   poller.configurePolling?.(dashboardSettings.values);
@@ -150,6 +153,28 @@ function createApp({
   if (config.trustProxy) app.set("trust proxy", /^d+$/.test(config.trustProxy) ? Number(config.trustProxy) : config.trustProxy);
   if (dashboardAuth) app.use(dashboardAuth.router);
 
+  // Reserve dashboard/controller access for one paced topology reader. Existing
+  // requests drain before start; cached pages and SSE remain available.
+  app.use("/api", (request, response, next) => {
+    if (["/admin/catalog/status", "/admin/catalog/start", "/admin/catalog/pause", "/dashboard/events"].includes(request.path.replace(/\/$/, ""))) return next();
+    if (buildingScan?.busy && !["GET", "HEAD"].includes(request.method)) return response.status(409).json({ error: "Skeniranje kataloga je u tijeku. Za upravljanje ili promjenu postavki najprije pauziraj skeniranje.", code: "CATALOG_SCAN_ACTIVE" });
+    activeScanConflicts++;
+    let released = false;
+    const release = () => { if (!released) { released = true; activeScanConflicts--; } };
+    response.once("finish", release); response.once("close", release);
+    return next();
+  });
+
+  // Count controller work for as long as it runs, not for as long as the
+  // browser stays connected: an aborted request must not let a scan start
+  // while its middleware read is still in flight. A handler that reaches the
+  // controller only after a scan started is refused instead of overlapping it.
+  async function controllerWork(operation) {
+    if (buildingScan?.busy) throw new DeviceWidgetStoreError("Skeniranje kataloga je u tijeku. Pokušaj ponovno nakon pauze ili završetka.", 409, "CATALOG_SCAN_ACTIVE");
+    activeScanConflicts++;
+    try { return await operation(); } finally { activeScanConflicts--; }
+  }
+
   function currentRoomIndex(metadata = demo || deviceMetadata.groupingMetadata?.()) {
     return createRoomIndex([...(demo?.widgets || []), ...config.widgets], {
       ...refreshModelOptions(), ...metadata,
@@ -162,11 +187,17 @@ function createApp({
       throw error;
     });
     await roomStateReady;
+    return roomMetadata();
+  }
+
+  // The metadata room access is derived from. Reads nothing into storage.
+  async function roomMetadata() {
     if (demo) return demo;
     const cached = deviceMetadata.groupingMetadata?.();
+    if (buildingScan?.busy) return cached;
     if (Object.keys(cached?.roomByZone || {}).length || !config.widgets.length) return cached;
     try {
-      const metadata = await deviceMetadata.read(config.widgets);
+      const metadata = await controllerWork(() => deviceMetadata.read(config.widgets));
       return deviceMetadata.groupingMetadata?.() || metadata;
     }
     catch { return cached; }
@@ -185,8 +216,17 @@ function createApp({
   if (dashboardAuth) {
     const { users, revoke, listSessions } = dashboardAuth;
     app.use("/api/admin", (request, response, next) => {
-      if (response.locals.dashboardSession?.role === "admin") return next();
-      return response.status(403).json({ code: "ADMIN_REQUIRED" });
+      if (response.locals.dashboardSession?.role !== "admin") return response.status(403).json({ code: "ADMIN_REQUIRED" });
+      // User grants affect organization previews. These routes precede the
+      // general configuration gate, so account operations participate here.
+      if (!request.path.startsWith("/organization") && !request.path.startsWith("/catalog/")) {
+        if (transferBusy) return response.status(409).json({ error: "Promjena konfiguracije je u tijeku.", code: "TRANSFER_IN_PROGRESS" });
+        activeConfigurationRequests++;
+        let released = false;
+        const release = () => { if (!released) { released = true; activeConfigurationRequests--; } };
+        response.once("finish", release); response.once("close", release);
+      }
+      return next();
     });
     app.get("/api/admin/users", async (request, response) => {
       const metadata = await prepareRoomState();
@@ -349,6 +389,79 @@ function createApp({
   poller.on("removed", (payload) => broadcast("removed", payload));
 
   app.get("/api/dashboard-transfer/status", (request, response) => response.json({ enabled: dashboardTransfer.enabled && Boolean(widgetStore?.enabled), demoMode: config.demoMode }));
+  const organizationAdmin = (request, response, next) => {
+    if (response.locals.dashboardSession?.role !== "admin" || !response.locals.isSessionActive?.()) {
+      return response.status(403).json({ error: "Potreban je administratorski pristup.", code: "ADMIN_REQUIRED" });
+    }
+    return next();
+  };
+  app.get("/api/admin/catalog/status", organizationAdmin, (request, response) => {
+    try { response.set("Cache-Control", "no-store"); return response.json(buildingScan?.status() || { enabled: false, busy: false, jobs: [] }); }
+    catch (error) { return sendOperationError(response, error, "CATALOG_STATUS_FAILED", "Stanje skeniranja nije dostupno."); }
+  });
+  app.post("/api/admin/catalog/start", organizationAdmin, requireJson, express.json({ limit: "8kb" }), (request, response) => {
+    try {
+      if (!buildingScan) throw new DeviceWidgetStoreError("Skeniranje nije dostupno u ovoj instalaciji.", 409, "CATALOG_SCAN_UNAVAILABLE");
+      if (activeScanConflicts || activeConfigurationRequests > 1 || transferBusy || clearingWidgets || autoDiscovery.state === "running") throw new DeviceWidgetStoreError("Pričekaj završetak aktivnih zahtjeva ili otkrivanja pa pokušaj ponovno.", 409, "WIDGET_OPERATION_IN_PROGRESS");
+      return response.status(202).json(buildingScan.start(request.body));
+    } catch (error) { return sendOperationError(response, error, "CATALOG_START_FAILED", "Skeniranje nije pokrenuto."); }
+  });
+  app.post("/api/admin/catalog/pause", organizationAdmin, requireJson, express.json({ limit: "4kb" }), (request, response) => {
+    try { return response.json(buildingScan.pause(request.body?.id)); }
+    catch (error) { return sendOperationError(response, error, "CATALOG_PAUSE_FAILED", "Skeniranje nije moguće pauzirati."); }
+  });
+  app.get("/api/admin/catalog/:id/devices", organizationAdmin, async (request, response) => {
+    try { response.set("Cache-Control", "no-store"); return response.json(await buildingScan.devices(request.params.id, request.query.search || "", Number(request.query.offset || 0))); }
+    catch (error) { return sendOperationError(response, error, "CATALOG_READ_FAILED", "Katalog nije dostupan."); }
+  });
+  app.get("/api/admin/catalog/:id/files/:filename", organizationAdmin, (request, response) => {
+    try { response.set("Cache-Control", "no-store"); const file = buildingScan.download(request.params.id, request.params.filename); return response.download(path.basename(file), request.params.filename, { root: path.dirname(file) }); }
+    catch (error) { return sendOperationError(response, error, "CATALOG_DOWNLOAD_FAILED", "Datoteka nije dostupna."); }
+  });
+  // Plan with the same room metadata that room access uses. Without a saved
+  // catalog that is the live controller description, not the stored null.
+  async function organizationMetadata() {
+    const live = await roomMetadata();
+    return { metadataById: live?.metadataById || {}, roomByZone: live?.roomByZone || {} };
+  }
+  const planningConfiguration = (configuration, metadata) => ({ ...configuration, metadata: { ...configuration.metadata, ...metadata } });
+  app.post("/api/admin/organization/preview", organizationAdmin, requireJson, express.json({ limit: "8kb" }), async (request, response) => {
+    try {
+      if (!dashboardTransfer.enabled || !deviceWidgetStore.enabled || !widgetStore?.enabled) throw new DeviceWidgetStoreError("Organizacija zahtijeva trajnu pohranu i stvarni način rada.", 409, "ORGANIZATION_UNAVAILABLE");
+      const metadata = await organizationMetadata();
+      response.set("Cache-Control", "no-store");
+      return response.json(proposeOrganization(planningConfiguration(dashboardTransfer.current(), metadata), dashboardAuth.users.list(), request.body?.scope));
+    } catch (error) { return sendOperationError(response, error, "ORGANIZATION_PREVIEW_FAILED", "Prijedlog nije moguće pripremiti."); }
+  });
+  app.post("/api/admin/organization/apply", organizationAdmin, requireJson, express.json({ limit: "4mb" }), async (request, response) => {
+    // This request is counted by the configuration gate above. Keep the same
+    // global exclusion as imports, including reads that synchronize settings.
+    if (activeConfigurationRequests > 1 || clearingWidgets || autoDiscovery.state === "running") return response.status(409).json({ error: "Pričekaj završetak promjene konfiguracije ili otkrivanja pa pokušaj ponovno.", code: "WIDGET_OPERATION_IN_PROGRESS" });
+    if (!dashboardTransfer.enabled || !deviceWidgetStore.enabled || !widgetStore?.enabled) return response.status(409).json({ error: "Organizacija nije dostupna.", code: "ORGANIZATION_UNAVAILABLE" });
+    // Hold other configuration changes, including automatic discovery, while
+    // the room metadata is read too, not only while the result is saved.
+    transferBusy = true;
+    try {
+      const metadata = await organizationMetadata();
+      const result = await widgetStore.withExclusive(() => deviceWidgetStore.applyOrganization(document => {
+        if (!response.locals.isSessionActive()) throw new DeviceWidgetStoreError("Prijava je istekla.", 401, "LOGIN_REQUIRED");
+        // The backup below keeps the stored configuration, including its metadata.
+        const configuration = { ...dashboardTransfer.current(), deviceWidgets: document };
+        const planned = applyOrganizationSelection(planningConfiguration(configuration, metadata), dashboardAuth.users.list(), request.body);
+        return { ...planned, backup: { format: "iot-electric-dashboard", version: 2, exportedAt: new Date().toISOString(), ...configuration } };
+      }));
+      broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
+      return response.json({ ...result, backupUrl: `/api/admin/organization/backups/${result.backupId}` });
+    } catch (error) { return sendOperationError(response, error, "ORGANIZATION_APPLY_FAILED", "Organizacija nije spremljena. Prethodne postavke su zadržane."); }
+    finally { transferBusy = false; }
+  });
+  app.get("/api/admin/organization/backups/:id", organizationAdmin, async (request, response) => {
+    try {
+      const backup = await deviceWidgetStore.organizationBackup(request.params.id);
+      response.set({ "Cache-Control": "no-store", "Content-Disposition": 'attachment; filename="dashboard-before-organization.json"' });
+      return response.json(backup);
+    } catch (error) { return sendOperationError(response, error, "ORGANIZATION_BACKUP_FAILED", "Sigurnosnu kopiju nije moguće preuzeti."); }
+  });
   app.get("/api/dashboard-transfer/export", (request, response) => {
     try {
       response.set({ "Cache-Control": "no-store", "Content-Disposition": 'attachment; filename="dashboard-backup.json"' });
@@ -502,7 +615,7 @@ function createApp({
       if (scoped && !isSessionActive()) return response.status(401).json({ code: "LOGIN_REQUIRED" });
       const access = scoped ? scopeRooms(currentRoomIndex(metadata), dashboardSession.roomIds) : undefined;
       const { ids, deviceCount } = resolveManualRefreshScope(config.widgets, { ...refreshModelOptions(), ...metadata }, request.body, access);
-      const result = await poller.refreshScope(ids);
+      const result = await controllerWork(() => poller.refreshScope(ids));
       if (scoped && !isSessionActive()) return response.status(401).json({ code: "LOGIN_REQUIRED" });
       return response.json({ ...request.body, deviceCount, ...result });
     } catch (error) { return sendOperationError(response, error, "SCOPED_REFRESH_FAILED", "Osvježavanje odabranih uređaja nije uspjelo."); }
@@ -644,7 +757,7 @@ function createApp({
       return response.json({ metadataById: demo.metadataById, roomByZone: demo.roomByZone, demoWidgets: demo.widgets, warnings: [] });
     }
     try {
-      const metadata = await deviceMetadata.read(config.widgets);
+      const metadata = buildingScan?.busy ? deviceMetadata.groupingMetadata?.() || { metadataById: {}, roomByZone: {}, warnings: [] } : await controllerWork(() => deviceMetadata.read(config.widgets));
       automaticRoomNames = Object.values(metadata.roomByZone || {}).map((room) => typeof room === "string" ? room : room?.label).filter((name) => typeof name === "string" && name.trim());
       return response.json(metadata);
     } catch {
@@ -672,7 +785,7 @@ function createApp({
         // The room assignment can change while the controller checks the point.
         requireControl(scopeRooms(currentRoomIndex(), dashboardSession.roomIds, dashboardSession.writeRoomIds));
       } : undefined;
-      return response.json(await deviceCommands.write(pointId, body.value, authorize));
+      return response.json(await controllerWork(() => deviceCommands.write(pointId, body.value, authorize)));
     } catch (error) {
       return sendOperationError(response, error, "DEVICE_COMMAND_WRITE_FAILED", "Slanje naredbe nije uspjelo.");
     }
@@ -692,7 +805,7 @@ function createApp({
   for (const kind of ["history", "alarms"]) {
     app.post(`/api/${kind}/query`, requireJson, express.json({ limit: "16kb" }), async (request, response) => {
       try {
-        return response.json(await telemetry.query(kind, request.body || {}));
+        return response.json(await controllerWork(() => telemetry.query(kind, request.body || {})));
       } catch (error) {
         return sendOperationError(response, error, "TELEMETRY_FAILED", "Dohvat podataka nije uspio.");
       }
@@ -700,7 +813,7 @@ function createApp({
   }
   app.post("/api/history/browse", requireJson, express.json({ limit: "8kb" }), async (request, response) => {
     try {
-      return response.json(await telemetry.browse(request.body?.containerId ?? ""));
+      return response.json(await controllerWork(() => telemetry.browse(request.body?.containerId ?? "")));
     } catch (error) {
       return sendOperationError(response, error, "TELEMETRY_FAILED", "Dohvat trendova nije uspio.");
     }
@@ -723,7 +836,7 @@ function createApp({
       try {
         // Recognized device commands must use the same fresh checks even when
         // submitted through the older value-widget endpoint.
-        const result = await (deviceCommands.isDeviceCommand(widgetId)
+        const result = await controllerWork(() => deviceCommands.isDeviceCommand(widgetId)
           ? deviceCommands.write(widgetId, value) : poller.writeValue(widgetId, value));
         return response.json(result);
       } catch (error) {
@@ -751,7 +864,7 @@ function createApp({
       }
 
       try {
-        const result = await poller.discoverObjects(query);
+        const result = await controllerWork(() => poller.discoverObjects(query));
         discoveredById.clear();
         for (const item of result.items) {
           if (item.kind === "value") discoveredById.set(item.id, item);

@@ -136,6 +136,7 @@ class PointPoller extends EventEmitter {
 
   #writeRefreshGeneration = 0;
   #paused = false;
+  #catalogScan = false;
   #readingKind = null;
   #readingManual = false;
   #activeReadGeneration = null;
@@ -250,7 +251,30 @@ class PointPoller extends EventEmitter {
   }
 
   getPollingState() {
-    return { paused: this.#paused, active: this.#readingKind !== null, scope: this.#readingKind, manual: this.#readingManual };
+    return { paused: this.#paused, active: this.#readingKind !== null, scope: this.#readingKind, manual: this.#readingManual,
+      ...(this.#catalogScan && { catalogScan: true }) };
+  }
+
+  async holdForCatalogScan() {
+    if (this.#catalogScan) throw new PointDiscoveryError("Skeniranje kataloga je već aktivno.", 409, "CATALOG_SCAN_ACTIVE");
+    const wasPaused = this.#paused;
+    this.#catalogScan = true;
+    this.setPaused(true);
+    if (wasPaused) this.emit("polling", this.getPollingState());
+    // A failed previous request must not strand the scanner's pause lease.
+    if (this.#priorityPromise) await this.#priorityPromise.catch(() => {});
+    if (this.#pollPromise) await this.#pollPromise.catch(() => {});
+    let released = false;
+    return (resume = true) => {
+      if (released) return;
+      released = true;
+      this.#catalogScan = false;
+      if (resume) {
+        this.setPaused(wasPaused);
+        if (this.#pendingWriteIds.size) void this.#refreshAfterWrite(this.#writeRefreshGeneration);
+      }
+      this.emit("polling", this.getPollingState());
+    };
   }
 
   configurePolling({ intervalMs, timeoutMs, readBatchSize, readBatchDelayMs }) {
@@ -267,6 +291,7 @@ class PointPoller extends EventEmitter {
   }
 
   setPaused(paused) {
+    if (this.#catalogScan && !paused) throw new PointDiscoveryError("Najprije zaustavi skeniranje kataloga.", 409, "CATALOG_SCAN_ACTIVE");
     if (paused === this.#paused) return this.getPollingState();
     this.#paused = paused;
     if (paused && this.#readingKind === "all" && !this.#readingManual) this.#readGeneration += 1;
@@ -287,6 +312,7 @@ class PointPoller extends EventEmitter {
   }
 
   async poll({ manual = false } = {}) {
+    if (this.#catalogScan && manual) throw new PointDiscoveryError("Skeniranje kataloga je u tijeku.", 409, "CATALOG_SCAN_ACTIVE");
     if (this.#paused && !manual) return this.getSnapshot();
     if (this.#priorityPromise) {
       await this.#priorityPromise;
@@ -337,6 +363,11 @@ class PointPoller extends EventEmitter {
   }
 
   async #queueRefresh(ids, manual) {
+    if (this.#catalogScan) {
+      if (manual) throw new PointDiscoveryError("Skeniranje kataloga je u tijeku.", 409, "CATALOG_SCAN_ACTIVE");
+      for (const id of ids) this.#pendingWriteIds.add(id);
+      return this.getSnapshot();
+    }
     const configured = new Set(this.#widgets.map(widget => widget.id));
     const selected = [...new Set(ids)].filter(id => configured.has(id));
     if (!selected.length) {
@@ -767,6 +798,7 @@ class PointPoller extends EventEmitter {
 
   async #refreshAfterWrite(generation) {
     if (generation !== this.#writeRefreshGeneration) return;
+    if (this.#catalogScan) return;
     const writtenIds = [...this.#pendingWriteIds];
     this.#pendingWriteIds.clear();
     const ids = new Set(writtenIds);

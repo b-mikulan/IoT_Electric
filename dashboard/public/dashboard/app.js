@@ -307,19 +307,19 @@ function visualForUnit(unit = "") {
   const normalized = unit.trim().toLowerCase();
 
   if (normalized.includes("°c") || normalized === "c") {
-    return { icon: "🌡", color: "#d35400", soft: "#fff1e8" };
+    return { icon: "🌡", color: "#A2512A", soft: "#F7EDE7" };
   }
   if (normalized === "%" || normalized.includes("rh")) {
-    return { icon: "💧", color: "#0277bd", soft: "#e6f4fb" };
+    return { icon: "💧", color: "#3F7891", soft: "#EBF2F5" };
   }
   if (normalized.includes("kw") || normalized.includes("w")) {
-    return { icon: "⚡", color: "#b77900", soft: "#fff8dc" };
+    return { icon: "⚡", color: "#87683C", soft: "#F5F0E7" };
   }
   if (normalized.includes("v") || normalized.includes("a")) {
-    return { icon: "⌁", color: "#6a4fb3", soft: "#f1edfc" };
+    return { icon: "⌁", color: "#75609A", soft: "#F1EEF6" };
   }
 
-  return { icon: "●", color: "#00796b", soft: "#e4f4f1" };
+  return { icon: "●", color: "#3E474C", soft: "#EEF0EF" };
 }
 
 function widgetGroupName(widget) {
