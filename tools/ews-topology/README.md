@@ -136,6 +136,16 @@ Exit codes: `0` = discovered queue drained without errors/partial folders (legac
 
 Run the local fixture tests (no real controller required):
 
+The dashboard also exposes this mapper through **Admin → Skeniranje zgrade**;
+see [dashboard setup and API](../../dashboard/README.md#building-scans-from-the-admin-page).
+`admin_scan.py` is its private child-process entry point, not a replacement CLI:
+it receives configuration/credentials through stdin, emits JSON progress, and
+pauses on another stdin line or EOF. A per-directory OS lock protects admin jobs
+across dashboard restarts. The existing command-line interface remains unchanged.
+Dashboard integration tests run a real Python worker against a local fixture,
+including checkpoint continuation and catalog indexing; Python must be installed
+when running `npm test`.
+
 ```powershell
 python -m unittest discover -s tools/ews-topology -p "test_*.py" -v
 ```

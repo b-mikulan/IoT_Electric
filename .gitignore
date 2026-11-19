@@ -11,6 +11,7 @@ dashboard-users.json
 dashboard-users.json.*.tmp
 dashboard.sqlite
 dashboard.sqlite-*
+building-scans/
 .env
 /docker-compose.override.yml
 *.crt

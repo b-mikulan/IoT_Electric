@@ -121,6 +121,30 @@ class TopologyTests(unittest.TestCase):
         self.addCleanup(store.db.close)
         return store
 
+    def test_admin_pause_commits_active_page_and_keeps_pending_work(self):
+        store = self.store()
+        stopped = threading.Event()
+        progress = []
+
+        class Client:
+            stop = threading.Event()
+
+            def page(self, container_id, token, metadata):
+                return page(["00/next"], ["01/temperature"]), 0.01
+
+        def report(summary, requests):
+            progress.append((summary, requests))
+            stopped.set()
+
+        with redirect_stdout(io.StringIO()):
+            code = mapper.crawl(store, Client(), on_progress=report, should_stop=stopped.is_set)
+        self.assertEqual(code, 130)
+        self.assertEqual(len(progress), 1)
+        self.assertEqual(progress[0][1], 1)
+        self.assertEqual(store.summary()["pages"], 1)
+        self.assertEqual(store.summary()["states"]["pending"], 1)
+        self.assertFalse(store.summary()["traversalFinished"])
+
     def test_budget_resume_parallel_traversal_exports_and_offline_export(self):
         fixture = self.fixture()
         self.assertEqual(self.run_cli(fixture, "--max-requests", "1"), 2)

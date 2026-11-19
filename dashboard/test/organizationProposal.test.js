@@ -169,8 +169,20 @@ test("admin API applies selected changes atomically, broadcasts and restores SQL
   const stream = await fetch(`${base}/events`, { headers: { cookie }, signal: AbortSignal.timeout(5000) });
   const reader = stream.body.getReader();
   await reader.read();
-  // Opening SSE synchronizes device entries: obtain the preview after it.
+  // Preview again after opening the stream, before applying the selection.
   const current = await (await preview()).json();
+  const preFailure = runtime.database.readConfiguration();
+  const saveDocument = runtime.database.saveDocument;
+  runtime.database.saveDocument = function(name, document) {
+    if (name === "devices") throw new Error("simulated disk failure");
+    return saveDocument.call(this, name, document);
+  };
+  try {
+    const failed = await post("/api/admin/organization/apply", { token: current.token, scope: current.scope, selectedIds: current.suggestions.map(item => item.id) });
+    assert.equal(failed.status, 500);
+    assert.deepEqual(runtime.database.readConfiguration(), preFailure);
+    assert.equal(runtime.deviceWidgetStore.devices.find(item => item.key === "ES/Zones/Z1/L1")?.room ?? null, null);
+  } finally { runtime.database.saveDocument = saveDocument; }
   const response = await post("/api/admin/organization/apply", { token: current.token, scope: current.scope, selectedIds: current.suggestions.map(item => item.id) });
   const applied = await response.json();
   assert.equal(response.status, 200, JSON.stringify(applied));

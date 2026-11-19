@@ -108,6 +108,10 @@
 #organization-apply { margin-top: 14px; }
 .admin-skip { position: absolute; top: 8px; left: 8px; z-index: 2; transform: translateY(-150%); padding: 12px; background: #fff; color: var(--brand-dark); border: 1px solid var(--brand); border-radius: 8px; }
 .admin-skip:focus { transform: translateY(0); }
+.catalog-actions { margin-top: 16px; }
+.catalog-search { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.catalog-search .admin-field { flex: 1 1 240px; }
+#catalog-scope { overflow-wrap: anywhere; }
 @media (max-width: 950px) {
   .admin-header-inner { align-items: start; }
   .admin-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }

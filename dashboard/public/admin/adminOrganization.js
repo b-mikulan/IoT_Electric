@@ -101,7 +101,6 @@
       const result = await request("/api/admin/organization/apply", { token: proposal.token, scope: proposal.scope, selectedIds: [...selected] });
       get("backup-link").href = result.backupUrl; get("backup").hidden = false;
       status(`Spremljeno promjena: ${result.count}. Prethodna konfiguracija dostupna je za preuzimanje.`);
-      document.dispatchEvent(new CustomEvent("organization-applied"));
     } catch (error) { status(`${error.message} Pripremi novi prijedlog prije sljedećeg pokušaja.`, true); }
     finally { proposal = null; selected.clear(); get("result").hidden = true; get("confirm").checked = false; setBusy(false); }
   });

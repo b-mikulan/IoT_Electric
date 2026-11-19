@@ -73,7 +73,7 @@ jobs:
             cache_scope: middleware
           - name: dashboard
             image: b-mikulan/iot-electric-dashboard
-            context: ./dashboard
+            context: .
             dockerfile: ./dashboard/Dockerfile
             cache_scope: dashboard
 

@@ -121,6 +121,7 @@ function createApp({
   deviceCommands = new DeviceCommandService({ poller, config, deviceMetadata }),
   dashboardTransfer = new DashboardTransfer(config),
   dashboardSettings = new DashboardSettingsStore(config),
+  buildingScan,
 }) {
   if (!poller) throw new Error("A point poller is required.");
   if (!config) throw new Error("Dashboard configuration is required.");
@@ -135,6 +136,7 @@ function createApp({
   let transferBusy = false;
   let activeConfigurationRequests = 0;
   let roomStateReady;
+  let activeScanConflicts = 0;
   const demo = config.demoMode ? createDeviceDemo() : null;
   Object.assign(config, dashboardSettings.values);
   poller.configurePolling?.(dashboardSettings.values);
@@ -151,6 +153,18 @@ function createApp({
   if (config.trustProxy) app.set("trust proxy", /^d+$/.test(config.trustProxy) ? Number(config.trustProxy) : config.trustProxy);
   if (dashboardAuth) app.use(dashboardAuth.router);
 
+  // Reserve dashboard/controller access for one paced topology reader. Existing
+  // requests drain before start; cached pages and SSE remain available.
+  app.use("/api", (request, response, next) => {
+    if (["/admin/catalog/status", "/admin/catalog/start", "/admin/catalog/pause", "/dashboard/events"].includes(request.path.replace(/\/$/, ""))) return next();
+    if (buildingScan?.busy && !["GET", "HEAD"].includes(request.method)) return response.status(409).json({ error: "Skeniranje kataloga je u tijeku. Za upravljanje ili promjenu postavki najprije pauziraj skeniranje.", code: "CATALOG_SCAN_ACTIVE" });
+    activeScanConflicts++;
+    let released = false;
+    const release = () => { if (!released) { released = true; activeScanConflicts--; } };
+    response.once("finish", release); response.once("close", release);
+    return next();
+  });
+
   function currentRoomIndex(metadata = demo || deviceMetadata.groupingMetadata?.()) {
     return createRoomIndex([...(demo?.widgets || []), ...config.widgets], {
       ...refreshModelOptions(), ...metadata,
@@ -165,12 +179,15 @@ function createApp({
     await roomStateReady;
     if (demo) return demo;
     const cached = deviceMetadata.groupingMetadata?.();
+    if (buildingScan?.busy) return cached;
     if (Object.keys(cached?.roomByZone || {}).length || !config.widgets.length) return cached;
+    activeScanConflicts++;
     try {
       const metadata = await deviceMetadata.read(config.widgets);
       return deviceMetadata.groupingMetadata?.() || metadata;
     }
     catch { return cached; }
+    finally { activeScanConflicts--; }
   }
 
   app.use(["/api", "/events"], async (request, response, next) => {
@@ -189,7 +206,7 @@ function createApp({
       if (response.locals.dashboardSession?.role !== "admin") return response.status(403).json({ code: "ADMIN_REQUIRED" });
       // User grants affect organization previews. These routes precede the
       // general configuration gate, so account operations participate here.
-      if (!request.path.startsWith("/organization")) {
+      if (!request.path.startsWith("/organization") && !request.path.startsWith("/catalog/")) {
         if (transferBusy) return response.status(409).json({ error: "Promjena konfiguracije je u tijeku.", code: "TRANSFER_IN_PROGRESS" });
         activeConfigurationRequests++;
         let released = false;
@@ -365,9 +382,32 @@ function createApp({
     }
     return next();
   };
+  app.get("/api/admin/catalog/status", organizationAdmin, (request, response) => {
+    try { response.set("Cache-Control", "no-store"); return response.json(buildingScan?.status() || { enabled: false, busy: false, jobs: [] }); }
+    catch (error) { return sendOperationError(response, error, "CATALOG_STATUS_FAILED", "Stanje skeniranja nije dostupno."); }
+  });
+  app.post("/api/admin/catalog/start", organizationAdmin, requireJson, express.json({ limit: "8kb" }), (request, response) => {
+    try {
+      if (!buildingScan) throw new DeviceWidgetStoreError("Skeniranje nije dostupno u ovoj instalaciji.", 409, "CATALOG_SCAN_UNAVAILABLE");
+      if (activeScanConflicts || activeConfigurationRequests > 1 || transferBusy || clearingWidgets || autoDiscovery.state === "running") throw new DeviceWidgetStoreError("Pričekaj završetak aktivnih zahtjeva ili otkrivanja pa pokušaj ponovno.", 409, "WIDGET_OPERATION_IN_PROGRESS");
+      return response.status(202).json(buildingScan.start(request.body));
+    } catch (error) { return sendOperationError(response, error, "CATALOG_START_FAILED", "Skeniranje nije pokrenuto."); }
+  });
+  app.post("/api/admin/catalog/pause", organizationAdmin, requireJson, express.json({ limit: "4kb" }), (request, response) => {
+    try { return response.json(buildingScan.pause(request.body?.id)); }
+    catch (error) { return sendOperationError(response, error, "CATALOG_PAUSE_FAILED", "Skeniranje nije moguće pauzirati."); }
+  });
+  app.get("/api/admin/catalog/:id/devices", organizationAdmin, async (request, response) => {
+    try { response.set("Cache-Control", "no-store"); return response.json(await buildingScan.devices(request.params.id, request.query.search || "", Number(request.query.offset || 0))); }
+    catch (error) { return sendOperationError(response, error, "CATALOG_READ_FAILED", "Katalog nije dostupan."); }
+  });
+  app.get("/api/admin/catalog/:id/files/:filename", organizationAdmin, (request, response) => {
+    try { response.set("Cache-Control", "no-store"); return response.download(buildingScan.download(request.params.id, request.params.filename), request.params.filename); }
+    catch (error) { return sendOperationError(response, error, "CATALOG_DOWNLOAD_FAILED", "Datoteka nije dostupna."); }
+  });
   app.post("/api/admin/organization/preview", organizationAdmin, requireJson, express.json({ limit: "8kb" }), (request, response) => {
     try {
-      if (!dashboardTransfer.enabled || !deviceWidgetStore.enabled) throw new DeviceWidgetStoreError("Organizacija zahtijeva trajnu pohranu i stvarni način rada.", 409, "ORGANIZATION_UNAVAILABLE");
+      if (!dashboardTransfer.enabled || !deviceWidgetStore.enabled || !widgetStore?.enabled) throw new DeviceWidgetStoreError("Organizacija zahtijeva trajnu pohranu i stvarni način rada.", 409, "ORGANIZATION_UNAVAILABLE");
       response.set("Cache-Control", "no-store");
       return response.json(proposeOrganization(dashboardTransfer.current(), dashboardAuth.users.list(), request.body?.scope));
     } catch (error) { return sendOperationError(response, error, "ORGANIZATION_PREVIEW_FAILED", "Prijedlog nije moguće pripremiti."); }
@@ -376,7 +416,7 @@ function createApp({
     // This request is counted by the configuration gate above. Keep the same
     // global exclusion as imports, including reads that synchronize settings.
     if (activeConfigurationRequests > 1 || clearingWidgets || autoDiscovery.state === "running") return response.status(409).json({ error: "Pričekaj završetak promjene konfiguracije ili otkrivanja pa pokušaj ponovno.", code: "WIDGET_OPERATION_IN_PROGRESS" });
-    if (!dashboardTransfer.enabled || !deviceWidgetStore.enabled) return response.status(409).json({ error: "Organizacija nije dostupna.", code: "ORGANIZATION_UNAVAILABLE" });
+    if (!dashboardTransfer.enabled || !deviceWidgetStore.enabled || !widgetStore?.enabled) return response.status(409).json({ error: "Organizacija nije dostupna.", code: "ORGANIZATION_UNAVAILABLE" });
     transferBusy = true;
     try {
       const result = await widgetStore.withExclusive(() => deviceWidgetStore.applyOrganization(document => {
@@ -692,7 +732,7 @@ function createApp({
       return response.json({ metadataById: demo.metadataById, roomByZone: demo.roomByZone, demoWidgets: demo.widgets, warnings: [] });
     }
     try {
-      const metadata = await deviceMetadata.read(config.widgets);
+      const metadata = buildingScan?.busy ? deviceMetadata.groupingMetadata?.() || { metadataById: {}, roomByZone: {}, warnings: [] } : await deviceMetadata.read(config.widgets);
       automaticRoomNames = Object.values(metadata.roomByZone || {}).map((room) => typeof room === "string" ? room : room?.label).filter((name) => typeof name === "string" && name.trim());
       return response.json(metadata);
     } catch {

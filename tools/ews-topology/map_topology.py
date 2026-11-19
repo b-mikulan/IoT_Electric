@@ -375,7 +375,8 @@ class Store:
         return summary
 
 
-def crawl(store, client, workers=1, metadata=False, max_pages=10000, max_requests=0, progress_every=20, max_consecutive_failures=3):
+def crawl(store, client, workers=1, metadata=False, max_pages=10000, max_requests=0, progress_every=20, max_consecutive_failures=3,
+          on_progress=None, should_stop=None):
     active = {}
     submitted = finished = 0
     interrupted = fatal = stopped_for_failures = False
@@ -383,7 +384,9 @@ def crawl(store, client, workers=1, metadata=False, max_pages=10000, max_request
     executor = ThreadPoolExecutor(max_workers=workers)
     try:
         while True:
-            room = workers - len(active)
+            if should_stop and should_stop():
+                interrupted = True
+            room = 0 if interrupted else workers - len(active)
             if max_requests:
                 room = min(room, max_requests - submitted)
             for row in store.pending(room, {value[0] for value in active.values()}):
@@ -407,6 +410,8 @@ def crawl(store, client, workers=1, metadata=False, max_pages=10000, max_request
                     fatal = fatal or error.fatal
                     consecutive_failures = consecutive_failures + 1 if error.transient else 0
                 finished += 1
+                if on_progress:
+                    on_progress(store.summary(), finished)
                 if finished == 1 or finished % progress_every == 0:
                     summary = store.summary()
                     print(f"Requests: {finished}; containers: {summary['containers']}; pending: {summary['states'].get('pending', 0)}; pruned: {summary['states'].get('pruned', 0)}; values: {summary['items'].get('value', 0)}", flush=True)

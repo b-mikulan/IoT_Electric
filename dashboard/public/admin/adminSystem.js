@@ -12,7 +12,7 @@
   }
   const settings = globalThis.IoTDashboardSettings.create({
     onPolling(state) {
-      element("admin-polling-status").textContent = state.active ? "Osvježavanje u tijeku"
+      element("admin-polling-status").textContent = state.catalogScan ? "Skeniranje zgrade · očitanja i upravljanje su pauzirani" : state.active ? "Osvježavanje u tijeku"
         : state.paused ? "Automatsko osvježavanje je pauzirano" : "Automatsko osvježavanje je uključeno";
       if (!state.active) void loadHealth();
     },

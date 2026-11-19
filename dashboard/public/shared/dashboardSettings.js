@@ -84,22 +84,22 @@
 
     function setPolling(next) {
       if (!next) return;
-      polling = { ...polling, ...next };
-      const label = polling.paused ? "Nastavi osvježavanje" : "Pauziraj osvježavanje";
+      polling = { ...polling, catalogScan: false, ...next };
+      const label = polling.catalogScan ? "Skeniranje zgrade je aktivno" : polling.paused ? "Nastavi osvježavanje" : "Pauziraj osvježavanje";
       if (quickPause) {
-        quickPause.disabled = busy || !settings;
+        quickPause.disabled = busy || !settings || polling.catalogScan;
         quickPause.setAttribute("aria-label", label);
         quickPause.setAttribute("title", label);
         quickPause.setAttribute("aria-pressed", String(polling.paused));
         quickPause.classList.toggle("is-paused", polling.paused);
-        quickPause.querySelector("span").textContent = polling.paused ? "Nastavi" : "Pauziraj";
+        quickPause.querySelector("span").textContent = polling.catalogScan ? "Skeniranje" : polling.paused ? "Nastavi" : "Pauziraj";
       }
       pause.textContent = polling.paused ? "Nastavi osvježavanje" : "Pauziraj osvježavanje";
-      pause.disabled = busy || !settings;
-      refresh.disabled = busy || polling.active || !settings;
+      pause.disabled = busy || !settings || polling.catalogScan;
+      refresh.disabled = busy || polling.active || !settings || polling.catalogScan;
       refresh.textContent = polling.active ? "Osvježavanje u tijeku…" : "Osvježi sve sada";
       dialog.querySelector(".general-refresh-panel").classList.toggle("is-paused", polling.paused);
-      dialog.querySelector("[data-polling-status]").textContent = polling.active
+      dialog.querySelector("[data-polling-status]").textContent = polling.catalogScan ? "Skeniranje zgrade je aktivno. Očitanja i upravljanje su privremeno pauzirani." : polling.active
         ? polling.paused && polling.scope === "all" && !polling.manual ? "Zaustavljam nakon trenutačnog zahtjeva…" : polling.scope === "partial" ? "Provjeravam odabrane uređaje…" : "Provjeravam sve pointove…"
         : polling.paused ? "Automatsko osvježavanje je pauzirano." : "Automatsko osvježavanje je uključeno.";
       onPolling?.(polling);

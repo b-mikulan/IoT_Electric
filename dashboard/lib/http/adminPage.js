@@ -14,6 +14,7 @@ function sendAdminPage(response) {
     <script defer src="/adminUsers.js"></script>
     <script defer src="/adminSystem.js"></script>
     <script defer src="/adminOrganization.js"></script>
+    <script defer src="/adminCatalog.js"></script>
   </head>
   <body class="admin-page">
     <a class="admin-skip" href="#users">Preskoči na upravljanje korisnicima</a>
@@ -44,6 +45,7 @@ function sendAdminPage(response) {
         <a href="#users">Korisnici i prava</a>
         <a href="#system">Sustav i konfiguracija</a>
         <a href="#organization">Organizacija zgrade</a>
+        <a href="#catalog">Skeniranje zgrade</a>
       </nav>
       <noscript><p class="admin-warning">Za upravljanje korisnicima i postavkama potrebno je omogućiti JavaScript u pregledniku.</p></noscript>
 
@@ -158,6 +160,39 @@ function sendAdminPage(response) {
             <button id="organization-apply" class="admin-button" type="button" disabled>Primijeni odabrano</button>
           </div>
           <p id="organization-backup" class="admin-hint" hidden><a id="organization-backup-link">Preuzmi prethodnu konfiguraciju</a>. Za povrat je uvezi kroz <a href="/transfer.html">Prijenos konfiguracije</a>.</p>
+        </div>
+      </section>
+      <section id="catalog" class="admin-section" aria-labelledby="catalog-title">
+        <div class="admin-section-heading"><div><h2 id="catalog-title">Skeniranje zgrade</h2><p>Izradi katalog dostupnih uređaja i točaka iz kontrolera.</p></div></div>
+        <div class="admin-card admin-system-card">
+          <p class="admin-warning">Skeniranje privremeno pauzira očitanja i upravljanje za sve korisnike ovog dashboarda. Nakon pauze ili završetka skena vraća se prethodno stanje osvježavanja. Zatvaranje stranice ne prekida skeniranje.</p>
+          <p class="admin-hint">Rezultat je zasebna snimka kataloga. Dodavanje točaka na dashboard i organizacija postojećih uređaja ostaju zasebni koraci.</p>
+          <div class="admin-account-fields">
+            <div class="admin-field"><label class="admin-label" for="catalog-profile">Obuhvat novog skena</label><select id="catalog-profile"><option value="catalog">Uređaji i točke (preporučeno)</option><option value="full">Sve dostupne grane</option></select><p class="admin-hint">Preporučeni obuhvat preskače programe, grafike i druge tehničke grane.</p></div>
+            <div class="admin-field"><label class="admin-label" for="catalog-limit">Zahtjevi po pokretanju / nastavku</label><select id="catalog-limit"><option value="500">Do 500 zahtjeva</option><option value="2000">Do 2000 zahtjeva</option><option value="0">Bez ograničenja</option></select><p class="admin-hint">Jedan zahtjev u trenutku, uz najmanje 3 sekunde razmaka. Na limitu se napredak sprema za nastavak.</p></div>
+            <div class="admin-field"><label class="admin-label" for="catalog-root">Početna grana (opcionalno)</label><input id="catalog-root" maxlength="4096" placeholder="Prazno za cijelu dostupnu zgradu" autocomplete="off"><p class="admin-hint">Za uži obuhvat unesi točan EWS ID grane.</p></div>
+          </div>
+          <div class="admin-form-footer">
+            <label class="admin-checkbox"><input id="catalog-confirm" type="checkbox"><span>Potvrđujem privremenu pauzu očitanja i upravljanja.</span></label>
+            <div class="admin-actions catalog-actions"><button id="catalog-start" class="admin-button" type="button" disabled>Pokreni novi sken</button><button id="catalog-pause" class="admin-button secondary" type="button" disabled>Pauziraj aktivni sken</button><button id="catalog-refresh" class="admin-text-button" type="button">Osvježi stanje</button></div>
+          </div>
+          <p id="catalog-status" class="admin-status" role="status" aria-live="polite">Učitavam stanje skeniranja…</p>
+          <div id="catalog-history" class="admin-form-footer" hidden>
+            <label class="admin-label" for="catalog-job">Spremljene snimke (posljednjih 30)</label><select id="catalog-job"></select>
+            <p id="catalog-message" class="admin-status" role="status" aria-live="polite"></p>
+            <p id="catalog-scope" class="admin-hint"></p>
+            <dl id="catalog-counts" class="admin-system-details" aria-label="Napredak skeniranja"></dl>
+            <p id="catalog-coverage" class="admin-hint"></p>
+            <div class="admin-actions catalog-actions"><button id="catalog-resume" class="admin-button secondary" type="button" disabled>Nastavi odabrani sken</button><label class="admin-checkbox"><input id="catalog-retry" type="checkbox"><span>Ponovi i neuspjele grane</span></label></div>
+            <div id="catalog-downloads" class="admin-actions catalog-actions" aria-label="Preuzimanje snimke"></div>
+            <div id="catalog-browser" class="admin-form-footer" hidden>
+              <h3>Uređaji u snimci</h3>
+              <form id="catalog-search-form" class="catalog-search"><div class="admin-field"><label class="admin-label" for="catalog-search">Naziv, prostorija ili putanja</label><input id="catalog-search" type="search" maxlength="200" autocomplete="off"></div><button class="admin-button secondary" type="submit">Pretraži</button></form>
+              <p id="catalog-devices-status" class="admin-status" role="status"></p>
+              <div id="catalog-devices" class="organization-items"></div>
+              <div class="admin-actions"><button id="catalog-prev" class="admin-button secondary" type="button" disabled>Prethodnih 50</button><button id="catalog-next" class="admin-button secondary" type="button" disabled>Sljedećih 50</button></div>
+            </div>
+          </div>
         </div>
       </section>
       <footer class="admin-footer">IoT Electric · Administracija</footer>

@@ -40,6 +40,8 @@ The admin page includes user search, room search and floor filters, a selected-r
 
 For HTTPS deployments, set `DASHBOARD_SECURE_COOKIES=true` so browsers send the session cookie only over HTTPS.
 
+**Admin → Organizacija zgrade → Predloži organizaciju** prepares an offline preview from saved metadata and configured visible devices. It suggests missing rooms from exact ancestor zones with manual assignments, or uniquely matching registered room names. An optional full branch and target room let an administrator preview bulk placement. Explicit device room choices (including no room), room suppression rules and saved membership lists take precedence. Possible same-room light/sensor grouping requires individual review; it does not prove physical group membership. Existing automatic sensor grouping stays automatic. The preview lists room-access changes, supports selecting a subset and rejects application if configuration or user grants changed. Application saves a downloadable backup and broadcasts the updated settings; restore the backup through **Prijenos konfiguracije**. SQLite uses the existing ten-backup retention; file-backed storage keeps organization backups beside the device settings file. See [ORGANIZATION.md](ORGANIZATION.md) for the API and scope.
+
 ## Dashboard storage
 
 Docker Compose and Portainer use `/app/config/dashboard.sqlite` on the mounted configuration volume. Local runs use `dashboard.sqlite` beside the configured `WIDGETS_FILE`, or under `dashboard/config/` when no widget file is configured. Override the location with `DASHBOARD_DB_FILE`. The dashboard service must be able to write to that directory. Use a separate database file for each dashboard instance.
@@ -372,6 +374,64 @@ The dashboard container user (UID `1000`) must be able to write to the directory
 
 `/health` is a container liveness check. `/ready` returns `503` until a middleware poll succeeds and can be used when controller connectivity must be part of readiness.
 
+## Building scans from the admin page
+
+Open **Admin → Skeniranje zgrade** in real mode. The dashboard uses its configured
+middleware credentials; none are entered in or sent to the browser. Local runs
+require Python 3.10+ (`python` on Windows, `python3` elsewhere). Docker includes
+Python. Override the executable with `DASHBOARD_SCAN_PYTHON`; for HTTPS middleware
+with a private CA, set `DASHBOARD_SCAN_CA_FILE` to its readable PEM path. Certificate
+verification remains enabled. These variables belong to the dashboard process;
+mount a CA and add the environment variable explicitly in a custom Compose stack.
+
+Leave the starting branch empty to scan the entire structure exposed by EWS, or
+enter an exact EWS container ID. The default **Uređaji i točke** profile skips
+technical branches as documented in the [mapper README](../tools/ews-topology/README.md).
+**Sve dostupne grane** traverses those branches too. Neither profile proves that
+EWS exposes every physical object. The UI reports errors, unconfirmed completeness
+and excluded branches separately, without estimating a percentage from an unknown total.
+
+Confirm the temporary pause, then choose **Pokreni novi sken**. The dashboard waits
+for existing reads, pauses its poller and blocks controller commands, manual reads,
+discovery and configuration changes until the scan/export finishes. Cached views
+and SSE remain available. Each run uses one worker, a minimum three-second request
+spacing, no automatic retries and a stop after three consecutive transient failures.
+This coordination covers this dashboard instance, not other dashboards or CLI mappers.
+
+The default budget is 500 page requests per run (including failures). Choose 2000
+or unlimited if appropriate. **Pauziraj aktivni sken** drains the current request
+and saves progress. Closing the browser does not stop the job. Resume a paused or
+interrupted snapshot after confirming another pause; its original branch, profile
+and middleware URL must stay the same. **Ponovi i neuspjele grane** retries `error`
+pages only. For `partial`/`unknown` branches, start a new scan of the exact branch.
+The previous polling pause state returns when scanning/indexing ends. Restarted
+jobs never resume controller access automatically.
+
+Snapshots live in `building-scans/<job-id>/` beside `DASHBOARD_DB_FILE` (beside the
+legacy widgets file, or under `dashboard/config`, in file-backed operation). Every
+page is checkpointed. After a run with collected pages, a separate catalog worker
+indexes a catalog database. Admins can search devices and download CSV, topology
+JSON, checkpoint SQLite or catalog SQLite. Active files cannot be downloaded.
+The selector shows up to 30 recent snapshots, always including the active snapshot;
+older files remain on disk. No automatic retention/deletion runs. Include this
+directory separately in installation backups: portable dashboard backups do not
+contain scan snapshots. Snapshots contain building data, so keep the volume private.
+
+Scanning does not add points to active polling or change manual room assignments.
+Use existing discovery to add selected points; **Organizacija zgrade** continues
+to work from configured points and their existing metadata. The scan's catalog
+is a separate inventory, with no automatic transfer into organization proposals.
+
+Admin API (authenticated admin session and JSON for POST):
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/admin/catalog/status` | Availability, current job and snapshot history |
+| `POST /api/admin/catalog/start` | `{confirmPause:true, root:"", profile:"catalog", maxRequests:500}`; use `resumeId` and optional `retryFailed` for resume |
+| `POST /api/admin/catalog/pause` | `{id:"<job-id>"}`; waits for current page asynchronously |
+| `GET /api/admin/catalog/:id/devices?search=...&offset=0` | Offline search, 50 devices per page |
+| `GET /api/admin/catalog/:id/files/:filename` | Download an available snapshot artifact |
+
 ## Docker
 
 From the repository root:
@@ -381,5 +441,11 @@ docker compose up --build
 ```
 
 The middleware is available on port `3000` and this dashboard on port `3001`.
+
+The dashboard image now builds from the repository root so it can include the
+shared catalog importer and Python mapper: `docker build -f dashboard/Dockerfile .`.
+The Dockerfile-specific ignore file includes only application code and package
+manifests; local configuration, credentials and scan databases stay out of the image.
+The persistent volume remains `/app/config`.
 
 The test stack serves HTTP on port `3001`. Use an HTTPS reverse proxy for production deployments.
