@@ -402,7 +402,7 @@ function createApp({
     catch (error) { return sendOperationError(response, error, "CATALOG_READ_FAILED", "Katalog nije dostupan."); }
   });
   app.get("/api/admin/catalog/:id/files/:filename", organizationAdmin, (request, response) => {
-    try { response.set("Cache-Control", "no-store"); return response.download(buildingScan.download(request.params.id, request.params.filename), request.params.filename); }
+    try { response.set("Cache-Control", "no-store"); const file = buildingScan.download(request.params.id, request.params.filename); return response.download(path.basename(file), request.params.filename, { root: path.dirname(file) }); }
     catch (error) { return sendOperationError(response, error, "CATALOG_DOWNLOAD_FAILED", "Datoteka nije dostupna."); }
   });
   app.post("/api/admin/organization/preview", organizationAdmin, requireJson, express.json({ limit: "8kb" }), (request, response) => {
