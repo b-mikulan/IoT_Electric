@@ -83,10 +83,15 @@
     $("chart-note").textContent = rows.length && numericCount < rows.length ? "Graf prikazuje samo brojčane vrijednosti s valjanim vremenom. Svi zapisi dostupni su u tablici." : "";
     if (!numericCount) return;
     Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    // Chart colours follow the design tokens in styles.css; the data line uses ink, not the action blue.
+    const tokens = getComputedStyle(document.documentElement);
+    const chartInk = tokens.getPropertyValue("--ink").trim() || "#23292D";
+    const chartMuted = tokens.getPropertyValue("--muted").trim() || "#5A646A";
+    const chartGrid = tokens.getPropertyValue("--line-soft").trim() || "#E1E5E4";
     chart = new Chart($("history-chart"), {
-      type: "line", data: { datasets: [{ label: unit && unit !== "none" ? `Vrijednost (${unit})` : "Vrijednost", data: points, borderColor: "#00796b", borderWidth: 1.5, pointRadius: points.length > 200 ? 0 : 2, spanGaps: false }] },
+      type: "line", data: { datasets: [{ label: unit && unit !== "none" ? `Vrijednost (${unit})` : "Vrijednost", data: points, borderColor: chartInk, backgroundColor: chartInk, borderWidth: 1.5, pointRadius: points.length > 200 ? 0 : 2, spanGaps: false }] },
       options: { responsive: true, maintainAspectRatio: false, animation: false, parsing: false,
-        scales: { x: { type: "linear", grid: { color: "#e7efeb" }, ticks: { color: "#60786e", maxTicksLimit: 6, callback: (value) => formatTime(new Date(value).toISOString()) }, title: { display: true, text: "Vrijeme", color: "#60786e" } }, y: { grid: { color: "#e7efeb" }, ticks: { color: "#60786e" } } },
+        scales: { x: { type: "linear", grid: { color: chartGrid }, ticks: { color: chartMuted, maxTicksLimit: innerWidth < 600 ? 3 : 6, maxRotation: 0, callback: (value) => formatTime(new Date(value).toISOString()) }, title: { display: true, text: "Vrijeme", color: chartMuted } }, y: { grid: { color: chartGrid }, ticks: { color: chartMuted } } },
         plugins: { tooltip: { callbacks: { title: (items) => items.length ? formatTime(new Date(items[0].parsed.x).toISOString()) : "" } } },
       },
     });
