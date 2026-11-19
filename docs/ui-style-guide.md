@@ -133,7 +133,7 @@ Potpuno okrugli su samo lampice, prekidači i točke statusa. Radijus prati hije
 | Token | Za što |
 | --- | --- |
 | `--shadow-card` | Kartice |
-| `--shadow-raised` | Login panel i plutajući izbornici |
+| `--shadow-raised` | Login panel |
 | `--shadow-dialog` | Samo dijalozi |
 
 Ne dodajte gradijente, staklo ni podizanje kartice na hover. Hover mijenja boju ruba, ne položaj.
@@ -178,6 +178,10 @@ Pravila:
 
   Ne dodajte drugi indikator veze.
 - **Gumbi na traci.** Sekundarni gumbi imaju bijeli obrub na prozirnoj pozadini; primarni ostaju plavi. Najviše jedan primarni gumb po zaglavlju.
+- **Kretanje.** Kretanje odgovara na korisnikovu radnju; nema animacija pri učitavanju stranice.
+  - Gumbi i polja: prijelaz boje 120–160 ms.
+  - Prekidači i kontrole na kartici: smiju koristiti `--dc-spring`, do oko 400 ms.
+  - Stalna animacija: samo indikator rada (vrtnja pri osvježavanju).
 - **Mobitel.** Ispod 760 px traka se slaže okomito i poravnava lijevo. Gumbi s ikonom smiju sakriti tekst (`span`), ali tada moraju imati `aria-label`.
 
 ## Komponente
@@ -195,7 +199,7 @@ Pravila:
 
 - **Tekst gumba** je glagol koji kaže što će se dogoditi ("Spremi", "Dodaj korisnika", "Natrag na dashboard"). Ne pišite "U redu" ni "Pošalji" ako postoji precizniji glagol.
 - **Ikone** su linijske SVG ikone od 18–20 px s `stroke="currentColor"`. Ne koristite emoji u gumbima ni strelice u tekstu.
-- **Onemogućen gumb** ima `opacity: .5` i `cursor: not-allowed`. Uz njega mora pisati zašto je onemogućen, ako razlog nije očit.
+- **Onemogućen gumb** ima `opacity: .5`. Ako razlog nije očit, napišite ga uz gumb.
 - **Specifičnost.** Pravilo za "goli" `.btn` ima specifičnost jedne klase (`:where()`), pa ga crvena i onemogućena stanja nadjačavaju. Ne podižite mu specifičnost.
 - **Opasne radnje** uvijek traže potvrdu u istom dijalogu (`.settings-delete-confirmation`) prije izvršenja.
 
@@ -234,7 +238,7 @@ Pravila:
 | --- | --- | --- |
 | Lampica (`.connection-dot`) | Krug od 10 px | Stanje veze u zaglavlju |
 | Demo oznaka (`.demo-badge`) | Jantarna, lampica i tekst "Demo podaci" | Uvijek kad podaci nisu s kontrolera |
-| Chip izvora (`.telemetry-source.chip`) | Jantarni okvir | Izvor podataka trendova kad nije uživo |
+| Chip izvora (`.telemetry-source.chip`) | Jantarni okvir | Izvor podataka na stranici trendova |
 | Obavijest | Uvučena površina s lijevim rubom u boji stanja | Rezultat radnje, upozorenje, greška |
 
 ### Paneli i odjeljci
@@ -258,9 +262,9 @@ Ovo je minimum za svaku promjenu, ne dodatak:
 
 - **Fokus.** Fokus mora biti vidljiv svugdje. Globalni `:focus-visible` crta plavi prsten od 2 px s odmakom od 2 px; na tamnom zaglavlju prsten je bijel. Ne pišite `outline: none` bez zamjene.
 - **Kontrast.** Tekst najmanje 4,5:1, veliki tekst i rubovi kontrola najmanje 3:1. `--muted` je najsvjetlija boja za mali tekst.
-- **Smanjeno kretanje.** `prefers-reduced-motion` gasi prijelaze i animacije (pravilo na dnu `styles.css`). Nova animacija ili radi s tim pravilom ili ima vlastitu iznimku. Prijelazi traju najviše 150 ms i odgovaraju na korisnikovu radnju; nema animacija pri učitavanju.
+- **Smanjeno kretanje.** `prefers-reduced-motion` gasi prijelaze i animacije (pravilo na dnu `styles.css`). Nova animacija mora poštovati to pravilo.
 - **Mobitel.** Na 375 px nema horizontalnog pomicanja stranice. Široke tablice pomiču se unutar vlastitog spremnika.
-- **Veličina kontrola.** Ciljevi dodira veliki su najmanje 40 × 40 px.
+- **Veličina kontrola.** Glavne kontrole visoke su najmanje 40 px. Mali gumb (34 px) i male poveznice koristite samo u gustim popisima i alatnim trakama.
 - **Ikone.** Gumb sa samo ikonom ima `aria-label`; ukrasne ikone imaju `aria-hidden="true"`.
 - **Stanje.** Stanje nikad nije označeno samo bojom; uvijek ide i tekst.
 
