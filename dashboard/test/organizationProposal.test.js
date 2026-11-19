@@ -201,3 +201,49 @@ test("admin API applies selected changes atomically, broadcasts and restores SQL
   assert.equal(restore.status, 200, await restore.text());
   assert.equal(runtime.deviceWidgetStore.devices.find(item => item.key === "ES/Zones/Z1/L1")?.room ?? null, null);
 });
+
+test("without a stored catalog, preview uses the live rooms that decide access and flags lost access", async t => {
+  let runtime, server, upstream;
+  const dir = directory(t, async () => {
+    runtime?.poller.stop();
+    for (const item of [server, upstream]) if (item) await new Promise(resolve => { item.close(resolve); item.closeAllConnections(); });
+    runtime?.database.close();
+  });
+  upstream = require("node:http").createServer((request, response) => {
+    const url = new URL(request.url, "http://fixture");
+    response.setHeader("Content-Type", "application/json");
+    if (url.pathname === "/api/containers") {
+      const id = url.searchParams.get("id");
+      return response.end(JSON.stringify({ containers: [{ id, name: "Z1", description: "Soba A" }], errors: [] }));
+    }
+    return response.end("{}");
+  }).listen(0, "127.0.0.1");
+  await once(upstream, "listening");
+  const write = (name, data) => { const file = path.join(dir, name); fs.writeFileSync(file, JSON.stringify(data)); return file; };
+  runtime = createRuntime({ DEMO_MODE: "false", WIDGETS_FILE: write("widgets.json", [point("ES/Zones/Z1/L1")]),
+    DEVICE_WIDGETS_FILE: write("devices.json", { version: 1, organizationVersion: 1, devices: [], rooms: ["rB"], roomRules: [], floors: [],
+      roomDetails: [{ id: "rB", name: "Soba B", floorId: null }] }),
+    DASHBOARD_DB_FILE: path.join(dir, "dashboard.sqlite"), MIDDLEWARE_URL: `http://127.0.0.1:${upstream.address().port}`,
+    MIDDLEWARE_USER: "fixture", MIDDLEWARE_PASSWORD: "fixture-password", DASHBOARD_ADMIN_USER: "admin", DASHBOARD_ADMIN_PASSWORD: "fixture-password",
+    DASHBOARD_LOGIN_USER: "viewer", DASHBOARD_LOGIN_PASSWORD: "viewer-password" });
+  runtime.poller.setPaused(true);
+  assert.equal(runtime.database.readDocument("metadata"), null);
+  server = runtime.app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const cookie = (await fetch(`${base}/login`, { method: "POST", redirect: "manual", body: new URLSearchParams({ username: "admin", password: "fixture-password" }) })).headers.get("set-cookie").split(";")[0];
+  const post = (route, body) => fetch(base + route, { method: "POST", headers: { cookie, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const { rooms } = await (await fetch(`${base}/api/admin/users`, { headers: { cookie } })).json();
+  const roomA = rooms.find(room => room.name === "Soba A")?.id;
+  assert.ok(roomA, "room access sees the live room");
+  assert.equal((await post("/api/admin/users", { previousUsername: "viewer", username: "viewer", roomIds: [roomA], writeRoomIds: [roomA] })).status, 200);
+  const plan = await (await post("/api/admin/organization/preview", { scope: { root: "ES/Zones/Z1", roomId: "rB" } })).json();
+  const move = plan.suggestions.find(item => item.key === "ES/Zones/Z1/L1");
+  assert.equal(move.from, "Soba A");
+  assert.equal(move.review, true);
+  assert.deepEqual(move.permissions, [{ username: "viewer", before: { read: true, write: true }, after: { read: false, write: false } }]);
+  const applied = await post("/api/admin/organization/apply", { token: plan.token, scope: plan.scope, selectedIds: [move.id] });
+  assert.equal(applied.status, 200, await applied.clone().text());
+  const backup = await (await fetch(base + (await applied.json()).backupUrl, { headers: { cookie } })).json();
+  assert.equal(backup.metadata, null, "the backup keeps the stored configuration");
+});

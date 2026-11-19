@@ -6,7 +6,7 @@ import sys
 import threading
 from urllib.parse import urlsplit
 
-from map_topology import Client, Store, crawl, scan_lock, RequestFailure
+from map_topology import Client, Store, crawl, scan_lock, RequestFailure, ScanStopped
 
 
 def main():
@@ -44,8 +44,11 @@ def main():
             emit({"event": "progress", "summary": store.summary(), "requests": 0})
             client = Client(url, config["username"], config["password"], timeout=config["timeout"], retries=0,
                             delay=config["delay"], ca_file=config.get("caFile"), attempt_log=directory / "request-attempts.jsonl")
-            if not stopped.is_set():
+            client.stop = stopped  # A pause also cancels a request waiting for its turn.
+            try:
                 client.get("/health", authenticated=False)
+            except ScanStopped:
+                pass  # crawl() sees the pause and returns 130 without a request.
             code = crawl(store, client, workers=1, max_requests=config["maxRequests"], progress_every=1000000,
                          on_progress=lambda summary, requests: emit({"event": "progress", "summary": summary, "requests": requests}),
                          should_stop=stopped.is_set)

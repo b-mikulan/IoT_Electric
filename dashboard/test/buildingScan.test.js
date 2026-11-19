@@ -183,6 +183,53 @@ test("admin API runs Python scan, budgets and resumes pages, indexes catalog, pr
   assert.deepEqual(runtime.config.widgets, []);
 });
 
+test("a controller read keeps the scan from starting after its browser disconnects", async t => {
+  let runtime, release, readStarted;
+  const dir = directory(t, async () => { if (runtime) { await runtime.buildingScan.shutdown(); runtime.poller.stop(); runtime.database.close(); } });
+  const started = new Promise(resolve => { readStarted = resolve; });
+  const upstream = await listen(t, http.createServer((req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    if (req.url.startsWith("/api/items/read")) {
+      readStarted();
+      release = () => res.end("{}");
+      return;
+    }
+    res.end(JSON.stringify({ containers: [], errors: [] }));
+  }));
+  runtime = createRuntime({ DEMO_MODE: "false", MIDDLEWARE_URL: upstream, MIDDLEWARE_USER: config.username, MIDDLEWARE_PASSWORD: config.password,
+    DASHBOARD_ADMIN_USER: "admin", DASHBOARD_ADMIN_PASSWORD: "fixture-admin", DASHBOARD_USERS_FILE: path.join(dir, "users.json"),
+    DASHBOARD_DB_FILE: path.join(dir, "dashboard.sqlite"), WIDGETS_JSON: JSON.stringify([{ id: "01/A/Zones/Z1/L1/Values/LtPct", label: "L1" }]) });
+  runtime.poller.setPaused(true);
+  // No Python: the fake worker reports a pause as soon as it is asked to stop.
+  runtime.buildingScan.spawnImpl = () => {
+    const child = new EventEmitter(); child.stdin = new PassThrough(); child.stdout = new PassThrough();
+    child.stdin.on("finish", () => setImmediate(() => child.emit("close", 130)));
+    return child;
+  };
+  const base = await listen(t, http.createServer(runtime.app));
+  const cookie = (await fetch(`${base}/login`, { method: "POST", redirect: "manual", body: new URLSearchParams({ username: "admin", password: "fixture-admin" }) })).headers.get("set-cookie").split(";")[0];
+  const start = () => fetch(`${base}/api/admin/catalog/start`, { method: "POST", headers: { cookie, "Content-Type": "application/json" }, body: JSON.stringify({ confirmPause: true }) });
+  const abort = new AbortController();
+  const read = fetch(`${base}/api/devices/metadata`, { headers: { cookie }, signal: abort.signal }).catch(error => error.name);
+  await started;
+  abort.abort();
+  assert.equal(await read, "AbortError");
+  await new Promise(resolve => setTimeout(resolve, 50));
+  const blocked = await start();
+  assert.equal(blocked.status, 409);
+  assert.equal((await blocked.json()).code, "WIDGET_OPERATION_IN_PROGRESS");
+  assert.equal(runtime.buildingScan.busy, false);
+  release();
+  let accepted;
+  for (let attempt = 0; attempt < 50 && accepted?.status !== 202; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 20));
+    accepted = await start();
+  }
+  assert.equal(accepted.status, 202);
+  runtime.buildingScan.pause((await accepted.json()).id);
+  await runtime.buildingScan.active?.done;
+});
+
 test("dashboard image ships every local Python module the scan worker imports", () => {
   const root = path.resolve(__dirname, "../..");
   const mapper = path.join(root, "tools/ews-topology");

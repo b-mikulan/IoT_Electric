@@ -165,6 +165,14 @@ function createApp({
     return next();
   });
 
+  // Count controller work for as long as it runs, not for as long as the
+  // browser stays connected: an aborted request must not let a scan start
+  // while its middleware read is still in flight.
+  async function controllerWork(operation) {
+    activeScanConflicts++;
+    try { return await operation(); } finally { activeScanConflicts--; }
+  }
+
   function currentRoomIndex(metadata = demo || deviceMetadata.groupingMetadata?.()) {
     return createRoomIndex([...(demo?.widgets || []), ...config.widgets], {
       ...refreshModelOptions(), ...metadata,
@@ -177,17 +185,20 @@ function createApp({
       throw error;
     });
     await roomStateReady;
+    return roomMetadata();
+  }
+
+  // The metadata room access is derived from. Reads nothing into storage.
+  async function roomMetadata() {
     if (demo) return demo;
     const cached = deviceMetadata.groupingMetadata?.();
     if (buildingScan?.busy) return cached;
     if (Object.keys(cached?.roomByZone || {}).length || !config.widgets.length) return cached;
-    activeScanConflicts++;
     try {
-      const metadata = await deviceMetadata.read(config.widgets);
+      const metadata = await controllerWork(() => deviceMetadata.read(config.widgets));
       return deviceMetadata.groupingMetadata?.() || metadata;
     }
     catch { return cached; }
-    finally { activeScanConflicts--; }
   }
 
   app.use(["/api", "/events"], async (request, response, next) => {
@@ -405,11 +416,19 @@ function createApp({
     try { response.set("Cache-Control", "no-store"); const file = buildingScan.download(request.params.id, request.params.filename); return response.download(path.basename(file), request.params.filename, { root: path.dirname(file) }); }
     catch (error) { return sendOperationError(response, error, "CATALOG_DOWNLOAD_FAILED", "Datoteka nije dostupna."); }
   });
-  app.post("/api/admin/organization/preview", organizationAdmin, requireJson, express.json({ limit: "8kb" }), (request, response) => {
+  // Plan with the same room metadata that room access uses. Without a saved
+  // catalog that is the live controller description, not the stored null.
+  async function organizationMetadata() {
+    const live = await roomMetadata();
+    return { metadataById: live?.metadataById || {}, roomByZone: live?.roomByZone || {} };
+  }
+  const planningConfiguration = (configuration, metadata) => ({ ...configuration, metadata: { ...configuration.metadata, ...metadata } });
+  app.post("/api/admin/organization/preview", organizationAdmin, requireJson, express.json({ limit: "8kb" }), async (request, response) => {
     try {
       if (!dashboardTransfer.enabled || !deviceWidgetStore.enabled || !widgetStore?.enabled) throw new DeviceWidgetStoreError("Organizacija zahtijeva trajnu pohranu i stvarni način rada.", 409, "ORGANIZATION_UNAVAILABLE");
+      const metadata = await organizationMetadata();
       response.set("Cache-Control", "no-store");
-      return response.json(proposeOrganization(dashboardTransfer.current(), dashboardAuth.users.list(), request.body?.scope));
+      return response.json(proposeOrganization(planningConfiguration(dashboardTransfer.current(), metadata), dashboardAuth.users.list(), request.body?.scope));
     } catch (error) { return sendOperationError(response, error, "ORGANIZATION_PREVIEW_FAILED", "Prijedlog nije moguće pripremiti."); }
   });
   app.post("/api/admin/organization/apply", organizationAdmin, requireJson, express.json({ limit: "4mb" }), async (request, response) => {
@@ -417,12 +436,16 @@ function createApp({
     // global exclusion as imports, including reads that synchronize settings.
     if (activeConfigurationRequests > 1 || clearingWidgets || autoDiscovery.state === "running") return response.status(409).json({ error: "Pričekaj završetak promjene konfiguracije ili otkrivanja pa pokušaj ponovno.", code: "WIDGET_OPERATION_IN_PROGRESS" });
     if (!dashboardTransfer.enabled || !deviceWidgetStore.enabled || !widgetStore?.enabled) return response.status(409).json({ error: "Organizacija nije dostupna.", code: "ORGANIZATION_UNAVAILABLE" });
+    let metadata;
+    try { metadata = await organizationMetadata(); }
+    catch (error) { return sendOperationError(response, error, "ORGANIZATION_APPLY_FAILED", "Organizacija nije spremljena. Prethodne postavke su zadržane."); }
     transferBusy = true;
     try {
       const result = await widgetStore.withExclusive(() => deviceWidgetStore.applyOrganization(document => {
         if (!response.locals.isSessionActive()) throw new DeviceWidgetStoreError("Prijava je istekla.", 401, "LOGIN_REQUIRED");
+        // The backup below keeps the stored configuration, including its metadata.
         const configuration = { ...dashboardTransfer.current(), deviceWidgets: document };
-        const planned = applyOrganizationSelection(configuration, dashboardAuth.users.list(), request.body);
+        const planned = applyOrganizationSelection(planningConfiguration(configuration, metadata), dashboardAuth.users.list(), request.body);
         return { ...planned, backup: { format: "iot-electric-dashboard", version: 2, exportedAt: new Date().toISOString(), ...configuration } };
       }));
       broadcast("device-settings", { devices: deviceWidgetStore.devices, rooms: deviceWidgetStore.rooms, roomRules: deviceWidgetStore.roomRules, ...organizationState() });
@@ -590,7 +613,7 @@ function createApp({
       if (scoped && !isSessionActive()) return response.status(401).json({ code: "LOGIN_REQUIRED" });
       const access = scoped ? scopeRooms(currentRoomIndex(metadata), dashboardSession.roomIds) : undefined;
       const { ids, deviceCount } = resolveManualRefreshScope(config.widgets, { ...refreshModelOptions(), ...metadata }, request.body, access);
-      const result = await poller.refreshScope(ids);
+      const result = await controllerWork(() => poller.refreshScope(ids));
       if (scoped && !isSessionActive()) return response.status(401).json({ code: "LOGIN_REQUIRED" });
       return response.json({ ...request.body, deviceCount, ...result });
     } catch (error) { return sendOperationError(response, error, "SCOPED_REFRESH_FAILED", "Osvježavanje odabranih uređaja nije uspjelo."); }
@@ -732,7 +755,7 @@ function createApp({
       return response.json({ metadataById: demo.metadataById, roomByZone: demo.roomByZone, demoWidgets: demo.widgets, warnings: [] });
     }
     try {
-      const metadata = buildingScan?.busy ? deviceMetadata.groupingMetadata?.() || { metadataById: {}, roomByZone: {}, warnings: [] } : await deviceMetadata.read(config.widgets);
+      const metadata = buildingScan?.busy ? deviceMetadata.groupingMetadata?.() || { metadataById: {}, roomByZone: {}, warnings: [] } : await controllerWork(() => deviceMetadata.read(config.widgets));
       automaticRoomNames = Object.values(metadata.roomByZone || {}).map((room) => typeof room === "string" ? room : room?.label).filter((name) => typeof name === "string" && name.trim());
       return response.json(metadata);
     } catch {
@@ -760,7 +783,7 @@ function createApp({
         // The room assignment can change while the controller checks the point.
         requireControl(scopeRooms(currentRoomIndex(), dashboardSession.roomIds, dashboardSession.writeRoomIds));
       } : undefined;
-      return response.json(await deviceCommands.write(pointId, body.value, authorize));
+      return response.json(await controllerWork(() => deviceCommands.write(pointId, body.value, authorize)));
     } catch (error) {
       return sendOperationError(response, error, "DEVICE_COMMAND_WRITE_FAILED", "Slanje naredbe nije uspjelo.");
     }
@@ -780,7 +803,7 @@ function createApp({
   for (const kind of ["history", "alarms"]) {
     app.post(`/api/${kind}/query`, requireJson, express.json({ limit: "16kb" }), async (request, response) => {
       try {
-        return response.json(await telemetry.query(kind, request.body || {}));
+        return response.json(await controllerWork(() => telemetry.query(kind, request.body || {})));
       } catch (error) {
         return sendOperationError(response, error, "TELEMETRY_FAILED", "Dohvat podataka nije uspio.");
       }
@@ -788,7 +811,7 @@ function createApp({
   }
   app.post("/api/history/browse", requireJson, express.json({ limit: "8kb" }), async (request, response) => {
     try {
-      return response.json(await telemetry.browse(request.body?.containerId ?? ""));
+      return response.json(await controllerWork(() => telemetry.browse(request.body?.containerId ?? "")));
     } catch (error) {
       return sendOperationError(response, error, "TELEMETRY_FAILED", "Dohvat trendova nije uspio.");
     }
@@ -811,7 +834,7 @@ function createApp({
       try {
         // Recognized device commands must use the same fresh checks even when
         // submitted through the older value-widget endpoint.
-        const result = await (deviceCommands.isDeviceCommand(widgetId)
+        const result = await controllerWork(() => deviceCommands.isDeviceCommand(widgetId)
           ? deviceCommands.write(widgetId, value) : poller.writeValue(widgetId, value));
         return response.json(result);
       } catch (error) {
@@ -839,7 +862,7 @@ function createApp({
       }
 
       try {
-        const result = await poller.discoverObjects(query);
+        const result = await controllerWork(() => poller.discoverObjects(query));
         discoveredById.clear();
         for (const item of result.items) {
           if (item.kind === "value") discoveredById.set(item.id, item);
