@@ -93,10 +93,25 @@
     const number = numeric(value);
     const positionReading = ["positionSet", "positionStatus", "slatSet", "slatStatus"].includes(point?.role);
     const text = number === null ? String(value) : (positionReading ? preciseFormatter : formatter).format(number);
+    const unit = displayUnit(point);
+    return `${text}${unit ? ` ${unit}` : ""}`;
+  }
+
+  function displayUnit(point) {
     let unit = point?.unit || "";
     if (!point?.unitOverridden && point?.role === "humidity" && /^%\s*RH$/i.test(unit)) unit = "%";
     if (!point?.unitOverridden && point?.role === "brightnessSet" && !unit && point?.control?.rangeConfirmed === true && Number(point.control.min) === 0 && Number(point.control.max) === 100) unit = "%";
-    return `${text}${unit ? ` ${unit}` : ""}`;
+    return unit;
+  }
+
+  // Writes a reading with its unit in a smaller, quieter span; the element's text stays "24,1 °C".
+  function renderReading(element, point) {
+    const text = point?.error ? "—" : format(point);
+    const unit = displayUnit(point);
+    const suffix = ` ${unit}`;
+    if (!unit || text === "—" || !text.endsWith(suffix)) { element.textContent = text; return; }
+    element.textContent = text.slice(0, -suffix.length);
+    element.append(el("span", "dc-metric-unit", suffix));
   }
 
   function statusName(point) {
@@ -769,7 +784,7 @@
         body.append(wrapper);
         card.bindings.push(() => {
           const point = currentPoint();
-          value.textContent = point?.error ? "—" : format(point);
+          renderReading(value, point);
           caption.textContent = label || point?.metricLabel || roleLabels[point?.role] || point?.label || "Očitanje";
           wrapper.classList.toggle("dc-reading-warning", point?.error || [1, 2, 3, 4].includes(Number(point?.state)));
           value.title = statusName(point);

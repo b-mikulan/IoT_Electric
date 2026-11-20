@@ -23,7 +23,7 @@
 .admin-user-editor { padding: 26px; }
 .admin-label { display: block; margin-bottom: 7px; color: var(--ink); font-size: var(--fs-sm); font-weight: 600; }
 .admin-page input:not([type="checkbox"]), .admin-page select { display: block; width: 100%; min-width: 0; height: var(--control-h); padding: 0 var(--sp-3); border: 1px solid var(--line-strong); border-radius: var(--r-sm); color: var(--ink); background: var(--surface); font: inherit; font-size: var(--fs-base); }
-.admin-page input::placeholder { color: var(--muted-2); }
+.admin-page input::placeholder { color: var(--muted); }
 .admin-page :is(input, select):focus-visible { border-color: var(--action); outline-offset: 1px; }
 .admin-page input[type="checkbox"] { width: 17px; height: 17px; flex: 0 0 17px; margin: 0; accent-color: var(--brand); cursor: pointer; }
 .admin-page button { font-family: inherit; cursor: pointer; }
@@ -71,6 +71,9 @@
 .admin-form-footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
 .admin-form-footer .admin-hint { margin-top: 10px; }
 .admin-user-session { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border); }
+.admin-delete-confirmation { margin-top: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-left: 3px solid var(--alarm); background: var(--alarm-tint); color: var(--alarm-ink); }
+.admin-delete-confirmation[hidden] { display: none; }
+.admin-delete-confirmation p { margin: 0 0 var(--sp-3); font-size: var(--fs-sm); }
 .admin-status { margin: 16px 0 0; font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .admin-status:empty { margin: 0; }
 .admin-status.is-error { color: var(--error); }

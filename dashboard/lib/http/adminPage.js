@@ -108,7 +108,11 @@ function sendAdminPage(response) {
                 <div><h4>Prijave korisnika</h4><p id="admin-user-session-count" class="admin-hint"></p></div>
                 <button id="admin-revoke" class="admin-button secondary" type="button">Odjavi sve sesije</button>
               </section>
-              <button id="admin-delete" class="admin-text-button danger" type="button" hidden>Izbriši korisnika</button>
+              <button id="admin-delete" class="admin-text-button danger" type="button" aria-controls="admin-delete-confirmation" aria-expanded="false" hidden>Izbriši korisnika</button>
+              <div id="admin-delete-confirmation" class="admin-delete-confirmation" hidden>
+                <p id="admin-delete-question"></p>
+                <div class="admin-actions"><button id="admin-delete-cancel" class="admin-button secondary" type="button">Odustani</button><button id="admin-delete-confirm" class="admin-button danger" type="button">Izbriši korisnika</button></div>
+              </div>
             </form>
             <p id="admin-status" class="admin-status" role="status" aria-live="polite"></p>
           </div>

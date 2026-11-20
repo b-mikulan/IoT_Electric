@@ -4,7 +4,9 @@
   const formatTime = (value) => Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString("hr-HR") : String(value || "—");
   const text = DataTable.render.text();
   const dateColumn = (data) => ({ data, render: (value, type) => type === "display" || type === "filter" ? text.display(formatTime(value)) : Date.parse(value) || 0 });
-  const language = { emptyTable: "Nema podataka za prikaz", search: "Pretraži:", searchPlaceholder: "Pretraži zapise", thousands: ".", lengthMenu: "Prikaži _MENU_ redaka", info: "_START_–_END_ od _TOTAL_ redaka", infoEmpty: "0 redaka", infoFiltered: "(od ukupno _MAX_)", zeroRecords: "Nema rezultata pretrage", paginate: { first: "Prva", last: "Zadnja", next: "Sljedeća", previous: "Prethodna" } };
+  const language = { emptyTable: "Nema podataka za prikaz", search: "Pretraži:", searchPlaceholder: "Pretraži zapise", thousands: ".", lengthMenu: "Prikaži _MENU_ redaka", info: "_START_–_END_ od _TOTAL_ redaka", infoEmpty: "0 redaka", infoFiltered: "(od ukupno _MAX_)", zeroRecords: "Nema rezultata pretrage", loadingRecords: "Učitavam…", lengthLabels: { "-1": "Sve" }, entries: { _: "redaka", 1: "redak" },
+    paginate: { first: "Prva", last: "Zadnja", next: "Sljedeća", previous: "Prethodna" },
+    aria: { orderable: ": aktiviraj za sortiranje", orderableReverse: ": aktiviraj za obrnuti redoslijed", orderableRemove: ": aktiviraj za uklanjanje sortiranja", paginate: { first: "Prva stranica", last: "Zadnja stranica", next: "Sljedeća stranica", previous: "Prethodna stranica", number: "Stranica " } } };
   const tableOptions = { language, pageLength: 10, initComplete() {
     this.api().table().container().querySelectorAll(".dt-length select").forEach(select => select.classList.add("browser-default"));
   } };
@@ -43,6 +45,13 @@
     } },
   ] });
 
+  // Every telemetry response says whether it is simulated, so demo data is labelled even when the catalog fails.
+  function showSource(result) {
+    if (typeof result?.demoMode !== "boolean") return;
+    const chip = $("telemetry-mode");
+    chip.textContent = result.demoMode ? "Demo podaci — simulirani trend i alarm" : "Podaci s kontrolera";
+    chip.classList.toggle("is-live", !result.demoMode);
+  }
   async function loadCatalog() {
     $("trend-catalog-reload").disabled = true;
     status("trend-catalog-status", "Učitavam spremljeni popis trendova…");
@@ -51,13 +60,16 @@
       const result = await response.json();
       if (!response.ok || !Array.isArray(result.items)) throw new Error(result.error || "Popis trendova nije dostupan.");
       catalogTable.clear(); catalogTable.rows.add(result.items).draw(false);
-      $("telemetry-mode").textContent = result.demoMode ? "Demo podaci — simulirani trend i alarm" : "Podaci s kontrolera";
+      showSource(result);
       if (result.demoMode && !$("history-id").value) $("history-id").value = "demo-history";
       const captured = result.capturedAt ? ` · snimka ${formatTime(result.capturedAt)}` : "";
       status("trend-catalog-status", result.available
         ? `${result.total.toLocaleString("hr-HR")} trendova iz spremljenog kataloga${captured}. Za podatke odaberi trend i razdoblje.`
         : "Popis trendova još nije prenesen na ovaj dashboard. Uvezi novu sigurnosnu kopiju s popisom ili koristi pregled mapa ispod.");
-    } catch (error) { status("trend-catalog-status", error.message, true); }
+    } catch (error) {
+      status("trend-catalog-status", error.message, true);
+      if ($("telemetry-mode").textContent === "Provjeravam izvor…") $("telemetry-mode").textContent = "Izvor još nije poznat";
+    }
     finally { $("trend-catalog-reload").disabled = false; }
   }
   let chart;
@@ -121,6 +133,7 @@
         current.cursor = null;
         throw new Error("Lista alarma se promijenila tijekom dohvata. Pokreni novi dohvat alarma.");
       }
+      showSource(result);
       const usedCursor = current.cursor;
       current.rows.push(...result.rows);
       current.table.rows.add(result.rows).draw(false);
@@ -149,6 +162,7 @@
     status("browse-status", "Dohvaćam mape i trendove…");
     try {
       const result = await post("/api/history/browse", { containerId: $("container-id").value });
+      showSource(result);
       for (const item of result.items) {
         const li = document.createElement("li"), button = document.createElement("button");
         li.className = "collection-item";

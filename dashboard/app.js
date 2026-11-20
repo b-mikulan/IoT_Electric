@@ -805,7 +805,7 @@ function createApp({
   for (const kind of ["history", "alarms"]) {
     app.post(`/api/${kind}/query`, requireJson, express.json({ limit: "16kb" }), async (request, response) => {
       try {
-        return response.json(await controllerWork(() => telemetry.query(kind, request.body || {})));
+        return response.json({ ...(await controllerWork(() => telemetry.query(kind, request.body || {}))), demoMode: Boolean(config.demoMode) });
       } catch (error) {
         return sendOperationError(response, error, "TELEMETRY_FAILED", "Dohvat podataka nije uspio.");
       }
@@ -813,7 +813,7 @@ function createApp({
   }
   app.post("/api/history/browse", requireJson, express.json({ limit: "8kb" }), async (request, response) => {
     try {
-      return response.json(await controllerWork(() => telemetry.browse(request.body?.containerId ?? "")));
+      return response.json({ ...(await controllerWork(() => telemetry.browse(request.body?.containerId ?? ""))), demoMode: Boolean(config.demoMode) });
     } catch (error) {
       return sendOperationError(response, error, "TELEMETRY_FAILED", "Dohvat trendova nije uspio.");
     }

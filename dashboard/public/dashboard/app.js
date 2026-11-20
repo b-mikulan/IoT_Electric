@@ -784,13 +784,24 @@ function updateWidget(widget, syncedAt) {
   widgetTime.textContent = `Promjena: ${formatTime(changedAt)}`;
   widgetTime.title = "Vrijeme kada je dashboard zadnji put uočio promjenu vrijednosti.";
 
-  card.classList.toggle("has-error", Boolean(widget.error));
-  state.classList.toggle("is-error", Boolean(widget.error));
-  state.classList.toggle("is-current", !widget.error);
-  state.textContent = widget.error || "Aktualno";
+  const pointStatus = widgetPointStatus(widget);
+  card.classList.toggle("has-error", pointStatus.kind === "error");
+  state.classList.toggle("is-error", pointStatus.kind === "error");
+  state.classList.toggle("is-warning", pointStatus.kind === "warning");
+  state.classList.toggle("is-current", pointStatus.kind === "current");
+  state.textContent = pointStatus.text;
 
   card.classList.remove("is-updated");
   requestAnimationFrame(() => card.classList.add("is-updated"));
+}
+
+// EWS point states: 0 normal, 1 uncertain, 2 forced, 3 offline, 4 error (same labels as the device cards).
+function widgetPointStatus(widget) {
+  if (widget.error) return { kind: "error", text: widget.error };
+  const state = widget.state;
+  if (state === null || state === undefined || state === "" || state === "ok" || String(state) === "0") return { kind: "current", text: "Aktualno" };
+  const known = { 1: ["warning", "Nesigurno očitanje"], 2: ["warning", "Forsirano"], 3: ["error", "Izvan mreže"], 4: ["error", "Greška"] }[String(state)];
+  return known ? { kind: known[0], text: known[1] } : { kind: "warning", text: "Stanje nije poznato" };
 }
 
 function showStatus(status = {}) {

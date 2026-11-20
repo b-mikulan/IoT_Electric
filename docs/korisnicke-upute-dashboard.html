@@ -40,11 +40,11 @@
 .dc-search-field { flex: 1; min-width: 0; }
 .dc-type-field { width: 180px; }
 .dc-filter-label { display: block; margin-bottom: 6px; font-size: var(--fs-xs, .75rem); font-weight: 600; color: var(--dc-muted); }
-.device-cards-section input.dc-search, .device-cards-section select.dc-type-filter { display: block; box-sizing: border-box; width: 100%; height: var(--control-h, 40px); margin: 0; padding: 0 12px; border: 1px solid var(--line-strong, #97A1A3); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--dc-ink); font: inherit; font-size: var(--fs-sm, .8125rem); box-shadow: none; }
+.device-cards-section input.dc-search, .device-cards-section select.dc-type-filter { display: block; box-sizing: border-box; width: 100%; height: var(--control-h, 40px); margin: 0; padding: 0 12px; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--dc-ink); font: inherit; font-size: var(--fs-sm, .8125rem); box-shadow: none; }
 .device-cards-section select.dc-type-filter { appearance: none; padding-right: 38px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m2 2 4 4 4-4' fill='none' stroke='%235A646A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-size: 12px 8px; background-position: right 14px center; }
 .dc-room-panel { margin-top: 14px; }
 .room-create-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(140px, .65fr) auto; align-items: end; gap: 12px; }
-.room-create-grid input, .room-create-grid select { box-sizing: border-box; width: 100%; height: var(--control-h, 40px); margin: 0; padding: 0 11px; border: 1px solid var(--line-strong, #97A1A3); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); font: inherit; font-size: var(--fs-base, .875rem); }
+.room-create-grid input, .room-create-grid select { box-sizing: border-box; width: 100%; height: var(--control-h, 40px); margin: 0; padding: 0 11px; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); font: inherit; font-size: var(--fs-base, .875rem); }
 .room-create-grid button { height: var(--control-h, 40px); white-space: nowrap; }
 #rooms-dialog .room-create-grid .btn { margin: 0; line-height: 38px; }
 #rooms-dialog .room-create-grid :is(input, select):focus { border-color: var(--brand); outline: 2px solid var(--focus, #1C5D99); box-shadow: none; }
@@ -54,7 +54,7 @@
 .floor-management input { box-sizing: border-box; margin-bottom: 0; height: var(--control-h, 40px); }
 .floor-registry-list { margin-top: 14px !important; max-height: 180px !important; }
 .dc-management, .dc-selection-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 14px; }
-.dc-management button, .dc-selection-actions button { border: 1px solid var(--line-strong, #97A1A3); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--ink-2, #3E474C); padding: 9px 12px; font: inherit; font-size: var(--fs-xs, .75rem); cursor: pointer; }
+.dc-management button, .dc-selection-actions button { border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--ink-2, #3E474C); padding: 9px 12px; font: inherit; font-size: var(--fs-xs, .75rem); cursor: pointer; }
 .dc-selection-actions { padding: 12px; border-radius: var(--r-md, 8px); background: var(--surface, #FFFFFF); }
 .dc-selection-count { font-size: var(--fs-xs, .75rem); font-weight: 600; color: var(--ink-2, #3E474C); }
 .dc-selection-actions .dc-move-selection { background: var(--action, #1C5D99); color: #fff; border-color: var(--action, #1C5D99); }
@@ -77,7 +77,7 @@
 .room-registry-heading span { font-size: var(--fs-xs, .75rem); color: var(--muted); }
 .room-registry-filters { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 12px; margin-bottom: 12px; }
 .room-registry-filters > div { min-width: 0; }
-.room-registry-filters input[type="search"], .room-registry-filters select { box-sizing: border-box; width: 100%; min-width: 0; height: var(--control-h, 40px); margin: 0; padding: 0 12px; border: 1px solid var(--border, var(--line-strong, #97A1A3)); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--text, var(--ink, #23292D)); font: inherit; font-size: var(--fs-base, .875rem); }
+.room-registry-filters input[type="search"], .room-registry-filters select { box-sizing: border-box; width: 100%; min-width: 0; height: var(--control-h, 40px); margin: 0; padding: 0 12px; border: 1px solid var(--border, var(--line-strong, #858F92)); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--text, var(--ink, #23292D)); font: inherit; font-size: var(--fs-base, .875rem); }
 .room-registry-filters input[type="search"]:focus, .room-registry-filters select:focus { outline: 2px solid var(--focus, #1C5D99); outline-offset: 1px; border-color: var(--action, #1C5D99); box-shadow: none; }
 .room-registry-filters input::placeholder { color: var(--muted, #5A646A); }
 .room-registry-list .room-registry-empty { padding: 22px 16px; color: var(--muted); font-size: var(--fs-base, .875rem); text-align: center; }
@@ -118,7 +118,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-grid-heading-floor + .dc-grid-heading-room { margin-top: 0; }
 .dc-grid-heading-room { color: var(--dc-muted); font-size: var(--fs-base, .875rem); font-weight: 400; letter-spacing: .02em; }
 .dc-card { border: 1px solid var(--line, #CBD1CF); border-radius: var(--r-md, 8px); padding: 22px; background: var(--surface, #FFFFFF); box-shadow: var(--shadow-card, 0 1px 0 rgba(30, 36, 40, .06)); color: var(--dc-ink); min-width: 0; transition: box-shadow .15s, border-color .15s; }
-.dc-card:hover { border-color: var(--line-strong, #97A1A3); }
+.dc-card:hover { border-color: var(--line-strong, #858F92); }
 .dc-load-more { padding: 26px 0 10px; text-align: center; }
 .dc-load-more[hidden] { display: none; }
 .dc-load-count { margin: 0 0 12px; color: var(--dc-muted); font-size: var(--fs-base, .875rem); }
@@ -158,9 +158,13 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-metric-main .dc-metric-value { font-size: var(--fs-reading, 2.5rem); line-height: 1.1; font-weight: 600; letter-spacing: -.01em; color: var(--ink, #23292D); }
 .dc-metric-main .dc-metric-label { font-size: var(--fs-xs, .75rem); }
 .dc-reading-warning .dc-metric-value { color: var(--warn-ink, #7A4E00); }
+/* The unit sits beside the number, smaller and quieter, so the reading leads. */
+.dc-metric-unit { color: var(--dc-muted); font-size: .55em; font-weight: 500; letter-spacing: 0; }
+.dc-metric:not(.dc-metric-main) .dc-metric-unit { font-size: .85em; }
+.dc-group-member-list .dc-metric .dc-metric-unit { font-size: 1em; }
 .dc-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 0; border-radius: var(--r-sm, 4px); padding: 10px 12px; width: 100%; background: var(--surface-sunken, #F4F6F5); color: var(--ink-2, #3E474C); cursor: pointer; }
 .dc-toggle-label { font-size: var(--fs-xs, .75rem); }
-.dc-toggle-track { display: inline-flex; align-items: center; padding: 3px; width: 40px; height: 24px; background: var(--line-strong, #97A1A3); border-radius: 999px; flex: 0 0 40px; transition: background-color .22s ease, box-shadow .22s ease; }
+.dc-toggle-track { display: inline-flex; align-items: center; padding: 3px; width: 40px; height: 24px; background: var(--line-strong, #858F92); border-radius: 999px; flex: 0 0 40px; transition: background-color .22s ease, box-shadow .22s ease; }
 .dc-toggle-thumb { height: 18px; width: 18px; border-radius: 50%; background: white; box-shadow: 0 1px 3px #0002; transition: transform .42s var(--dc-spring), box-shadow .2s ease; }
 .dc-toggle[aria-pressed="true"] .dc-toggle-track { background: var(--dc-accent); }
 .dc-toggle[aria-pressed="true"] .dc-toggle-thumb { transform: translateX(16px); }
@@ -174,12 +178,12 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-draft-line { margin: 8px 0 0; font-size: var(--fs-xs, .75rem); color: var(--muted, #5A646A); }
 .dc-temperature-control { border-top: 1px solid var(--line-soft, #E1E5E4); padding-top: 14px; }
 .dc-stepper { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0 0; }
-.dc-step-button { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; border: 1px solid var(--line-strong, #97A1A3); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--ink, #23292D); font-size: var(--fs-lg, 1.25rem); font-weight: 400; cursor: pointer; }
+.dc-step-button { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--ink, #23292D); font-size: var(--fs-lg, 1.25rem); font-weight: 400; cursor: pointer; }
 .dc-setpoint { font-family: var(--dc-din); font-size: var(--fs-xl, 1.625rem); font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; }
 .dc-select-control .dc-control-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.device-cards-section .dc-select { display: block; max-width: 58%; width: auto; min-height: 34px; height: 34px; padding: 4px 26px 4px 10px; border: 1px solid var(--line-strong, #97A1A3); border-radius: var(--r-sm, 4px); background-color: var(--surface, #FFFFFF); color: var(--ink-2, #3E474C); font-family: inherit; font-size: var(--fs-xs, .75rem); }
+.device-cards-section .dc-select { display: block; max-width: 58%; width: auto; min-height: 34px; height: 34px; padding: 4px 26px 4px 10px; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background-color: var(--surface, #FFFFFF); color: var(--ink-2, #3E474C); font-family: inherit; font-size: var(--fs-xs, .75rem); }
 .dc-number-control .dc-control-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.device-cards-section input.dc-number { height: 34px; width: 90px; margin: 0; padding: 4px 9px; box-sizing: border-box; border: 1px solid var(--line-strong, #97A1A3); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); box-shadow: none; color: var(--ink-2, #3E474C); font-family: inherit; font-size: var(--fs-sm, .8125rem); }
+.device-cards-section input.dc-number { height: 34px; width: 90px; margin: 0; padding: 4px 9px; box-sizing: border-box; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); box-shadow: none; color: var(--ink-2, #3E474C); font-family: inherit; font-size: var(--fs-sm, .8125rem); }
 .dc-control-hint { font-size: var(--fs-xs, .75rem); color: var(--muted, #5A646A); line-height: 1.5; margin: 7px 0 0; }
 .dc-state-line { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 15px; }
 .dc-state { display: inline-flex; padding: 4px 7px; border-radius: var(--r-sm, 4px); font-size: var(--fs-xs, .75rem); }
@@ -1202,10 +1206,25 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
     const number = numeric(value);
     const positionReading = ["positionSet", "positionStatus", "slatSet", "slatStatus"].includes(point?.role);
     const text = number === null ? String(value) : (positionReading ? preciseFormatter : formatter).format(number);
+    const unit = displayUnit(point);
+    return `${text}${unit ? ` ${unit}` : ""}`;
+  }
+
+  function displayUnit(point) {
     let unit = point?.unit || "";
     if (!point?.unitOverridden && point?.role === "humidity" && /^%\s*RH$/i.test(unit)) unit = "%";
     if (!point?.unitOverridden && point?.role === "brightnessSet" && !unit && point?.control?.rangeConfirmed === true && Number(point.control.min) === 0 && Number(point.control.max) === 100) unit = "%";
-    return `${text}${unit ? ` ${unit}` : ""}`;
+    return unit;
+  }
+
+  // Writes a reading with its unit in a smaller, quieter span; the element's text stays "24,1 °C".
+  function renderReading(element, point) {
+    const text = point?.error ? "—" : format(point);
+    const unit = displayUnit(point);
+    const suffix = ` ${unit}`;
+    if (!unit || text === "—" || !text.endsWith(suffix)) { element.textContent = text; return; }
+    element.textContent = text.slice(0, -suffix.length);
+    element.append(el("span", "dc-metric-unit", suffix));
   }
 
   function statusName(point) {
@@ -1878,7 +1897,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
         body.append(wrapper);
         card.bindings.push(() => {
           const point = currentPoint();
-          value.textContent = point?.error ? "—" : format(point);
+          renderReading(value, point);
           caption.textContent = label || point?.metricLabel || roleLabels[point?.role] || point?.label || "Očitanje";
           wrapper.classList.toggle("dc-reading-warning", point?.error || [1, 2, 3, 4].includes(Number(point?.state)));
           value.title = statusName(point);

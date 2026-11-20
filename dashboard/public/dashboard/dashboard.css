@@ -1,6 +1,5 @@
 /* Device-page adaptations of the shared Materialize theme. */
 .dashboard-page:has(dialog[open]) { overflow: hidden; }
-.dashboard-page :is(.dashboard-shell, .page-header-inner, .app-footer) { width: min(var(--page-max), calc(100% - 48px)); max-width: var(--page-max); }
 .dashboard-page .error-banner { border-radius: var(--r-md); font-size: var(--fs-base); }
 
 .dashboard-page .dc-search-tools { gap: 16px; align-items: center; }
@@ -81,7 +80,6 @@
   .dashboard-page .dc-header-actions { flex-basis: 100%; align-items: flex-start; }
 }
 @media (max-width: 650px) {
-  .dashboard-page :is(.dashboard-shell, .page-header-inner, .app-footer) { width: calc(100% - 32px); }
   .dashboard-page .dashboard-shell { padding-top: 30px; }
   .dashboard-page .page-header-actions :is(.btn, .trends-open) { padding-inline: var(--sp-3); font-size: var(--fs-sm); }
   .dashboard-page .dc-search-tools { align-items: stretch; gap: 14px; }

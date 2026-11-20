@@ -21,7 +21,7 @@
   --muted-2: #7A8489;
   --line-soft: #E1E5E4;
   --line: #CBD1CF;
-  --line-strong: #97A1A3;
+  --line-strong: #858F92;
 
   /* Action (blue): buttons, links, selection, focus */
   --action: #1C5D99;
@@ -286,6 +286,10 @@ a:hover {
 html {
   -webkit-text-size-adjust: 100%;
 }
+/* Materialize sets the root to 14-15px, which shrinks every rem token; keep the browser's 16px base. */
+:root {
+  font-size: 100%;
+}
 
 body {
   min-height: 100vh;
@@ -306,8 +310,19 @@ body {
 }
 
 .app-header:has(.connection-dot.is-online) { border-bottom-color: var(--ok); }
-.app-header:has(.connection-dot.is-offline) { border-bottom-color: var(--alarm); }
-.app-header:has(.connection-dot.is-paused) { border-bottom-color: var(--warn); }
+/* Polling is paused for the whole dashboard, so every page shows it; the pause button carries the state. */
+.app-header:has(.connection-dot.is-paused),
+body:has(#refresh-pause.is-paused) .app-header { border-bottom-color: var(--warn); }
+:root .app-header:has(.connection-dot.is-offline) { border-bottom-color: var(--alarm); }
+
+/* One content width for the header, page and footer on every page. */
+:is(.page-header-inner, .dashboard-shell, .app-footer).container {
+  width: min(var(--page-max), calc(100% - 48px));
+  max-width: var(--page-max);
+}
+@media (max-width: 650px) {
+  :is(.page-header-inner, .dashboard-shell, .app-footer).container { width: calc(100% - 32px); }
+}
 
 /*
   Page header, shared by every page (the admin page set the pattern):
@@ -691,6 +706,9 @@ h1 {
   background: var(--action-tint);
   border-color: var(--action);
 }
+
+.admin-button.danger { color: #fff; background: var(--alarm); border-color: var(--alarm); }
+.admin-button.danger:hover { color: #fff; background: var(--alarm-ink); border-color: var(--alarm-ink); }
 
 :is(.trends-open, .admin-button, .general-button, .general-settings-open, .refresh-pause):disabled {
   opacity: .5;
@@ -1573,6 +1591,8 @@ h1 {
 .widget-state.is-current::before { background: var(--ok); }
 .widget-state.is-error { color: var(--error); }
 .widget-state.is-error::before { background: var(--error); }
+.widget-state.is-warning { color: var(--warn-ink); }
+.widget-state.is-warning::before { background: var(--warn); }
 
 .widget-time {
   white-space: nowrap;

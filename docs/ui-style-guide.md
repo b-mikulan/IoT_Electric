@@ -45,7 +45,7 @@ Ako nova komponenta privlači pažnju više od očitanja ili alarma, smanjite je
 | `--muted-2` | `#7A8489` | Samo za veliki ili nebitan tekst |
 | `--line-soft` | `#E1E5E4` | Razdjelnici unutar panela, mreža grafa |
 | `--line` | `#CBD1CF` | Rub kartice i panela |
-| `--line-strong` | `#97A1A3` | Rub polja i sekundarnog gumba |
+| `--line-strong` | `#858F92` | Rub polja i sekundarnog gumba (najmanje 3:1 na bijeloj) |
 
 ### Radnja
 
@@ -104,7 +104,7 @@ Bahnschrift je DIN font koji dolazi s Windowsima, pa ne treba webfont. CSP (`def
 
 Pravila:
 
-- **Ne manje od 12 px.**
+- **Ne manje od 12 px.** Tokeni su u `rem`, a `:root { font-size: 100% }` u `styles.css` vraća osnovu na 16 px, jer je Materialize smanjuje na 14–15 px. Ne uklanjajte to pravilo.
 - **Naslovi** imaju težinu 600 i visinu retka 1.2.
 - **Brojke** (očitanja, vremena, tablice) koriste `font-variant-numeric: tabular-nums`, da ne skaču pri osvježavanju.
 - **Bez `text-transform: uppercase`** i bez razmaknutih velikih slova. `.eyebrow` je kratka kontekstualna linija u rečeničnom stilu i koristi se samo kad stvarno daje kontekst.
@@ -138,7 +138,7 @@ Potpuno okrugli su samo lampice, prekidači i točke statusa. Radijus prati hije
 
 Ne dodajte gradijente, staklo ni podizanje kartice na hover. Hover mijenja boju ruba, ne položaj.
 
-**Širina.** Sadržaj je najviše `--page-max` (1200 px) širok, s 24 px ruba sa svake strane na desktopu i 16 px na mobitelu.
+**Širina.** Sadržaj je najviše `--page-max` (1200 px) širok, s 24 px ruba sa svake strane na desktopu i 16 px na mobitelu. Zaglavlje, sadržaj i podnožje dijele istu širinu preko pravila `:is(.page-header-inner, .dashboard-shell, .app-footer).container` u `styles.css`; stranice ga ne ponavljaju.
 
 ## Zaglavlje stranice
 
@@ -171,17 +171,13 @@ Pravila:
 - **Naslov i radnje stranice su u traci**, a ne ispod nje. Nema zasebnog bloka `.intro` u sadržaju.
 - **Statusni redak** se sam skriva kad su mu sva djeca skrivena.
 - **Rub veze.** Donji rub trake (3 px) pokazuje stanje veze preko klasa `.connection-dot.is-*`:
-  - sivo: povezivanje;
+  - sivo: povezivanje, ili stranica bez indikatora veze;
   - zeleno: uživo;
-  - jantarno: pauzirano;
-  - crveno: prekid.
+  - jantarno: pauzirano. Pauza vrijedi za cijeli dashboard, pa je rub jantaran na svakoj stranici čiji gumb `#refresh-pause` ima `.is-paused`;
+  - crveno: prekid (ima prednost pred pauzom).
 
   Ne dodajte drugi indikator veze.
 - **Gumbi na traci.** Sekundarni gumbi imaju bijeli obrub na prozirnoj pozadini; primarni ostaju plavi. Najviše jedan primarni gumb po zaglavlju.
-- **Kretanje.** Kretanje odgovara na korisnikovu radnju; nema animacija pri učitavanju stranice.
-  - Gumbi i polja: prijelaz boje 120–160 ms.
-  - Prekidači i kontrole na kartici: smiju koristiti `--dc-spring`, do oko 400 ms.
-  - Stalna animacija: samo indikator rada (vrtnja pri osvježavanju).
 - **Mobitel.** Ispod 760 px traka se slaže okomito i poravnava lijevo. Gumbi s ikonom smiju sakriti tekst (`span`), ali tada moraju imati `aria-label`.
 
 ## Komponente
@@ -201,7 +197,7 @@ Pravila:
 - **Ikone** su linijske SVG ikone od 18–20 px s `stroke="currentColor"`. Ne koristite emoji u gumbima ni strelice u tekstu.
 - **Onemogućen gumb** ima `opacity: .5`. Ako razlog nije očit, napišite ga uz gumb.
 - **Specifičnost.** Pravilo za "goli" `.btn` ima specifičnost jedne klase (`:where()`), pa ga crvena i onemogućena stanja nadjačavaju. Ne podižite mu specifičnost.
-- **Opasne radnje** uvijek traže potvrdu u istom dijalogu (`.settings-delete-confirmation`) prije izvršenja.
+- **Opasne radnje** uvijek traže potvrdu unutar aplikacije prije izvršenja: u dijalogu (`.settings-delete-confirmation`) ili uz sam gumb (`.admin-delete-confirmation`). Ne koristite `window.confirm`.
 
 ### Polja i obrasci
 
@@ -221,7 +217,7 @@ Pravila:
 ### Kartice uređaja
 
 - **Kartica:** bijela, rub `--line`, radijus `--r-md`, unutarnji razmak 22 px (20 px na mobitelu).
-- **Naslov** je DIN; **očitanje** je DIN 40 px s `tabular-nums`. Jedinica je manja i `--muted`.
+- **Naslov** je DIN; **očitanje** je DIN 40 px s `tabular-nums`. Jedinica je u zasebnom `span.dc-metric-unit`, manja i `--muted`; tekst elementa ostaje „24,1 °C”.
 - **Oznaka izvora:** "Simulacija" je jantarna oznaka s lampicom, a "Uživo" zelena. Demo i simulirani podaci uvijek moraju biti vidljivo označeni.
 - **Naredba na čekanju** koristi `--action-tint`.
 - **Poruke naredbe** (`.dc-command-status`) su oblačić s lijevim rubom od 3 px:
@@ -238,7 +234,7 @@ Pravila:
 | --- | --- | --- |
 | Lampica (`.connection-dot`) | Krug od 10 px | Stanje veze u zaglavlju |
 | Demo oznaka (`.demo-badge`) | Jantarna, lampica i tekst "Demo podaci" | Uvijek kad podaci nisu s kontrolera |
-| Chip izvora (`.telemetry-source.chip`) | Jantarni okvir | Izvor podataka na stranici trendova |
+| Chip izvora (`.telemetry-source.chip`) | Jantarni za demo ili nepoznat izvor, zeleni (`.is-live`) za kontroler | Izvor podataka na stranici trendova; postavlja ga svaki odgovor trendova (`demoMode`) |
 | Obavijest | Uvučena površina s lijevim rubom u boji stanja | Rezultat radnje, upozorenje, greška |
 
 ### Paneli i odjeljci
@@ -263,6 +259,10 @@ Ovo je minimum za svaku promjenu, ne dodatak:
 - **Fokus.** Fokus mora biti vidljiv svugdje. Globalni `:focus-visible` crta plavi prsten od 2 px s odmakom od 2 px; na tamnom zaglavlju prsten je bijel. Ne pišite `outline: none` bez zamjene.
 - **Kontrast.** Tekst najmanje 4,5:1, veliki tekst i rubovi kontrola najmanje 3:1. `--muted` je najsvjetlija boja za mali tekst.
 - **Smanjeno kretanje.** `prefers-reduced-motion` gasi prijelaze i animacije (pravilo na dnu `styles.css`). Nova animacija mora poštovati to pravilo.
+- **Kretanje.** Kretanje odgovara na korisnikovu radnju; nema animacija pri učitavanju stranice.
+  - Gumbi i polja: prijelaz boje 120–160 ms.
+  - Prekidači i kontrole na kartici: smiju koristiti `--dc-spring`, do oko 400 ms.
+  - Stalna animacija: samo indikator rada (vrtnja pri osvježavanju).
 - **Mobitel.** Na 375 px nema horizontalnog pomicanja stranice. Široke tablice pomiču se unutar vlastitog spremnika.
 - **Veličina kontrola.** Glavne kontrole visoke su najmanje 40 px. Mali gumb (34 px) i male poveznice koristite samo u gustim popisima i alatnim trakama.
 - **Ikone.** Gumb sa samo ikonom ima `aria-label`; ukrasne ikone imaju `aria-hidden="true"`.

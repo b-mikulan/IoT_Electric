@@ -197,6 +197,7 @@
     roomFloor.value = "";
     selectedOnly.checked = false;
     element("admin-delete").hidden = !user;
+    closeDeleteConfirmation(false);
     renderUsers();
     renderRooms();
     renderSessions();
@@ -251,9 +252,28 @@
       showStatus(previousUsername === null ? "Korisnik je dodan." : "Izmjene su spremljene. Korisnik se treba ponovno prijaviti.");
     });
   });
+  // Deleting a user is confirmed in the page, next to the button, rather than in a browser prompt.
+  function closeDeleteConfirmation(returnFocus = true) {
+    const panel = element("admin-delete-confirmation");
+    if (panel.hidden) return;
+    panel.hidden = true;
+    element("admin-delete").setAttribute("aria-expanded", "false");
+    if (returnFocus && !element("admin-delete").hidden) element("admin-delete").focus();
+  }
   element("admin-delete").addEventListener("click", () => {
     const name = selectedUsername;
-    if (busy || name === null || !window.confirm(`Izbrisati korisnika „${name}”? Njegove aktivne sesije bit će odjavljene.`)) return;
+    if (busy || name === null) return;
+    element("admin-delete-question").textContent = `Izbrisati korisnika „${name}”? Njegove aktivne sesije bit će odjavljene. Brisanje se ne može poništiti.`;
+    element("admin-delete-confirmation").hidden = false;
+    element("admin-delete").setAttribute("aria-expanded", "true");
+    element("admin-delete-cancel").focus();
+  });
+  element("admin-delete-cancel").addEventListener("click", () => closeDeleteConfirmation());
+  element("admin-delete-confirmation").addEventListener("keydown", event => { if (event.key === "Escape") closeDeleteConfirmation(); });
+  element("admin-delete-confirm").addEventListener("click", () => {
+    const name = selectedUsername;
+    if (busy || name === null) return;
+    closeDeleteConfirmation(false);
     void submit(async () => {
       await request("/api/admin/users/delete", { username: name });
       users = users.filter(user => user.username !== name);
