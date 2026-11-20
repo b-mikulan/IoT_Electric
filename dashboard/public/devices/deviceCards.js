@@ -144,6 +144,9 @@
     const headings = new Map();
     let savedSettings = [];
     let memberParents = new Map();
+    // A light listed by several shown groups: its own card sits in the first
+    // of them and every other one holds a mirror card (device key -> parent key -> card).
+    const mirrors = new Map();
     let pageDevices = [];
 
     container.classList.add("device-cards-section");
@@ -154,7 +157,7 @@
     reset.hidden = true;
     reset.addEventListener("click", () => {
       drafts.clear();
-      for (const card of cards.values()) card.update(card.device);
+      for (const card of allCards()) card.update(card.device);
       reset.hidden = true;
       announce.textContent = "Simulacija je vraćena na trenutačna očitanja.";
     });
@@ -338,13 +341,20 @@
       summary.textContent = devices.length ? `${count === devices.length ? count : `${count} od ${devices.length}`} kartica uređaja${shown < pageDevices.length ? ` · prikazano ${shown}` : ""}${connection !== "connected" ? " · Očitanja se trenutačno ne osvježavaju" : ""}` : "";
     }
 
-    // Light key → light-group key. Saved settings, not device objects, carry
-    // membership, so live value updates never move a light out of its group.
-    // shortcut: a light is shown in its first listed group only; the store
-    // rejects a second group, revisit if multi-group membership is needed.
-    // Lights inside their group and sensors inside their zone: member key -> parent key.
+    // Lights inside their groups and sensors inside their zone: member key ->
+    // parent keys. Saved settings, not device objects, carry membership, so
+    // live value updates never move a light out of its group.
     function groupMembership() {
       return globalThis.IoTDeviceModel?.deviceMembership?.(devices, savedSettings) || new Map();
+    }
+
+    // Every card of one device: its own card first, then its mirrors.
+    function instancesOf(key) {
+      return [cards.get(key), ...(mirrors.get(key)?.values() || [])].filter(Boolean);
+    }
+
+    function allCards() {
+      return [...cards.values(), ...[...mirrors.values()].flatMap((byParent) => [...byParent.values()])];
     }
 
     function reconcileCommand(device) {
@@ -363,18 +373,22 @@
     }
 
     function updateCard(device) {
-      const card = cards.get(device.key);
-      if (!card) return false;
-      for (const [role, previousPoint] of Object.entries(card.device.roles || {})) {
+      const instances = instancesOf(device.key);
+      if (!instances.length) return false;
+      for (const [role, previousPoint] of Object.entries(instances[0].device.roles || {})) {
         const nextPoint = device.roles?.[role];
         if (!nextPoint?.control || (previousPoint.sourceId || previousPoint.id) !== (nextPoint.sourceId || nextPoint.id)) {
           drafts.delete(`${device.key}\u0000${role}`);
           if (commands.get(device.key)?.role === role) commands.delete(device.key);
         }
       }
-      if (card.node.hidden) { card.device = device; card.needsRefresh = true; return false; }
-      card.update(device);
-      return true;
+      let updated = false;
+      for (const card of instances) {
+        if (card.node.hidden) { card.device = device; card.needsRefresh = true; continue; }
+        card.update(device);
+        updated = true;
+      }
+      return updated;
     }
 
     function showMore() {
@@ -438,34 +452,53 @@
         && (typeFilter.value === "all" || device.type === typeFilter.value) && searchIndex.get(device.key)?.includes(query));
       const count = filteredDevices.length;
       // A text search lists matching lights on their own, captioned with their
-      // group. Otherwise a shown group holds all of its accessible lights,
-      // and only lights whose group is filtered out stay on the main list.
+      // groups. Otherwise a shown group holds all of its accessible lights,
+      // and only lights whose groups are all filtered out stay on the main list.
       const nested = query === "";
-      const filteredKeys = new Set(filteredDevices.map((device) => device.key));
-      pageDevices = nested ? filteredDevices.filter((device) => !filteredKeys.has(memberParents.get(device.key))) : filteredDevices;
+      // filteredDevices follows displayOrder, so its index orders a light's parents.
+      const filteredIndex = new Map(filteredDevices.map((device, index) => [device.key, index]));
+      const filteredParents = (key) => (memberParents.get(key) || []).filter((parent) => filteredIndex.has(parent))
+        .sort((a, b) => filteredIndex.get(a) - filteredIndex.get(b));
+      pageDevices = nested ? filteredDevices.filter((device) => !filteredParents(device.key).length) : filteredDevices;
       const shownDevices = pageDevices.slice(0, displayLimit);
       const members = new Map();
       if (nested) for (const device of devices) {
-        const parent = memberParents.get(device.key);
-        if (parent) members.set(parent, [...(members.get(parent) || []), device]);
+        for (const parent of memberParents.get(device.key) || []) members.set(parent, [...(members.get(parent) || []), device]);
       }
-      const groupedDevices = shownDevices.flatMap((device) => [device, ...(members.get(device.key) || [])]);
-      const shownKeys = new Set(groupedDevices.map((device) => device.key));
-      for (const device of groupedDevices) {
+      const cardFor = (device) => {
         if (!cards.has(device.key)) cards.set(device.key, makeCard(device));
-        const card = cards.get(device.key);
-        if (card.needsRefresh) { card.update(device); card.needsRefresh = false; }
+        return cards.get(device.key);
+      };
+      // A light's own card goes to its first filtered parent; the others get its mirrors.
+      const shownKeys = new Set();
+      const rows = new Map();
+      const usedMirrors = new Set();
+      for (const device of shownDevices) {
+        cardFor(device);
+        shownKeys.add(device.key);
+        rows.set(device.key, (members.get(device.key) || []).map((member) => {
+          if (filteredParents(member.key)[0] === device.key) { shownKeys.add(member.key); return cardFor(member); }
+          if (!mirrors.has(member.key)) mirrors.set(member.key, new Map());
+          const byParent = mirrors.get(member.key);
+          if (!byParent.has(device.key)) byParent.set(device.key, makeCard(member));
+          usedMirrors.add(byParent.get(device.key));
+          return byParent.get(device.key);
+        }));
       }
-      for (const card of cards.values()) {
+      const topLevel = new Set(shownDevices.map((device) => device.key));
+      for (const card of allCards()) {
         const device = card.device;
-        const shown = shownKeys.has(device.key);
+        const mirror = cards.get(device.key) !== card;
+        const shown = mirror ? usedMirrors.has(card) : shownKeys.has(device.key);
+        if (shown && card.needsRefresh) { card.update(device); card.needsRefresh = false; }
         card.node.hidden = !shown;
         if (!shown) card.node.remove();
         card.selection.hidden = !selectionMode;
         card.checkbox.checked = selectedKeys.has(device.key);
         card.node.classList.toggle("dc-card-selected", selectedKeys.has(device.key));
-        const parent = memberParents.get(device.key);
-        card.setGroupNote(shown && parent && !(nested && filteredKeys.has(parent)) ? devicesByKey.get(parent) : null);
+        // A top-level card has no filtered parent (or search is on), so it names all of them.
+        const parents = !mirror && topLevel.has(device.key) ? memberParents.get(device.key) || [] : [];
+        card.setGroupNote(parents.map((parent) => devicesByKey.get(parent)).filter(Boolean));
       }
       // Moving existing nodes preserves focused controls and their drafts.
       // Only the requested slice, with its headings, belongs to the live grid.
@@ -473,10 +506,7 @@
       for (let index = 0; index < nodes.length; index++) {
         if (grid.children[index] !== nodes[index]) grid.insertBefore(nodes[index], grid.children[index] || null);
       }
-      for (const device of shownDevices) {
-        const card = cards.get(device.key);
-        card.setMembers((members.get(card.device.key) || []).map((member) => cards.get(member.key).node));
-      }
+      for (const device of shownDevices) cards.get(device.key).setMembers(rows.get(device.key).map((row) => row.node));
       loadMore.hidden = shownDevices.length >= pageDevices.length;
       loadCount.textContent = `Prikazano ${shownDevices.length} od ${pageDevices.length} uređaja`;
       loadButton.disabled = loadMore.hidden;
@@ -610,9 +640,10 @@
       const groupNote = el("p", "dc-group-note");
       groupNote.hidden = true;
       identity.append(title, room, groupNote);
-      card.setGroupNote = (parent) => {
-        groupNote.hidden = !parent;
-        const text = parent ? `${parent.type === "zone" ? "U zoni" : "U grupi"}: ${parent.label}` : "";
+      card.setGroupNote = (parents) => {
+        groupNote.hidden = parents.length === 0;
+        const text = parents.length > 1 ? `U grupama: ${parents.map((parent) => parent.label).join(", ")}`
+          : parents.length ? `${parents[0].type === "zone" ? "U zoni" : "U grupi"}: ${parents[0].label}` : "";
         if (groupNote.textContent !== text) groupNote.textContent = text;
       };
       const settings = el("button", "dc-settings-button");
@@ -679,6 +710,8 @@
       const simulatedValue = (role) => drafts.has(draftKey(role)) ? drafts.get(draftKey(role)) : pointFor(role)?.value;
       const pending = () => commands.get(card.device.key)?.status === "pending";
       const actionLabel = () => demoMode ? "simulacija" : "šalje naredbu kontroleru";
+      // Drafts and commands belong to the device, so every row of it shows them.
+      const updateInstances = () => { for (const instance of instancesOf(card.device.key)) instance.update(instance.device); };
       const allowed = (role) => {
         const point = pointFor(role);
         return canControl(card.device) && connection === "connected" && !pending() && point?.controlAvailable === true && !point?.error && Number(point?.state) === 0
@@ -695,7 +728,7 @@
         if (!demoMode) commands.delete(card.device.key);
         drafts.set(draftKey(role), value);
         reset.hidden = !demoMode;
-        card.update(card.device);
+        updateInstances();
         if (demoMode) announce.textContent = `${card.device.label}: ${roleLabels[role] || "vrijednost"} simulirano ${format(pointFor(role), value)}. Kontroler nije promijenjen.`;
       }
 
@@ -709,7 +742,7 @@
         };
         commands.set(card.device.key, command);
         drafts.set(draftKey(role), value);
-        card.update(card.device);
+        updateInstances();
         try {
           await onWrite({ widgetId: command.pointId, value });
           if (destroyed || commands.get(card.device.key) !== command) return;
@@ -723,7 +756,7 @@
           drafts.delete(draftKey(role));
           card.forceControlSync = role;
         }
-        if (cards.get(card.device.key) === card) card.update(card.device);
+        updateInstances();
       }
 
       function metric(source, label, large = false) {
@@ -1095,6 +1128,12 @@
       for (const [key, card] of cards) {
         if (!present.has(key)) { card.node.remove(); cards.delete(key); commands.delete(key); }
       }
+      for (const [key, byParent] of mirrors) {
+        for (const [parent, mirror] of byParent) {
+          if (!present.has(key) || !(memberParents.get(key) || []).includes(parent)) { mirror.node.remove(); byParent.delete(parent); }
+        }
+        if (!byParent.size) mirrors.delete(key);
+      }
       for (const key of drafts.keys()) if (!present.has(key.split("\u0000")[0])) drafts.delete(key);
       reset.hidden = !demoMode || drafts.size === 0;
       for (const device of devices) updateCard(device);
@@ -1129,9 +1168,9 @@
         const device = devicesByKey.get(key);
         if (device && reconcileCommand(device)) dirty.add(key);
       }
-      if (connectionChanged) for (const [key, card] of cards) {
+      if (connectionChanged) for (const card of allCards()) {
         if (card.node.hidden) card.needsRefresh = true;
-        else dirty.add(key);
+        else dirty.add(card.device.key);
       }
       let updatedCards = 0;
       for (const key of dirty) if (updateCard(devicesByKey.get(key))) updatedCards++;
@@ -1146,7 +1185,7 @@
         selectedKeys.clear(); selectionMode = false; applyFilter();
         managementStatus.textContent = message; managementStatus.hidden = !message;
       },
-      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); selectedKeys.clear(); devices = []; displayOrder = []; headings.clear(); deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
+      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); mirrors.clear(); selectedKeys.clear(); devices = []; displayOrder = []; headings.clear(); deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
   }
 
   const api = { create };

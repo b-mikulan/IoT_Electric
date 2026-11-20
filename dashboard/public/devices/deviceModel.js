@@ -458,11 +458,14 @@
     return members;
   }
 
-  // Which card each listed card is shown inside: member key -> parent key.
-  // Saved lists come first: lights in a light group, sensors in a zone. A zone
-  // with no saved list then takes the sensors automaticZoneMembers pairs with
-  // it; a saved list, even an empty one, replaces that. A sensor that an
-  // administrator listed in any zone is never paired with another.
+  // Which cards each listed card is shown inside: member key -> parent keys.
+  // Saved lists come first: lights in light groups, sensors in a zone. A light
+  // can be listed by several groups (parents in saved-settings order); a sensor
+  // has exactly one parent, the first zone that lists it. A zone with no saved
+  // list then takes the sensors automaticZoneMembers pairs with it; a saved
+  // list, even an empty one, replaces that. A sensor that an administrator
+  // listed in any zone is never paired with another. A key appears only when
+  // it has at least one parent.
   const memberLists = { lightGroup: ["lightMembers", "light"], zone: ["sensorMembers", "sensor"] };
   function deviceMembership(devices, deviceSettings = []) {
     const types = new Map(devices.map((device) => [device.key, device.type]));
@@ -473,11 +476,15 @@
       if (!field || !Array.isArray(entry[field])) continue;
       if (field === "sensorMembers") decided.add(entry.key);
       for (const member of entry[field]) {
-        if (types.get(member) === memberType && !parents.has(member)) parents.set(member, entry.key);
+        if (types.get(member) !== memberType) continue;
+        const current = parents.get(member) ?? [];
+        if (memberType === "light") {
+          if (!current.includes(entry.key)) parents.set(member, [...current, entry.key]);
+        } else if (!current.length) parents.set(member, [entry.key]);
       }
     }
     for (const [sensor, zone] of automaticZoneMembers(devices)) {
-      if (!decided.has(zone) && !parents.has(sensor)) parents.set(sensor, zone);
+      if (!decided.has(zone) && !parents.has(sensor)) parents.set(sensor, [zone]);
     }
     return parents;
   }

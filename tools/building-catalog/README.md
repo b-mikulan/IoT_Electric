@@ -56,14 +56,18 @@ Review the import, then apply it:
 ```powershell
 npm run catalog -- widgets
 npm run catalog -- widgets --apply
-docker compose up -d --build --no-deps dashboard
 ```
 
-This exports **all native `01/` points** from one pinned catalog snapshot into `dashboard/config/widgets.json`, plus `catalog-metadata.json` beside it. It replaces the configured point set with those native points, including readings, commands and diagnostics, leaving `11/` references and technical properties in the catalog. Existing native point labels, descriptions, units, precision, group overrides, write flags and visibility are retained. Newly added points are visible and read-only. Existing device-card settings remain in `device-widgets.json` and are not replaced.
+This exports **all native `01/` points** from one pinned catalog snapshot into `dashboard/config/widgets.json`, plus `catalog-metadata.json` beside it. It replaces the configured point set with those native points, including readings, commands and diagnostics, leaving `11/` references and technical properties in the catalog. Existing native point labels, descriptions, units, precision, group overrides, write flags and visibility are retained from the target `widgets.json`. Newly added points are visible and read-only. Device-card settings are not part of the export and are not replaced.
 
-Before changing files, it saves the original widget list, any previous descriptor file and an import manifest under `output/building-catalog/widget-backups/<timestamp>/`. The dry run reports points added, retained and removed. Override destinations with `--widgets-file PATH` and `--metadata-file PATH`; both must be JSON files. This is a local configuration export, not a live dashboard API call: restart the dashboard after applying it. The catalog remains the source of the exported definitions.
+Before changing files, it saves the original widget list, any previous descriptor file and an import manifest under `output/building-catalog/widget-backups/<timestamp>/`. The dry run reports points added, retained and removed. Override destinations with `--widgets-file PATH` and `--metadata-file PATH`; both must be JSON files. This is a local configuration export, not a live dashboard API call. The catalog remains the source of the exported definitions.
 
-The dashboard automatically detects `catalog-metadata.json` beside `WIDGETS_FILE`, or accepts an explicit `DEVICE_METADATA_FILE` (`DASHBOARD_DEVICE_METADATA_FILE` in Compose). It uses these saved descriptors and full-path room labels for **all** configured points, without the live metadata client's 2000-point cap and without another EWS structure crawl. Missing descriptions produce a warning instead of triggering controller reads. Re-export and restart after updating the catalog. Reads of live values continue through the ordinary bounded, sequential value batches; displaying an imported point does not enable writes. Any command still performs the existing fresh controller permission/state/enum checks before sending.
+The dashboard stores its configuration in SQLite (`dashboard.sqlite`) and reads these JSON files only once, to seed a new database:
+
+- **New database:** apply the export, then start the dashboard (`docker compose up -d --build --no-deps dashboard`).
+- **Existing database:** a restart does not load the files. Upload the generated `widgets.json` through **Prijenos postavki** in the dashboard; it replaces the point set and keeps the dashboard's card settings and organization. Point settings are merged from the target `widgets.json` rather than from the database, so changes made in the dashboard since that file was written are not carried over. To also replace the saved descriptors, export a dashboard backup, replace its `metadata` field with the contents of `catalog-metadata.json` and import that bundle (see the [dashboard README](../../dashboard/README.md#connect-real-plc-points-with-docker-compose)).
+
+When seeding a new database, the dashboard automatically detects `catalog-metadata.json` beside `WIDGETS_FILE`, or accepts an explicit `DEVICE_METADATA_FILE` (`DASHBOARD_DEVICE_METADATA_FILE` in Compose). It uses these saved descriptors and full-path room labels for **all** configured points, without the live metadata client's 2000-point cap and without another EWS structure crawl. Missing descriptions produce a warning instead of triggering controller reads. After updating the catalog, re-export and load the result as described above. Reads of live values continue through the ordinary bounded, sequential value batches; displaying an imported point does not enable writes. Any command still performs the existing fresh controller permission/state/enum checks before sending.
 
 The device view supports name/path/room search, device-type filtering and expandable room filters. Filters combine without changing which points are polled or their stored configuration.
 
@@ -124,11 +128,14 @@ replacing its curated widgets, room assignments or descriptions**:
 
 ```powershell
 npm run catalog -- trends --apply
-docker compose up -d --build --no-deps dashboard
 ```
 
 This changes only the descriptor file and saves its original under
-`output/building-catalog/history-backups/`. It exports the full pinned snapshot,
+`output/building-catalog/history-backups/`. As with `widgets --apply`, a dashboard
+with an existing SQLite database does not reread this file on restart: export a
+dashboard backup, replace its `metadata` field with the updated
+`catalog-metadata.json` and import that bundle through **Prijenos postavki**. A new
+database picks the file up on its first start. It exports the full pinned snapshot,
 independently of list pagination/search options. The dashboard's **Trendovi i
 alarmi** page reads this local list and offers search, pagination and direct
 selection. Device/room labels are added only from explicit point references;

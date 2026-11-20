@@ -949,6 +949,127 @@ test("a light listed in a group opens its extra actions on request and stays ope
   assert.equal(expand.attributes["aria-expanded"], "false");
 });
 
+test("a light listed by two groups shows a full row in each and shares its command state", async (t) => {
+  const roomA = { id: "rA", label: "Ured A", floorId: "f1" }, roomB = { id: "rB", label: "Ured B", floorId: "f1" };
+  const groupA = { ...device("lightGroup", { brightnessSet: point("brightnessSet", 50, { id: "01/ES/GA/Values/LtPct" }) }), key: "ES/GA", label: "Grupa A", room: roomA };
+  const groupB = { ...device("lightGroup", { brightnessSet: point("brightnessSet", 50, { id: "01/ES/GB/Values/LtPct" }) }), key: "ES/GB", label: "Grupa B", room: roomB };
+  const light = { ...device("light", { brightnessSet: point("brightnessSet", 20, { id: "01/ES/L1/Values/LtPct" }) }), key: "ES/L1", label: "Svjetlo 1", room: roomB };
+  const calls = [];
+  let finishWrite;
+  const { container, update } = setup(t, [groupA, groupB, light], (body) => { calls.push(body); return new Promise((resolve) => { finishWrite = resolve; }); },
+    false, undefined, { floors: [{ id: "f1", name: "1. kat" }], onMove: () => {} });
+  const settings = { roomEditingEnabled: true, deviceSettings: [{ key: groupA.key, lightMembers: [light.key] }, { key: groupB.key, lightMembers: [light.key, "ES/absent"] }] };
+  update(undefined, undefined, settings);
+  const grid = byClass(container, "dc-grid")[0];
+  const cardOf = (key) => grid.children.find((node) => node.dataset.deviceKey === key);
+  const panelOf = (key) => byClass(cardOf(key), "dc-group-members")[0];
+  const rowsOf = (key) => byClass(panelOf(key), "dc-group-member-list")[0].children;
+  assert.deepEqual(gridCardKeys(container), [groupA.key, groupB.key]);
+  assert.deepEqual(rowsOf(groupA.key).map((node) => node.dataset.deviceKey), [light.key]);
+  assert.deepEqual(rowsOf(groupB.key).map((node) => node.dataset.deviceKey), [light.key]);
+  const rowA = rowsOf(groupA.key)[0], rowB = rowsOf(groupB.key)[0];
+  assert.notEqual(rowA, rowB);
+  assert.equal(panelOf(groupA.key).children[0].textContent, "Svjetla u grupi (1)");
+  assert.equal(panelOf(groupB.key).children[0].textContent, "Svjetla u grupi (1)");
+
+  // A command from one row is visible in both while it is pending.
+  const slider = byClass(rowB, "dc-range")[0];
+  slider.value = "70";
+  slider.dispatch("change");
+  assert.deepEqual(calls, [{ widgetId: light.roles.brightnessSet.id, value: 70 }]);
+  assert.equal(byClass(rowA, "dc-command-status")[0].hidden, false);
+  assert.equal(byClass(rowB, "dc-command-status")[0].hidden, false);
+  finishWrite();
+  await flush();
+  assert.match(byClass(rowA, "dc-command-status")[0].textContent, /prihvaćena/);
+  assert.match(byClass(rowB, "dc-command-status")[0].textContent, /prihvaćena/);
+
+  // Open state belongs to the row.
+  byClass(rowA, "dc-member-expand")[0].dispatch("click");
+  assert.equal(rowA.className.split(" ").includes("dc-member-open"), true);
+  assert.equal(rowB.className.split(" ").includes("dc-member-open"), false);
+
+  // Selection is per device: ticking one row ticks the other, and the light counts once.
+  byClass(container, "dc-select-devices")[0].dispatch("click");
+  const checkboxA = byClass(rowA, "dc-device-checkbox")[0];
+  checkboxA.checked = true;
+  checkboxA.dispatch("change");
+  const typeFilter = byClass(container, "dc-type-filter")[0];
+  typeFilter.dispatch("change");
+  assert.equal(byClass(rowB, "dc-device-checkbox")[0].checked, true);
+  assert.equal(rowB.className.split(" ").includes("dc-card-selected"), true);
+  assert.equal(byClass(container, "dc-select-shown")[0].textContent, "Odaberi sve rezultate (3)");
+  byClass(container, "dc-select-shown")[0].dispatch("click");
+  assert.equal(byClass(container, "dc-selection-count")[0].textContent, "Odabrano: 3");
+  byClass(container, "dc-select-devices")[0].dispatch("click");
+
+  // With both groups filtered out, the light stands alone once and names both groups.
+  typeFilter.value = "light";
+  typeFilter.dispatch("change");
+  assert.deepEqual(gridCardKeys(container), [light.key]);
+  assert.equal(cardOf(light.key), rowA);
+  assert.equal(rowB.hidden, true);
+  assert.equal(byClass(rowA, "dc-group-note")[0].textContent, "U grupama: Grupa A, Grupa B");
+  typeFilter.value = "all";
+  typeFilter.dispatch("change");
+  assert.equal(byClass(rowA, "dc-group-note")[0].hidden, true);
+  assert.equal(byClass(rowB, "dc-group-note")[0].hidden, true);
+
+  // Only Grupa B shown: the light sits inside it, not on the main list and not twice.
+  selectFloor(container, "f1");
+  byClass(container, "dc-room-filter").find((button) => button.dataset.room === "room:rB").dispatch("click");
+  assert.deepEqual(gridCardKeys(container), [groupB.key]);
+  assert.deepEqual(rowsOf(groupB.key).map((node) => node.dataset.deviceKey), [light.key]);
+  assert.equal(byClass(grid, "dc-card").filter((node) => node.dataset.deviceKey === light.key).length, 1);
+  byClass(container, "dc-room-filter").find((button) => button.textContent === "Svi uređaji").dispatch("click");
+
+  // Removing the light from Grupa B removes only that row.
+  update(undefined, undefined, { ...settings, deviceSettings: [settings.deviceSettings[0], { key: groupB.key, lightMembers: [] }] });
+  assert.deepEqual(gridCardKeys(container), [groupA.key, groupB.key]);
+  assert.equal(panelOf(groupB.key).hidden, true);
+  assert.equal(rowsOf(groupA.key)[0], rowA);
+  assert.equal(rowB.parent, null);
+
+  // Removing it from the first group instead leaves exactly one row, in the second group.
+  update(undefined, undefined, { ...settings, deviceSettings: [{ key: groupA.key, lightMembers: [] }, settings.deviceSettings[1]] });
+  assert.deepEqual(gridCardKeys(container), [groupA.key, groupB.key]);
+  assert.equal(panelOf(groupA.key).hidden, true);
+  assert.equal(panelOf(groupB.key).hidden, false);
+  assert.deepEqual(rowsOf(groupB.key).map((node) => node.dataset.deviceKey), [light.key]);
+  assert.equal(byClass(grid, "dc-card").filter((node) => node.dataset.deviceKey === light.key).length, 1);
+
+  // Saved order names the groups; display order places the light's own card. An absent group adds nothing.
+  update(undefined, undefined, { ...settings, deviceSettings: [{ key: "ES/gone", lightMembers: [light.key] }, settings.deviceSettings[1], settings.deviceSettings[0]] });
+  assert.equal(rowsOf(groupA.key)[0], rowA);
+  assert.deepEqual(rowsOf(groupB.key).map((node) => node.dataset.deviceKey), [light.key]);
+  typeFilter.value = "light";
+  typeFilter.dispatch("change");
+  assert.equal(byClass(rowA, "dc-group-note")[0].textContent, "U grupama: Grupa B, Grupa A");
+});
+
+test("a rejected write shows its error on every row of a light listed by two groups", async (t) => {
+  const roomA = { id: "rA", label: "Ured A", floorId: "f1" };
+  const groupA = { ...device("lightGroup", { brightnessSet: point("brightnessSet", 50, { id: "01/ES/GA/Values/LtPct" }) }), key: "ES/GA", label: "Grupa A", room: roomA };
+  const groupB = { ...device("lightGroup", { brightnessSet: point("brightnessSet", 50, { id: "01/ES/GB/Values/LtPct" }) }), key: "ES/GB", label: "Grupa B", room: roomA };
+  const light = { ...device("light", { brightnessSet: point("brightnessSet", 20, { id: "01/ES/L1/Values/LtPct" }) }), key: "ES/L1", label: "Svjetlo 1", room: roomA };
+  const { container, update } = setup(t, [groupA, groupB, light], async () => { throw new Error("Kontroler odbija naredbu"); },
+    false, undefined, { floors: [{ id: "f1", name: "1. kat" }], onMove: () => {} });
+  update(undefined, undefined, { roomEditingEnabled: true, deviceSettings: [{ key: groupA.key, lightMembers: [light.key] }, { key: groupB.key, lightMembers: [light.key] }] });
+  const grid = byClass(container, "dc-grid")[0];
+  const rowOf = (key) => byClass(grid.children.find((node) => node.dataset.deviceKey === key), "dc-group-member-list")[0].children[0];
+  const rowA = rowOf(groupA.key), rowB = rowOf(groupB.key);
+  assert.notEqual(rowA, rowB);
+  const slider = byClass(rowA, "dc-range")[0];
+  slider.value = "70";
+  slider.dispatch("change");
+  await flush();
+  for (const row of [rowA, rowB]) {
+    const status = byClass(row, "dc-command-status")[0];
+    assert.equal(status.hidden, false);
+    assert.match(status.textContent, /Kontroler odbija naredbu/);
+  }
+});
+
 test("a zone card lists its paired sensors, and a saved or emptied list replaces the automatic choice", (t) => {
   const reading = (owner, value) => point("illuminance", value, { id: `01/${owner}/Values/LtLvl`, controlAvailable: false, writeAllowed: false, liveControlAvailable: false, control: undefined, unit: "lx" });
   const sensor = (key, label) => ({ ...device("sensor", { illuminance: reading(key, 300) }), key, label });

@@ -554,22 +554,30 @@ test("saved lists place lights in their group and sensors in their zone, ignorin
     { key: "GRP2", lightMembers: ["L1", "L2"] },
     { key: "ES/Zones/Z1", sensorMembers: ["ES/Other/S1", "L2"] },
     { key: "L2", lightMembers: ["L1"], sensorMembers: ["ES/Other/S1"] },
-  ]), { L1: "GRP", L2: "GRP2", "ES/Other/S1": "ES/Zones/Z1" });
+  ]), { L1: ["GRP", "GRP2"], L2: ["GRP2"], "ES/Other/S1": ["ES/Zones/Z1"] });
+});
+
+test("a sensor listed by two zones stays in the first one only", () => {
+  const devices = [zoneCard("ES/Zones/Z1"), zoneCard("ES/Zones/Z2"), sensorCard("S1")];
+  assert.deepEqual(shownInside(devices, [
+    { key: "ES/Zones/Z1", sensorMembers: ["S1"] },
+    { key: "ES/Zones/Z2", sensorMembers: ["S1"] },
+  ]), { S1: ["ES/Zones/Z1"] });
 });
 
 test("a zone without a saved list shows its automatically paired sensors; a saved list, even an empty one, replaces them", () => {
   const first = "ES/Net/IP Network/RP1/Application/Zones/Z1/S1", second = "ES/Net/IP Network/RP1/Application/Zones/Z1/S2";
   const devices = [zoneCard("ES/Zones/Z1"), sensorCard(first), sensorCard(second)];
-  assert.deepEqual(shownInside(devices, []), { [first]: "ES/Zones/Z1", [second]: "ES/Zones/Z1" });
-  assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z1", label: "Ured" }]), { [first]: "ES/Zones/Z1", [second]: "ES/Zones/Z1" });
-  assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z1", sensorMembers: [second] }]), { [second]: "ES/Zones/Z1" });
+  assert.deepEqual(shownInside(devices, []), { [first]: ["ES/Zones/Z1"], [second]: ["ES/Zones/Z1"] });
+  assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z1", label: "Ured" }]), { [first]: ["ES/Zones/Z1"], [second]: ["ES/Zones/Z1"] });
+  assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z1", sensorMembers: [second] }]), { [second]: ["ES/Zones/Z1"] });
   assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z1", sensorMembers: [] }]), {});
 });
 
 test("a sensor an administrator listed in one zone is not paired automatically with another", () => {
   const moved = "ES/Net/IP Network/RP1/Application/Zones/Z1/S1", stays = "ES/Net/IP Network/RP1/Application/Zones/Z1/S2";
   const devices = [zoneCard("ES/Zones/Z1"), zoneCard("ES/Zones/Z2"), sensorCard(moved), sensorCard(stays)];
-  assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z2", sensorMembers: [moved] }]), { [moved]: "ES/Zones/Z2", [stays]: "ES/Zones/Z1" });
+  assert.deepEqual(shownInside(devices, [{ key: "ES/Zones/Z2", sensorMembers: [moved] }]), { [moved]: ["ES/Zones/Z2"], [stays]: ["ES/Zones/Z1"] });
 });
 
 const displayDevice = (key, type, label, room) => ({ key, type, label, room });

@@ -292,8 +292,12 @@ test("light group members persist, survive other saves and restart, and are vali
   await restarted.synchronize(keys);
   assert.deepEqual(restarted.devices.find((d) => d.key === "ES/Room/GRP"), { ...card("ES/Room/GRP", { label: "Hodnik" }), lightMembers: ["ES/Room/L1"] });
 
+  // A light may be listed by several groups; both lists keep it.
+  const second = await store.save(card("ES/Room/GRP2", { lightMembers: ["ES/Room/L1"] }), lights);
+  assert.deepEqual(second.lightMembers, ["ES/Room/L1"]);
+  assert.deepEqual(store.devices.find((d) => d.key === "ES/Room/GRP").lightMembers, ["ES/Room/L1"]);
+
   const before = await fs.readFile(file, "utf8");
-  await assert.rejects(store.save(card("ES/Room/GRP2", { lightMembers: ["ES/Room/L1"] }), lights), { code: "LIGHT_ALREADY_GROUPED" });
   await assert.rejects(store.save(card("ES/Room/L2", { lightMembers: ["ES/Room/L1"] }), lights), { code: "INVALID_DEVICE_SETTINGS" });
   await assert.rejects(store.save(card("ES/Room/GRP", { lightMembers: ["ES/Room/L1", "ES/Room/Sensor"] }), lights), { code: "INVALID_DEVICE_SETTINGS" });
   await assert.rejects(store.save(card("ES/Room/GRP", { lightMembers: ["ES/Room/GRP"] }), lights), { code: "INVALID_DEVICE_SETTINGS" });

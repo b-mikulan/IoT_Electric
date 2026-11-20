@@ -978,6 +978,14 @@ test("a zone card's settings start from its paired sensors, save a list only whe
   await fixture.cardNode("form").dispatch("submit");
   assert.equal(lastPost().sensorMembers, null);
   assert.equal(fixture.cardNode("members-auto").hidden, true);
+
+  // A sensor already listed by another zone stays locked: only lights may be shared.
+  const otherZone = "ES/Application/Zones/Pantry";
+  fixture.context.otherZoneReading = { id: `01/${otherZone}/Values/LtLvl`, label: "LtLvl", value: 90, unit: "lx", state: 0, writable: false, visible: true };
+  fixture.run(`configById.set(otherZoneReading.id, otherZoneReading); applyDeviceSettings([{ key: ${JSON.stringify(otherZone)}, sensorMembers: [${JSON.stringify(foreignOwner)}] }]);`);
+  open();
+  assert.deepEqual(choices().map((entry) => [entry.box.checked, entry.box.disabled]), [[false, true]]);
+  assert.match(choices()[0].hint, /već u zoni /);
 });
 
 test("a light group's settings still save its list of lights and offer no automatic choice", async () => {
@@ -1003,4 +1011,26 @@ test("a light group's settings still save its list of lights and offer no automa
   assert.deepEqual(body.lightMembers, [lightKey]);
   assert.equal(Object.hasOwn(body, "sensorMembers"), false);
   assert.equal(fixture.cardNode("members-auto").hidden, true);
+});
+
+test("a light already in another group can be added to this group too", async () => {
+  const fixture = setup();
+  const groupKey = "ES/Application/Items/GRP", otherKey = "ES/Application/Items/GRP2", lightKey = "ES/Application/Items/L1";
+  fixture.context.extra = [
+    { id: `01/${groupKey}/Values/GrpPct`, label: "GrpPct", value: 50, unit: "%", state: 0, writable: false, visible: true },
+    { id: `01/${otherKey}/Values/GrpPct`, label: "GrpPct", value: 50, unit: "%", state: 0, writable: false, visible: true },
+    { id: `01/${lightKey}/Values/LtPct`, label: "LtPct", value: 20, unit: "%", state: 0, writable: false, visible: true },
+  ];
+  fixture.run(`for (const widget of extra) configById.set(widget.id, widget); applyDeviceSettings([{ key: ${JSON.stringify(otherKey)}, lightMembers: [${JSON.stringify(lightKey)}] }]);`);
+  const otherLabel = fixture.run(`cardSettingsDevices().find((device) => device.key === ${JSON.stringify(otherKey)}).label`);
+  fixture.run(`openDeviceCardSettingsDialog(cardSettingsDevices().find((device) => device.key === ${JSON.stringify(groupKey)}))`);
+  const [choice] = fixture.cardNode("members-list").children;
+  assert.equal(fixture.cardNode("members-list").children.length, 1);
+  assert.equal(choice.children[0].disabled, false);
+  assert.equal(choice.children[0].checked, false);
+  assert.match(choice.children[1].children[0].textContent, new RegExp(`također u grupi ${otherLabel}`));
+  choice.children[0].checked = true;
+  choice.children[0].dispatch("change");
+  await fixture.cardNode("form").dispatch("submit");
+  assert.deepEqual(JSON.parse(fixture.posts().at(-1).options.body).lightMembers, [lightKey]);
 });
