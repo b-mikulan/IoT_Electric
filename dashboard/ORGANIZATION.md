@@ -6,7 +6,7 @@ Group deletion preserves rooms, room names, device assignments and all point set
 
 ## Saved structure
 
-`device-widgets.json` retains its base `version: 1` and adds an optional, validated organization extension:
+The device card document (the `devices` document in `dashboard.sqlite`; the legacy `device-widgets.json` uses the same format and is read only for the first migration) retains its base `version: 1` and adds an optional, validated organization extension:
 
 ```json
 {
@@ -33,7 +33,7 @@ Existing configurations with names such as `Kitchen · 1. kat` are migrated once
 
 ## Transfer and persistence
 
-Complete backups with organization data use `format: "iot-electric-dashboard", version: 2`. This prevents old dashboard versions from accepting a backup and silently dropping group information. New dashboards still accept version 1 backups and plain widget arrays, and migrate old room suffixes when needed. A plain widget array retains the destination's current organization. The existing multi-file transaction, backups and recovery journal also cover these fields inside the device settings file.
+Complete backups with organization data use `format: "iot-electric-dashboard", version: 2`. This prevents old dashboard versions from accepting a backup and silently dropping group information. New dashboards still accept version 1 backups and plain widget arrays, and migrate old room suffixes when needed. A plain widget array retains the destination's current organization. In SQLite the import, the previous-configuration backup and these fields are saved in one transaction. (File-backed operation without a database, used in tests, relies on the multi-file transaction and recovery journal instead.)
 
 Group and room edits are serialized through the device settings store and broadcast over the existing `device-settings` event. They do not query or write EWS. The shared device model is used by card rendering, command checks and incremental updates.
 
@@ -102,11 +102,11 @@ Updates preserve point flags, manual labels, absent-device preferences and other
 configuration. No controller command or discovery call is made.
 
 SQLite saves the configuration backup and new device document in one transaction.
-In file mode a complete backup is written before the atomic device-file replacement;
+In file mode (without a database, used in tests) a complete backup is written before the atomic device-file replacement;
 a failed backup aborts application. File backups use
 `<device-file>.organization-<uuid>.json` and have no automatic retention. SQLite
 backups share the existing newest-ten retention. Download the previous configuration
-from the success message and import it through **Prijenos konfiguracije** to restore.
+from the success message and import it through **Prijenos postavki** to restore.
 
 Admin-only API:
 
