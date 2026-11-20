@@ -1030,6 +1030,14 @@ test("a light listed by two groups shows a full row in each and shares its comma
   assert.equal(rowsOf(groupA.key)[0], rowA);
   assert.equal(rowB.parent, null);
 
+  // Removing it from the first group instead leaves exactly one row, in the second group.
+  update(undefined, undefined, { ...settings, deviceSettings: [{ key: groupA.key, lightMembers: [] }, settings.deviceSettings[1]] });
+  assert.deepEqual(gridCardKeys(container), [groupA.key, groupB.key]);
+  assert.equal(panelOf(groupA.key).hidden, true);
+  assert.equal(panelOf(groupB.key).hidden, false);
+  assert.deepEqual(rowsOf(groupB.key).map((node) => node.dataset.deviceKey), [light.key]);
+  assert.equal(byClass(grid, "dc-card").filter((node) => node.dataset.deviceKey === light.key).length, 1);
+
   // Saved order names the groups; display order places the light's own card. An absent group adds nothing.
   update(undefined, undefined, { ...settings, deviceSettings: [{ key: "ES/gone", lightMembers: [light.key] }, settings.deviceSettings[1], settings.deviceSettings[0]] });
   assert.equal(rowsOf(groupA.key)[0], rowA);
@@ -1037,6 +1045,29 @@ test("a light listed by two groups shows a full row in each and shares its comma
   typeFilter.value = "light";
   typeFilter.dispatch("change");
   assert.equal(byClass(rowA, "dc-group-note")[0].textContent, "U grupama: Grupa B, Grupa A");
+});
+
+test("a rejected write shows its error on every row of a light listed by two groups", async (t) => {
+  const roomA = { id: "rA", label: "Ured A", floorId: "f1" };
+  const groupA = { ...device("lightGroup", { brightnessSet: point("brightnessSet", 50, { id: "01/ES/GA/Values/LtPct" }) }), key: "ES/GA", label: "Grupa A", room: roomA };
+  const groupB = { ...device("lightGroup", { brightnessSet: point("brightnessSet", 50, { id: "01/ES/GB/Values/LtPct" }) }), key: "ES/GB", label: "Grupa B", room: roomA };
+  const light = { ...device("light", { brightnessSet: point("brightnessSet", 20, { id: "01/ES/L1/Values/LtPct" }) }), key: "ES/L1", label: "Svjetlo 1", room: roomA };
+  const { container, update } = setup(t, [groupA, groupB, light], async () => { throw new Error("Kontroler odbija naredbu"); },
+    false, undefined, { floors: [{ id: "f1", name: "1. kat" }], onMove: () => {} });
+  update(undefined, undefined, { roomEditingEnabled: true, deviceSettings: [{ key: groupA.key, lightMembers: [light.key] }, { key: groupB.key, lightMembers: [light.key] }] });
+  const grid = byClass(container, "dc-grid")[0];
+  const rowOf = (key) => byClass(grid.children.find((node) => node.dataset.deviceKey === key), "dc-group-member-list")[0].children[0];
+  const rowA = rowOf(groupA.key), rowB = rowOf(groupB.key);
+  assert.notEqual(rowA, rowB);
+  const slider = byClass(rowA, "dc-range")[0];
+  slider.value = "70";
+  slider.dispatch("change");
+  await flush();
+  for (const row of [rowA, rowB]) {
+    const status = byClass(row, "dc-command-status")[0];
+    assert.equal(status.hidden, false);
+    assert.match(status.textContent, /Kontroler odbija naredbu/);
+  }
 });
 
 test("a zone card lists its paired sensors, and a saved or emptied list replaces the automatic choice", (t) => {
