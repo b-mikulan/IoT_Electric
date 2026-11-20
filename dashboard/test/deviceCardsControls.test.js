@@ -1029,6 +1029,14 @@ test("a light listed by two groups shows a full row in each and shares its comma
   assert.equal(panelOf(groupB.key).hidden, true);
   assert.equal(rowsOf(groupA.key)[0], rowA);
   assert.equal(rowB.parent, null);
+
+  // Saved order names the groups; display order places the light's own card. An absent group adds nothing.
+  update(undefined, undefined, { ...settings, deviceSettings: [{ key: "ES/gone", lightMembers: [light.key] }, settings.deviceSettings[1], settings.deviceSettings[0]] });
+  assert.equal(rowsOf(groupA.key)[0], rowA);
+  assert.deepEqual(rowsOf(groupB.key).map((node) => node.dataset.deviceKey), [light.key]);
+  typeFilter.value = "light";
+  typeFilter.dispatch("change");
+  assert.equal(byClass(rowA, "dc-group-note")[0].textContent, "U grupama: Grupa B, Grupa A");
 });
 
 test("a zone card lists its paired sensors, and a saved or emptied list replaces the automatic choice", (t) => {
