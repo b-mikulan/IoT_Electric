@@ -135,6 +135,7 @@ test("admins list lights inside a light group; members are validated by type and
   await fs.writeFile(rawFile, JSON.stringify(config.widgets));
   const types = Object.fromEntries(buildDevices(config.widgets).map((device) => [device.type, device.key]));
   assert.ok(types.lightGroup && types.light && types.sensor);
+  const otherGroupWidgets = [...config.widgets, { id: "01/ES/Hall/GRP2/Values/GrpPct", label: "Group 2" }];
   const group = { key: types.lightGroup, label: null, room: null, primaryPointId: null, secondaryPointIds: null };
   const light2 = "ES/Hall/L2";
 
@@ -149,6 +150,14 @@ test("admins list lights inside a light group; members are validated by type and
   response = await save({ key: "ES/Hall/L1", label: null, room: null, primaryPointId: null, secondaryPointIds: null, lightMembers: [light2] });
   assert.equal(response.status, 400);
   assert.equal(await fs.readFile(file, "utf8"), before);
+
+  // The same light may be listed by a second light group.
+  config.widgets = otherGroupWidgets;
+  await fs.writeFile(rawFile, JSON.stringify(config.widgets));
+  const otherGroup = buildDevices(otherGroupWidgets).find((device) => device.type === "lightGroup" && device.key !== group.key);
+  assert.ok(otherGroup);
+  response = await save({ ...group, key: otherGroup.key, lightMembers: ["ES/Hall/L1"] });
+  assert.equal(response.status, 200);
 
   assert.equal((await save({ ...group, label: "Hodnik" })).status, 200);
   const read = await (await fetch(`${baseUrl}/api/devices/settings`)).json();

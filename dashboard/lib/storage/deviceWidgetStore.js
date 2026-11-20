@@ -10,18 +10,19 @@ const fields = ["label", "room", "primaryPointId", "secondaryPointIds"];
 // only and changes nothing on the controller. An omitted field keeps the
 // stored list and null removes it. An empty light list also removes it. An
 // empty sensor list is kept: it records that the administrator wants no
-// sensors in the zone, where no list at all means automatic pairing.
+// sensors in the zone, where no list at all means automatic pairing. A light
+// may be listed by several light groups; a sensor belongs to one zone only,
+// so only lists marked exclusive reject a member another card already lists.
 const memberLists = {
   lightMembers: {
-    ownerKeys: "lightGroupKeys", memberKeys: "lightKeys", keepEmpty: false,
+    ownerKeys: "lightGroupKeys", memberKeys: "lightKeys", keepEmpty: false, exclusive: false,
     limit: "A light group can list at most 500 lights.", keys: "Light group members must be device keys.",
     duplicate: "A light can be listed only once in a group.", self: "A light group cannot contain itself.",
     owner: "Svjetla se mogu dodati samo grupi rasvjete.", member: "U grupu se mogu dodati samo postojeća pojedinačna svjetla.",
-    taken: "Svjetlo je već prikazano u drugoj grupi rasvjete. Najprije ga ukloni iz te grupe.", takenCode: "LIGHT_ALREADY_GROUPED",
     admin: "Uređivanje svjetala u grupi zahtijeva administratorski pristup.",
   },
   sensorMembers: {
-    ownerKeys: "zoneKeys", memberKeys: "sensorKeys", keepEmpty: true,
+    ownerKeys: "zoneKeys", memberKeys: "sensorKeys", keepEmpty: true, exclusive: true,
     limit: "A zone can list at most 500 sensors.", keys: "Zone members must be device keys.",
     duplicate: "A sensor can be listed only once in a zone.", self: "A zone cannot contain itself.",
     owner: "Senzori se mogu dodati samo kartici zone.", member: "U zonu se mogu dodati samo postojeći senzori.",
@@ -118,6 +119,7 @@ function checkMembers(document, entry, previous, field, context) {
     // Previously saved references may be temporarily absent; keep them.
     if (kept.has(member)) continue;
     if (!context[list.memberKeys]?.has(member)) throw invalidSettings(list.member);
+    if (!list.exclusive) continue;
     const other = document.devices.find((device) => device.key !== entry.key && present.has(device.key)
       && Array.isArray(device[field]) && device[field].includes(member));
     if (other) throw new DeviceWidgetStoreError(list.taken, 409, list.takenCode);
