@@ -1952,13 +1952,13 @@ const MEMBER_CHOICE_LIMIT = 150;
 // zone without a saved list shows the sensors the model pairs with it.
 const memberKinds = {
   lightGroup: {
-    field: "lightMembers", member: "light", automatic: false, title: "Svjetla u grupi", search: "Pronađi svjetlo",
-    help: "Popis samo organizira prikaz: označena svjetla prikazuju se unutar ove kartice. Grupna naredba i dalje upravlja stvarnom DALI grupom, bez obzira na ovaj popis.",
-    missing: "Nedostupno svjetlo", elsewhere: "već u grupi", nouns: ["svjetlo", "svjetla", "svjetala"], where: "u grupi",
+    field: "lightMembers", member: "light", automatic: false, exclusive: false, title: "Svjetla u grupi", search: "Pronađi svjetlo",
+    help: "Popis samo organizira prikaz: označena svjetla prikazuju se unutar ove kartice. Grupna naredba i dalje upravlja stvarnom DALI grupom, bez obzira na ovaj popis. Svjetlo može biti u više grupa; prikazuje se u svakoj.",
+    missing: "Nedostupno svjetlo", elsewhere: "također u grupi", nouns: ["svjetlo", "svjetla", "svjetala"], where: "u grupi",
     saved: "Postavke kartice i popis svjetala u grupi su spremljeni.",
   },
   zone: {
-    field: "sensorMembers", member: "sensor", automatic: true, title: "Senzori u zoni", search: "Pronađi senzor",
+    field: "sensorMembers", member: "sensor", automatic: true, exclusive: true, title: "Senzori u zoni", search: "Pronađi senzor",
     help: "Popis samo organizira prikaz: označeni senzori prikazuju se unutar ove kartice umjesto na glavnom popisu. Dok popis ne promijeniš, kartica sama prikazuje senzore koji joj sigurno pripadaju.",
     missing: "Nedostupan senzor", elsewhere: "već u zoni", nouns: ["senzor", "senzora", "senzora"], where: "u zoni",
     saved: "Postavke kartice i popis senzora u zoni su spremljeni.",
@@ -1988,11 +1988,11 @@ function renderCardMemberChoices() {
   const { members, key: groupKey, device: group, memberKind: kind } = cardSettingsContext;
   const devices = cardSettingsDevices();
   const byKey = new Map(devices.map((device) => [device.key, device]));
-  // The store allows a member in one saved list only; show where else it is listed.
+  // A light may be listed by several groups; a sensor by one zone only. Show where else a member is listed.
   const otherGroup = new Map();
   for (const entry of deviceSettingsByKey.values()) {
     if (entry.key === groupKey || !byKey.has(entry.key)) continue;
-    for (const member of entry[kind.field] || []) if (!otherGroup.has(member)) otherGroup.set(member, byKey.get(entry.key).label);
+    for (const member of entry[kind.field] || []) otherGroup.set(member, [...(otherGroup.get(member) || []), byKey.get(entry.key).label]);
   }
   // Sensors paired with a zone on their own can still be listed here; that moves them.
   const paired = kind.automatic ? globalThis.IoTDeviceModel.automaticZoneMembers(devices) : new Map();
@@ -2014,8 +2014,10 @@ function renderCardMemberChoices() {
     checkbox.type = "checkbox";
     checkbox.className = "browser-default";
     checkbox.checked = members.has(device.key);
-    const elsewhere = !checkbox.checked && otherGroup.get(device.key);
-    checkbox.disabled = cardSettingsBusy || Boolean(elsewhere);
+    const listedIn = otherGroup.get(device.key)?.join(", ") || "";
+    // Zones keep their "already in" note for unchecked sensors; lights show it whether or not the box is checked.
+    const elsewhere = listedIn && (!kind.exclusive || !checkbox.checked) ? listedIn : "";
+    checkbox.disabled = cardSettingsBusy || Boolean(kind.exclusive && elsewhere);
     checkbox.setAttribute("aria-label", `${device.label} · ${device.key}`);
     checkbox.addEventListener("change", () => {
       if (cardSettingsBusy) return;
