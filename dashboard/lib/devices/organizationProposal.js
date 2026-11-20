@@ -144,11 +144,13 @@ function applyOrganizationSelection(configuration, users, { token, scope, select
   // must retain every sensor already shown in that zone, even in a subset apply.
   const beforeModels = buildDevices(configuration.widgets, { ...configuration.metadata, deviceSettings: configuration.deviceWidgets.devices,
     roomRules: document.roomRules, floors: document.floors, roomDetails: document.roomDetails });
-  for (const [member, parent] of deviceMembership(beforeModels, configuration.deviceWidgets.devices)) {
-    const entry = entries.get(parent);
-    if (Array.isArray(entry?.sensorMembers) && !entry.sensorMembers.includes(member)) {
-      entry.sensorMembers.push(member);
-      if (entry.sensorMembers.length > 500) fail("Jedna zona može sadržavati najviše 500 senzora.");
+  for (const [member, parents] of deviceMembership(beforeModels, configuration.deviceWidgets.devices)) {
+    for (const parent of parents) {
+      const entry = entries.get(parent);
+      if (Array.isArray(entry?.sensorMembers) && !entry.sensorMembers.includes(member)) {
+        entry.sensorMembers.push(member);
+        if (entry.sensorMembers.length > 500) fail("Jedna zona može sadržavati najviše 500 senzora.");
+      }
     }
   }
   return { document, count: selectedIds.length };

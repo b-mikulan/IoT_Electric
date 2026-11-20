@@ -340,11 +340,10 @@
 
     // Light key → light-group key. Saved settings, not device objects, carry
     // membership, so live value updates never move a light out of its group.
-    // shortcut: a light is shown in its first listed group only; the store
-    // rejects a second group, revisit if multi-group membership is needed.
     // Lights inside their group and sensors inside their zone: member key -> parent key.
     function groupMembership() {
-      return globalThis.IoTDeviceModel?.deviceMembership?.(devices, savedSettings) || new Map();
+      const membership = globalThis.IoTDeviceModel?.deviceMembership?.(devices, savedSettings) || new Map();
+      return new Map([...membership].map(([key, parents]) => [key, parents[0]]));
     }
 
     function reconcileCommand(device) {

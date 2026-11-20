@@ -1968,7 +1968,7 @@ const memberKinds = {
 // Members the card shows with the given settings: saved lists first, then
 // automatic pairing where the model allows it.
 function shownMembers(parentKey, settings) {
-  return [...globalThis.IoTDeviceModel.deviceMembership(cardSettingsDevices(), settings)].filter(([, parent]) => parent === parentKey).map(([member]) => member);
+  return [...globalThis.IoTDeviceModel.deviceMembership(cardSettingsDevices(), settings)].filter(([, parents]) => parents.includes(parentKey)).map(([member]) => member);
 }
 
 // Start the list from what the card shows now, so opening and saving a zone
@@ -2028,7 +2028,8 @@ function renderCardMemberChoices() {
     const copy = document.createElement("span");
     copy.textContent = device.label;
     const source = document.createElement("small");
-    const automaticParent = !elsewhere && shown.get(device.key) !== groupKey && byKey.get(shown.get(device.key));
+    const shownIn = shown.get(device.key)?.[0];
+    const automaticParent = !elsewhere && shownIn !== groupKey && byKey.get(shownIn);
     source.textContent = [device.room?.label || (device.missing ? null : "Bez prostorije"), elsewhere ? `${kind.elsewhere} ${elsewhere}` : null,
       paired.get(device.key) === groupKey ? "automatski uparen s ovom zonom" : automaticParent ? `sada automatski u zoni ${automaticParent.label}` : null,
       device.missing ? "trenutačno nije na dashboardu; odznači za uklanjanje" : null, device.key].filter(Boolean).join(" · ");
