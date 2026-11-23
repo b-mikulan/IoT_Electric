@@ -193,10 +193,14 @@ function sendAdminPage(response) {
               <button id="catalog-import" class="admin-button" type="button" aria-describedby="catalog-selected" hidden disabled>Dodaj odabrane u dashboard</button>
             </div>
             <p id="catalog-selected" class="admin-hint" role="status" hidden></p>
-            <p id="catalog-import-status" class="admin-status" role="status"></p>
+            <p id="catalog-import-status" class="admin-status catalog-import-notice" role="status"></p>
             <div id="catalog-browser" class="admin-form-footer" hidden>
               <h3>Uređaji u snimci</h3>
               <form id="catalog-search-form" class="catalog-search"><div class="admin-field"><label class="admin-label" for="catalog-search">Naziv, prostorija ili putanja</label><input id="catalog-search" type="search" maxlength="200" autocomplete="off"></div><button class="admin-button secondary" type="submit">Pretraži</button></form>
+              <div class="admin-actions catalog-actions" role="group" aria-label="Odabir uređaja na trenutačnoj stranici">
+                <button id="catalog-select-visible" class="admin-button secondary" type="button" disabled>Označi prikazane</button>
+                <button id="catalog-clear-visible" class="admin-text-button" type="button" disabled>Poništi odabir prikazanih</button>
+              </div>
               <p id="catalog-devices-status" class="admin-status" role="status"></p>
               <div id="catalog-devices" class="organization-items"></div>
               <div class="admin-actions"><button id="catalog-prev" class="admin-button secondary" type="button" disabled>Prethodnih 50</button><button id="catalog-next" class="admin-button secondary" type="button" disabled>Sljedećih 50</button></div>

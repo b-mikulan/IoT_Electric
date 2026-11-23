@@ -17,11 +17,14 @@
     get("status").textContent = message;
     get("status").classList.toggle("is-error", error);
   }
-  function importStatus(message, error = false) {
-    get("import-status").textContent = message;
-    get("import-status").classList.toggle("is-error", error);
+  function importStatus(message, state = "") {
+    const notice = get("import-status");
+    notice.classList.toggle("is-success", state === "success");
+    notice.classList.toggle("is-error", state === "error");
+    notice.textContent = message;
   }
   const canSelectDevices = () => browserKey !== "" && data.importEnabled && job()?.importable && !data.busy && !busy;
+  const deviceCheckboxes = () => get("devices").querySelectorAll('input[type="checkbox"]');
   function selectionControls() {
     const enabled = canSelectDevices();
     const full = selectedDevices.size >= maxSelection;
@@ -32,10 +35,26 @@
     else if (!data.importEnabled || !job()?.importable) message += " Dodavanje iz ove snimke nije dostupno.";
     else if (full) message += ` Dosegnut je limit od ${maxSelection} uređaja po dodavanju.`;
     if (summary.textContent !== message) summary.textContent = message;
-    for (const checkbox of get("devices").querySelectorAll('input[type="checkbox"]')) {
+    let hasSelected = false;
+    let hasUnselected = false;
+    for (const checkbox of deviceCheckboxes()) {
       checkbox.checked = selectedDevices.has(checkbox.value);
       checkbox.disabled = !enabled || (full && !checkbox.checked);
+      if (checkbox.checked) hasSelected = true;
+      else hasUnselected = true;
     }
+    get("select-visible").disabled = !enabled || full || !hasUnselected;
+    get("clear-visible").disabled = !enabled || !hasSelected;
+  }
+  function selectVisibleDevices(checked) {
+    if (!canSelectDevices()) return;
+    for (const checkbox of deviceCheckboxes()) {
+      if (checked) {
+        if (selectedDevices.size >= maxSelection) break;
+        selectedDevices.add(checkbox.value);
+      } else selectedDevices.delete(checkbox.value);
+    }
+    selectionControls();
   }
   function controls() {
     const confirmed = get("confirm").checked;
@@ -50,6 +69,7 @@
   async function devices() {
     const current = job(), version = ++deviceRequest;
     get("devices").replaceChildren();
+    selectionControls();
     get("prev").disabled = get("next").disabled = true;
     get("devices-status").textContent = "Učitavam uređaje…";
     try {
@@ -150,9 +170,9 @@
     try {
       const result = await request(`/api/admin/catalog/${id}/import`, { deviceKeys });
       selectedDevices.clear();
-      importStatus(`Dodano točaka: ${result.added}. Preskočeno postojećih točaka: ${result.skipped}.`);
+      importStatus(`Dodano točaka: ${result.added}. Preskočeno postojećih točaka: ${result.skipped}.`, "success");
       if (selected === id && browserKey) await devices();
-    } catch (error) { importStatus(error.message, true); }
+    } catch (error) { importStatus(error.message, "error"); }
     finally { busy = false; controls(); }
   }
   for (const kind of ["start", "pause", "resume"]) get(kind).addEventListener("click", () => void action(kind));
@@ -161,6 +181,8 @@
   get("confirm").addEventListener("change", controls);
   get("job").addEventListener("change", () => { selected = get("job").value; render(); });
   get("search-form").addEventListener("submit", event => { event.preventDefault(); search = get("search").value.trim(); offset = 0; void devices(); });
+  get("select-visible").addEventListener("click", () => selectVisibleDevices(true));
+  get("clear-visible").addEventListener("click", () => selectVisibleDevices(false));
   get("prev").addEventListener("click", () => { offset = Math.max(0, offset - 50); void devices(); });
   get("next").addEventListener("click", () => { offset += 50; void devices(); });
   void refresh();

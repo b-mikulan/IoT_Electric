@@ -422,8 +422,9 @@ Scanning keeps the results in a separate catalog. A device is marked
 **Na dashboardu** when at least one of its points is already configured, even
 if that point is hidden. To add devices to the dashboard,
 select them in the results and choose **Dodaj odabrane u dashboard** next to the
-download links. The selection stays selected across searches and pages in the same
-snapshot. The dashboard adds the selected devices' native `01/` points directly
+download links. **Označi prikazane** and **Poništi odabir prikazanih** apply to the
+current page. Selections on other pages or from other searches stay selected in
+the same snapshot. The dashboard adds the selected devices' native `01/` points directly
 from the saved snapshot, including any missing points on an existing device.
 It keeps the settings of existing points and enables dashboard write access by
 default for newly imported points. Actual device commands still require controller
