@@ -19,13 +19,17 @@ sudo bash tools/stack-setup/prepare-instance.sh \
   --ews-user 'KORISNIK_NOVOG_EWS_SERVERA'   --admin-user admin
 ```
 
-Skripta će pitati za **EWS lozinku** (unos se ne prikazuje) i **ID prve vrijednosti**.
-Puni EWS endpoint i stvarni ID trebaju odgovarati novom serveru; skripta ih ne otkriva automatski.
+Skripta će pitati za **EWS lozinku** (unos se ne prikazuje).
+Puni EWS endpoint treba odgovarati novom serveru; skripta ga ne otkriva automatski.
 URL putanja u primjeru nije potvrda da novi kontroler koristi baš tu putanju.
 
 `--image-tag` treba biti verzija koja je već objavljena za oba GHCR imagea, bez `v`.
 Nemoj pretpostaviti da je `latest` objavljen: trenutačni workflow objavljuje slike na push verzijskog taga.
 `0.5.0` je primjer; upiši verziju koju želiš deployati.
+
+Početne vrijednosti nisu potrebne. Bez dodatnih opcija skripta zapisuje prazan
+`widgets.json` (`[]`), dashboard kreće bez vrijednosti, a nakon deploya ih dodaješ
+kroz discovery na dashboardu.
 
 Ako već imaš konfiguraciju widgeta, dodaj:
 
@@ -33,12 +37,10 @@ Ako već imaš konfiguraciju widgeta, dodaj:
 --widgets /putanja/do/widgets.json
 ```
 
-Tada skripta kopira i provjerava tvoju datoteku. Inače prvu vrijednost možeš zadati
-s `--point-id '01/ES/Building/Temperature'` ili unijeti na upit.
-Prvi generirani widget ima `writable: false`. Postojeća datoteka zadržava svoje postavke.
-Bez `--widgets` skripta traži prvu vrijednost za početnu konfiguraciju.
-Postojeći `widgets.json` može sadržavati i prazan `[]`; dashboard tada čeka dodavanje vrijednosti.
-Nakon deploya ostale vrijednosti dodaješ kroz discovery na dashboardu.
+Tada skripta kopira i provjerava tvoju datoteku, koja zadržava svoje postavke.
+Za brzu provjeru EWS veze možeš umjesto toga zadati jednu stvarnu vrijednost s
+`--point-id '01/ES/Building/Temperature'`; taj widget ima `writable: false`.
+Datoteka služi samo za prvo pokretanje; nakon toga konfiguracija je u bazi.
 
 `--admin-user` zadaje administratora dashboarda (zadano `admin`). Skripta mu
 generira lozinku i upisuje oba podatka u `.env` i `portainer.env` kao

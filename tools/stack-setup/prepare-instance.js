@@ -12,7 +12,7 @@ const HELP = `Priprema nove IoT Electric instance za Linux / Portainer.
 
 sudo bash tools/stack-setup/prepare-instance.sh --name cnus \\
   --ews-url https://controller.example/EcoStruxure/DataExchange \\
-  --ews-user ews-user --point-id '01/ES/Building/Temperature' \\
+  --ews-user ews-user \\
   --middleware-port 3100 --dashboard-port 3101 --image-tag 0.3.0
 
 Opcije:
@@ -20,8 +20,10 @@ Opcije:
   --base-dir PUTANJA       Osnovni folder (zadano /opt/iot-electric).
   --ews-url URL            Puni EWS endpoint; pita ako nije zadan.
   --ews-user KORISNIK      EWS korisnik; pita ako nije zadan.
-  --point-id ID            Prva stvarna vrijednost, dodana kao read-only widget.
-  --widgets DATOTEKA       Postojeci widgets.json umjesto --point-id.
+  --point-id ID            Neobavezno; prva vrijednost, dodana kao read-only widget.
+  --widgets DATOTEKA       Neobavezno; postojeci widgets.json umjesto --point-id.
+                           Bez obje opcije dashboard krece bez vrijednosti
+                           i dodajes ih kroz discovery.
   --middleware-port PORT   Vanjski middleware port (zadano 3000).
   --dashboard-port PORT    Vanjski dashboard port (zadano 3001).
   --image-tag TAG          Obavezno; vec objavljena verzija obje slike, bez v.
@@ -170,9 +172,12 @@ function prepareInstance(options, connection) {
   let widgets;
   if (options.widgets) {
     widgets = readJson(options.widgets, "widget datoteku");
-  } else {
+  } else if (options["point-id"] !== undefined) {
     widgets = [{ id: text(options["point-id"], "ID prve EWS vrijednosti"),
       label: "Testna vrijednost", unit: "", writable: false }];
+  } else {
+    // An empty list is valid; points are added later through discovery.
+    widgets = [];
   }
   parseWidgets(JSON.stringify(widgets), false);
   const password = randomBytes(24).toString("base64url");
@@ -272,7 +277,7 @@ EWS/TLS vezu provjeri nakon deploya. Slike koriste CA iz middleware Dockerfilea.
 
 async function ask(label, secret = false) {
   if (!process.stdin.isTTY) {
-    throw new Error(`Nedostaje ${label}. Za pripremu bez pitanja koristi --connection-file i --widgets/--point-id.`);
+    throw new Error(`Nedostaje ${label}. Za pripremu bez pitanja koristi --connection-file.`);
   }
   const output = new Writable({ write(chunk, _encoding, callback) {
     if (!secret) process.stdout.write(chunk);
@@ -304,7 +309,6 @@ async function main(args) {
   connection.url = options["ews-url"] || connection.url || await ask("EWS URL");
   connection.username = options["ews-user"] || connection.username || await ask("EWS korisnik");
   connection.password = connection.password || await ask("EWS lozinka", true);
-  if (!options.widgets && !options["point-id"]) options["point-id"] = await ask("ID prve EWS vrijednosti");
   const result = prepareInstance(options, connection);
   console.log(`Pripremljena instanca: ${result.instanceDir}`);
   console.log("Portainer: ucitaj docker-compose.yml i varijable iz portainer.env.");

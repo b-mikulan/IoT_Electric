@@ -101,6 +101,14 @@ test("validates names, ports, URLs and widget files before creating an instance"
   fs.writeFileSync(widgets, '[{"id":"same"},{"id":"same"}]');
   assert.throws(() => prepareInstance({ ...withoutPoint, widgets }, connection), /duplicate/);
   assert.equal(fs.existsSync(path.join(options["base-dir"], options.name)), false);
+  const empty = prepareInstance({ ...withoutPoint, name: "empty", "middleware-port": "3300", "dashboard-port": "3301" }, connection);
+  const emptyFile = path.join(empty.instanceDir, "dashboard-config/widgets.json");
+  assert.deepEqual(JSON.parse(fs.readFileSync(emptyFile, "utf8")), []);
+  // Same loading path as the first start of a SQLite dashboard.
+  const emptyConfig = loadConfig({ DEMO_MODE: "false", MIDDLEWARE_USER: "user", MIDDLEWARE_PASSWORD: "password",
+    WIDGETS_FILE: emptyFile }, { allowEmptyWidgets: true });
+  assert.equal(emptyConfig.demoMode, false);
+  assert.deepEqual(emptyConfig.widgets, []);
   const original = [{ id: "existing", writable: true, visible: false, label: "Existing" }];
   fs.writeFileSync(widgets, JSON.stringify(original));
   const result = prepareInstance({ ...withoutPoint, widgets }, connection);
