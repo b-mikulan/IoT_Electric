@@ -26,6 +26,22 @@
 
   const roomId = room => room?.id || room?.label;
   const roomCaption = room => room ? [room.label, room.floorLabel].filter(Boolean).join(" · ") : "";
+  const deviceCount = count => `${count} ${count % 10 === 1 && count % 100 !== 11 ? "uređaj" : "uređaja"}`;
+
+  // Collapsed rooms are a per-browser view preference keyed by the stable room
+  // key ("room:<id>" or "unassigned"), never by the editable room name. Storage
+  // can be missing or blocked (private mode, file://), so failures fall back
+  // to every room being expanded.
+  const COLLAPSED_ROOMS_KEY = "iotElectric.dashboard.collapsedRooms";
+  function readCollapsedRooms() {
+    try {
+      const list = JSON.parse(globalThis.localStorage?.getItem(COLLAPSED_ROOMS_KEY) || "[]");
+      return new Set(Array.isArray(list) ? list.filter((key) => typeof key === "string" && key) : []);
+    } catch { return new Set(); }
+  }
+  function writeCollapsedRooms(keys) {
+    try { globalThis.localStorage?.setItem(COLLAPSED_ROOMS_KEY, JSON.stringify([...keys])); } catch { /* View preference only. */ }
+  }
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -157,6 +173,12 @@
     // Device keys in display order: floor, room, then kind of device.
     let displayOrder = [];
     const headings = new Map();
+    const collapsedRooms = readCollapsedRooms();
+    // Cards that fit the filters but are not mounted because their room is collapsed.
+    let foldedTotal = 0;
+    let visibleTotal = 0;
+    let pageEntryCount = 0;
+    let shownCardCount = 0;
     let savedSettings = [];
     let memberParents = new Map();
     // A light listed by several shown groups: its own card sits in the first
@@ -352,8 +374,8 @@
 
     function updateSummary() {
       const count = filteredDevices.length;
-      const shown = Math.min(pageDevices.length, displayLimit);
-      summary.textContent = devices.length ? `${count === devices.length ? count : `${count} od ${devices.length}`} kartica uređaja${shown < pageDevices.length ? ` · prikazano ${shown}` : ""}${connection !== "connected" ? " · Očitanja se trenutačno ne osvježavaju" : ""}` : "";
+      const shown = shownCardCount;
+      summary.textContent = devices.length ? `${count === devices.length ? count : `${count} od ${devices.length}`} kartica uređaja${shown < visibleTotal ? ` · prikazano ${shown}` : ""}${foldedTotal ? ` · ${foldedTotal} u sklopljenim prostorijama` : ""}${connection !== "connected" ? " · Očitanja se trenutačno ne osvježavaju" : ""}` : "";
     }
 
     // Lights inside their groups and sensors inside their zone: member key ->
@@ -407,7 +429,7 @@
     }
 
     function showMore() {
-      if (destroyed || displayLimit >= pageDevices.length) return;
+      if (destroyed || displayLimit >= pageEntryCount) return;
       displayLimit += CARD_BATCH_SIZE;
       applyFilter();
     }
@@ -433,13 +455,57 @@
       return node;
     }
 
-    function withHeadings(shown, page) {
-      const floorKeys = new Set(page.map(headingFloorKey).filter(Boolean));
-      const showFloors = floorKeys.size > 1;
+    function headingLayout(page) {
+      const showFloors = new Set(page.map(headingFloorKey).filter(Boolean)).size > 1;
       const showRooms = new Set(page.map(roomKey)).size > 1;
+      // Only a device under a room heading can be collapsed, so a hidden card
+      // always has a visible toggle that brings it back.
+      return { showFloors, showRooms, roomHeaded: (device) => showRooms && !(showFloors && !headingFloorKey(device)) };
+    }
+
+    // A room heading is a disclosure button. Its count is shown only while the
+    // room is collapsed, since the cards themselves show it otherwise.
+    function roomHeading(key, text, { folded, count, collapsible }) {
+      let node = headings.get(key);
+      if (!node) {
+        node = el("h3", "dc-grid-heading dc-grid-heading-room");
+        const toggle = el("button", "dc-room-toggle");
+        toggle.type = "button";
+        const name = el("span", "dc-room-toggle-name");
+        const total = el("span", "dc-room-toggle-count");
+        toggle.append(icon("chevron"), name, total);
+        toggle.addEventListener("click", () => {
+          if (toggle.disabled) return;
+          if (collapsedRooms.has(key)) collapsedRooms.delete(key); else collapsedRooms.add(key);
+          writeCollapsedRooms(collapsedRooms);
+          applyFilter();
+          // Re-inserting nearby cards must not drop keyboard focus.
+          if (typeof toggle.focus === "function" && document.activeElement !== toggle && toggle.isConnected !== false) toggle.focus();
+        });
+        node.append(toggle);
+        node.roomToggle = { toggle, name, total };
+        headings.set(key, node);
+      }
+      const { toggle, name, total } = node.roomToggle;
+      if (name.textContent !== text) name.textContent = text;
+      const totalText = folded ? deviceCount(count) : "";
+      if (total.textContent !== totalText) total.textContent = totalText;
+      toggle.disabled = !collapsible;
+      toggle.setAttribute("aria-expanded", String(!folded));
+      toggle.setAttribute("aria-label", `${text} · ${deviceCount(count)}`);
+      toggle.title = !collapsible ? "Sklapanje prostorija ne vrijedi dok su pretraga ili vrsta uređaja aktivne."
+        : folded ? "Prikaži uređaje u prostoriji" : "Sakrij uređaje u prostoriji";
+      node.classList.toggle("dc-room-collapsed", folded);
+      return node;
+    }
+
+    // entries: devices in page order, where a collapsed room contributes only
+    // its first device, as a marker for its heading.
+    function withHeadings(entries, layout, { folded, roomCounts, collapsible }) {
+      const { showFloors, showRooms } = layout;
       const nodes = [];
       let lastFloor, lastRoom;
-      for (const device of shown) {
+      for (const device of entries) {
         const floorKey = headingFloorKey(device);
         const key = roomKey(device);
         if (showFloors && !floorKey) {
@@ -448,10 +514,10 @@
         } else {
           if (showFloors && floorKey !== lastFloor) nodes.push(heading(`floor:${floorKey}`, "dc-grid-heading-floor", floorLabel(floorKey)));
           lastFloor = floorKey;
-          if (showRooms && key !== lastRoom) nodes.push(heading(key, "dc-grid-heading-room", device.room?.label || "Bez prostorije"));
+          if (showRooms && key !== lastRoom) nodes.push(roomHeading(key, device.room?.label || "Bez prostorije", { folded: folded(device), count: roomCounts.get(key) || 0, collapsible }));
         }
         lastRoom = key;
-        nodes.push(cards.get(device.key).node);
+        if (!folded(device)) nodes.push(cards.get(device.key).node);
       }
       const used = new Set(nodes);
       for (const node of headings.values()) if (!used.has(node)) node.remove();
@@ -475,7 +541,30 @@
       const filteredParents = (key) => (memberParents.get(key) || []).filter((parent) => filteredIndex.has(parent))
         .sort((a, b) => filteredIndex.get(a) - filteredIndex.get(b));
       pageDevices = nested ? filteredDevices.filter((device) => !filteredParents(device.key).length) : filteredDevices;
-      const shownDevices = pageDevices.slice(0, displayLimit);
+      // Collapsing is ignored while a search or type filter is active, so a
+      // match inside a collapsed room is never hidden. The saved state is kept.
+      const collapsible = query === "" && typeFilter.value === "all";
+      const layout = headingLayout(pageDevices);
+      const roomCounts = new Map();
+      // Counts include lights and sensors nested in group or zone cards, like the room registry.
+      for (const device of filteredDevices) roomCounts.set(roomKey(device), (roomCounts.get(roomKey(device)) || 0) + 1);
+      const folded = (device) => collapsible && layout.roomHeaded(device) && collapsedRooms.has(roomKey(device));
+      // A collapsed room keeps one marker entry for its heading, so its cards
+      // never use up the progressive display limit.
+      const entries = [];
+      const markedRooms = new Set();
+      let foldedCards = 0;
+      for (const device of pageDevices) {
+        if (!folded(device)) { entries.push(device); continue; }
+        foldedCards++;
+        if (!markedRooms.has(roomKey(device))) { markedRooms.add(roomKey(device)); entries.push(device); }
+      }
+      foldedTotal = [...markedRooms].reduce((total, key) => total + (roomCounts.get(key) || 0), 0);
+      pageEntryCount = entries.length;
+      visibleTotal = pageDevices.length - foldedCards;
+      const shownEntries = entries.slice(0, displayLimit);
+      const shownDevices = shownEntries.filter((device) => !folded(device));
+      shownCardCount = shownDevices.length;
       const members = new Map();
       if (nested) for (const device of devices) {
         for (const parent of memberParents.get(device.key) || []) members.set(parent, [...(members.get(parent) || []), device]);
@@ -517,13 +606,13 @@
       }
       // Moving existing nodes preserves focused controls and their drafts.
       // Only the requested slice, with its headings, belongs to the live grid.
-      const nodes = withHeadings(shownDevices, pageDevices);
+      const nodes = withHeadings(shownEntries, layout, { folded, roomCounts, collapsible });
       for (let index = 0; index < nodes.length; index++) {
         if (grid.children[index] !== nodes[index]) grid.insertBefore(nodes[index], grid.children[index] || null);
       }
       for (const device of shownDevices) cards.get(device.key).setMembers(rows.get(device.key).map((row) => row.node));
-      loadMore.hidden = shownDevices.length >= pageDevices.length;
-      loadCount.textContent = `Prikazano ${shownDevices.length} od ${pageDevices.length} uređaja`;
+      loadMore.hidden = shownEntries.length >= entries.length;
+      loadCount.textContent = `Prikazano ${shownDevices.length} od ${visibleTotal} uređaja`;
       loadButton.disabled = loadMore.hidden;
       selectShown.title = `Odaberi sve uređaje koji odgovaraju filtrima (${count}), uključujući one niže na popisu.`;
       selectShown.textContent = `Odaberi sve rezultate (${count})`;

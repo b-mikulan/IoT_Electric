@@ -95,6 +95,18 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-grid-heading-floor { margin-top: 22px; padding-bottom: 8px; border-bottom: 2px solid var(--dc-ink); font-size: var(--fs-lg, 1.25rem); }
 .dc-grid-heading-floor + .dc-grid-heading-room { margin-top: 0; }
 .dc-grid-heading-room { color: var(--dc-muted); font-size: var(--fs-base, .875rem); font-weight: 400; letter-spacing: .02em; }
+.dc-grid-heading-room.dc-room-collapsed + .dc-grid-heading-room { margin-top: calc(-1 * var(--sp-1, 4px)); }
+.dc-room-toggle { display: inline-flex; align-items: center; gap: var(--sp-2, 8px); max-width: 100%; min-height: var(--control-h-sm, 34px); margin: 0 0 0 calc(-1 * var(--sp-2, 8px)); padding: 0 var(--sp-2, 8px); border: 0; border-radius: var(--r-sm, 4px); background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; cursor: pointer; }
+.dc-room-toggle:not(:disabled):hover { color: var(--dc-ink); background: var(--surface-sunken, #F4F6F5); }
+.dc-room-toggle:disabled { cursor: default; color: inherit; }
+.dc-room-toggle svg { flex: 0 0 16px; width: 16px; height: 16px; stroke-width: 2; transform: rotate(90deg); transition: transform .15s; }
+.dc-room-collapsed .dc-room-toggle svg { transform: none; }
+.dc-room-toggle:disabled svg { opacity: .45; }
+.dc-room-toggle-name { min-width: 0; overflow-wrap: anywhere; }
+.dc-room-toggle-count { flex: 0 0 auto; color: var(--dc-muted); font-family: var(--font-ui, inherit); font-size: var(--fs-xs, .75rem); font-variant-numeric: tabular-nums; }
+.dc-room-toggle-count:empty { display: none; }
+.dc-room-toggle-count::before { content: "· "; }
+@media (prefers-reduced-motion: reduce) { .dc-room-toggle svg { transition: none; } }
 .dc-card { border: 1px solid var(--line, #CBD1CF); border-radius: var(--r-md, 8px); padding: 22px; background: var(--surface, #FFFFFF); box-shadow: var(--shadow-card, 0 1px 0 rgba(30, 36, 40, .06)); color: var(--dc-ink); min-width: 0; transition: box-shadow .15s, border-color .15s; }
 .dc-card:hover { border-color: var(--line-strong, #858F92); }
 .dc-load-more { padding: 26px 0 10px; text-align: center; }

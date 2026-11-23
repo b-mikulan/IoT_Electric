@@ -1218,3 +1218,144 @@ test("across floors, unassigned devices get a floor-level heading of their own",
   const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
   assert.deepEqual(gridSequence(container), ["F:1. kat", "R:Ured 1", "ES/A", "F:2. kat", "R:Hodnik", "ES/B", "F:Bez prostorije", "ES/N"]);
 });
+
+const COLLAPSED_ROOMS_KEY = "iotElectric.dashboard.collapsedRooms";
+// Replaces browser storage for one test; `fail` simulates blocked storage.
+function stubStorage(t, collapsed, { fail = false } = {}) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const data = new Map(collapsed ? [[COLLAPSED_ROOMS_KEY, JSON.stringify(collapsed)]] : []);
+  const storage = {
+    getItem: (key) => { if (fail) throw new Error("blocked"); return data.has(key) ? data.get(key) : null; },
+    setItem: (key, value) => { if (fail) throw new Error("blocked"); data.set(key, String(value)); },
+  };
+  Object.defineProperty(globalThis, "localStorage", { value: storage, configurable: true, writable: true });
+  t.after(() => { if (previous) Object.defineProperty(globalThis, "localStorage", previous); else delete globalThis.localStorage; });
+  return { saved: () => JSON.parse(data.get(COLLAPSED_ROOMS_KEY) || "null") };
+}
+const roomToggle = (container, label) => byClass(container, "dc-room-toggle").find((button) => button.children[1].textContent === label);
+const twoRooms = () => [
+  placed("light", "ES/A1", "A1", { id: "r1", label: "Ured 1", floorId: "f1" }),
+  placed("light", "ES/A2", "A2", { id: "r1", label: "Ured 1", floorId: "f1" }),
+  placed("light", "ES/B", "B", { id: "r2", label: "Hodnik", floorId: "f1" }),
+];
+
+test("a room heading collapses its cards, shows its count and remembers the stable room key", (t) => {
+  const storage = stubStorage(t);
+  const { container, update } = setup(t, twoRooms(), undefined, false, undefined, { floors: twoFloors });
+  const toggle = roomToggle(container, "Ured 1");
+  assert.equal(toggle.tagName, "button");
+  assert.equal(toggle.type, "button");
+  assert.equal(toggle.attributes["aria-expanded"], "true");
+  toggle.dispatch("click");
+  assert.equal(toggle.attributes["aria-expanded"], "false");
+  assert.deepEqual(gridSequence(container), ["R:Hodnik", "ES/B", "R:Ured 12 uređaja"]);
+  assert.match(toggle.attributes["aria-label"], /^Ured 1 · 2 uređaja$/);
+  assert.deepEqual(storage.saved(), ["room:r1"]);
+  assert.match(byClass(container, "dc-summary")[0].textContent, /2 u sklopljenim prostorijama/);
+  // A full re-render (as after an SSE configuration update) keeps the room collapsed.
+  update(twoRooms());
+  assert.deepEqual(gridSequence(container), ["R:Hodnik", "ES/B", "R:Ured 12 uređaja"]);
+  toggle.dispatch("click");
+  assert.deepEqual(gridSequence(container), ["R:Hodnik", "ES/B", "R:Ured 1", "ES/A1", "ES/A2"]);
+  assert.deepEqual(storage.saved(), []);
+});
+
+test("collapsed rooms are restored from storage by id, even after a rename", (t) => {
+  stubStorage(t, ["room:r1"]);
+  const renamed = twoRooms().map((entry) => entry.room.id === "r1" ? { ...entry, room: { ...entry.room, label: "Sastanci" } } : entry);
+  const { container } = setup(t, renamed, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridSequence(container), ["R:Hodnik", "ES/B", "R:Sastanci2 uređaja"]);
+  assert.equal(roomToggle(container, "Sastanci").attributes["aria-expanded"], "false");
+});
+
+test("search and type filters show matches inside collapsed rooms without changing the saved state", (t) => {
+  const storage = stubStorage(t, ["room:r1"]);
+  const devices = [...twoRooms(), placed("climate", "ES/K", "Klima", { id: "r1", label: "Ured 1", floorId: "f1" })];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  const search = byClass(container, "dc-search")[0];
+  search.value = "A2"; search.dispatch("input");
+  assert.deepEqual(gridSequence(container), ["ES/A2"]);
+  search.value = "es/"; search.dispatch("input");
+  assert.ok(gridSequence(container).includes("ES/A1"));
+  const toggle = roomToggle(container, "Ured 1");
+  assert.equal(toggle.attributes["aria-expanded"], "true");
+  assert.equal(toggle.disabled, true);
+  search.value = ""; search.dispatch("input");
+  const type = byClass(container, "dc-type-filter")[0];
+  type.value = "light"; type.dispatch("change");
+  assert.deepEqual(gridSequence(container), ["R:Hodnik", "ES/B", "R:Ured 1", "ES/A1", "ES/A2"]);
+  type.value = "all"; type.dispatch("change");
+  assert.equal(toggle.disabled, false);
+  assert.deepEqual(gridSequence(container).slice(0, 1), ["R:Hodnik"]);
+  assert.deepEqual(storage.saved(), ["room:r1"]);
+});
+
+test("a single selected room ignores its collapsed state because it has no heading", (t) => {
+  stubStorage(t, ["room:r1"]);
+  const { container } = setup(t, twoRooms(), undefined, false, undefined, { floors: twoFloors });
+  selectFloor(container, "f1");
+  byClass(container, "dc-room-filter").find((button) => button.dataset.room === "room:r1").dispatch("click");
+  assert.deepEqual(gridSequence(container), ["ES/A1", "ES/A2"]);
+});
+
+test("a collapsed room does not use up the progressive display limit", (t) => {
+  stubStorage(t, ["room:big"]);
+  const devices = [
+    ...Array.from({ length: 30 }, (_, index) => placed("light", `ES/L${index}`, `Svjetlo ${index}`, { id: "big", label: "Dvorana", floorId: "f1" })),
+    placed("light", "ES/X", "Svjetlo", { id: "small", label: "Ured", floorId: "f1" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridSequence(container), ["R:Dvorana30 uređaja", "R:Ured", "ES/X"]);
+  assert.equal(byClass(container, "dc-load-more")[0].hidden, true);
+  roomToggle(container, "Dvorana").dispatch("click");
+  assert.equal(byClass(container, "dc-card").length, 24);
+  assert.equal(byClass(container, "dc-load-more")[0].hidden, false);
+});
+
+test("a card updated while its room is collapsed shows the new state when expanded", (t) => {
+  stubStorage(t);
+  const { container, update } = setup(t, twoRooms(), undefined, false, undefined, { floors: twoFloors });
+  roomToggle(container, "Ured 1").dispatch("click");
+  update(twoRooms().map((entry) => entry.key === "ES/A1" ? { ...entry, label: "Novo ime" } : entry));
+  roomToggle(container, "Ured 1").dispatch("click");
+  const titles = byClass(container, "dc-card-title").map((node) => node.textContent);
+  assert.ok(titles.includes("Novo ime"));
+});
+
+test("blocked storage leaves rooms expanded and toggles still work", (t) => {
+  stubStorage(t, ["room:r1"], { fail: true });
+  const { container } = setup(t, twoRooms(), undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridSequence(container), ["R:Hodnik", "ES/B", "R:Ured 1", "ES/A1", "ES/A2"]);
+  roomToggle(container, "Ured 1").dispatch("click");
+  assert.deepEqual(gridSequence(container), ["R:Hodnik", "ES/B", "R:Ured 12 uređaja"]);
+});
+
+test("a collapsed room counts the lights nested in its group card", (t) => {
+  stubStorage(t, ["room:r1"]);
+  const room = { id: "r1", label: "Ured 1", floorId: "f1" };
+  const group = { ...placed("lightGroup", "ES/GRP", "Grupa", room), roles: { brightnessSet: point("brightnessSet", 50) } };
+  const members = ["ES/L1", "ES/L2"].map((key, index) => ({ ...placed("light", key, `Svjetlo ${index}`, room), roles: { brightnessSet: point("brightnessSet", 20, { id: `01/${key}/Values/LtPct` }) } }));
+  const other = placed("light", "ES/B", "B", { id: "r2", label: "Hodnik", floorId: "f1" });
+  const { container, update } = setup(t, [group, ...members, other], undefined, false, undefined, { floors: twoFloors });
+  update(undefined, undefined, { deviceSettings: [{ key: group.key, lightMembers: members.map((member) => member.key) }] });
+  assert.deepEqual(gridSequence(container), ["R:Hodnik", "ES/B", "R:Ured 13 uređaja"]);
+  assert.match(byClass(container, "dc-summary")[0].textContent, /^4 kartica uređaja · 3 u sklopljenim prostorijama/);
+});
+
+test("devices under the floor-level Bez prostorije heading are never collapsed", (t) => {
+  stubStorage(t, ["unassigned"]);
+  const devices = [
+    placed("light", "ES/N", "N", undefined),
+    placed("light", "ES/A", "A", { id: "r1", label: "Ured 1", floorId: "f1" }),
+    placed("light", "ES/B", "B", { id: "r2", label: "Hodnik", floorId: "f2" }),
+  ];
+  const { container } = setup(t, devices, undefined, false, undefined, { floors: twoFloors });
+  assert.deepEqual(gridSequence(container), ["F:1. kat", "R:Ured 1", "ES/A", "F:2. kat", "R:Hodnik", "ES/B", "F:Bez prostorije", "ES/N"]);
+});
+
+test("a selected floor keeps its collapsed rooms collapsed", (t) => {
+  stubStorage(t, ["room:r1"]);
+  const { container } = setup(t, twoRooms(), undefined, false, undefined, { floors: twoFloors });
+  selectFloor(container, "f1");
+  assert.deepEqual(gridSequence(container), ["R:Hodnik", "ES/B", "R:Ured 12 uređaja"]);
+});

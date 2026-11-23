@@ -17,6 +17,8 @@ grouping code are embedded unchanged from `dashboard/public/devices/`.
 function metadata from the local configuration (L3307, G3308, AC309, B301, S3201,
 ACX01). All values and states are synthetic. It contains no login data. Refreshing
 the page or resetting the demo discards edits; no configuration files are written.
+Collapsed room headings are the one exception: like on the dashboard, the browser
+remembers them in `localStorage` where the page's origin allows it.
 
 The renderer always uses `demo: true` with no write callback. Content Security
 Policy also blocks all connections, external resources and form submissions.
