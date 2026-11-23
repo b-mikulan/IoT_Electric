@@ -68,7 +68,10 @@
           selectionControls();
         });
         label.append(checkbox, node("strong", device.label || device.key));
-        row.append(label, node("p", `${device.type} · ${device.room_label || "Bez prepoznate prostorije"}`, "admin-hint"), node("code", device.key));
+        const heading = node("div", undefined, "catalog-device-heading");
+        heading.append(label);
+        if (device.onDashboard === true) heading.append(node("span", "Na dashboardu", "catalog-device-badge"));
+        row.append(heading, node("p", `${device.type} · ${device.room_label || "Bez prepoznate prostorije"}`, "admin-hint"), node("code", device.key));
         get("devices").append(row);
       }
       selectionControls();
@@ -111,12 +114,14 @@
       link.href = `/api/admin/catalog/${current.id}/files/${encodeURIComponent(file)}`; return link;
     }));
   }
-  async function refresh() {
+  async function refresh({ updateDevices = false } = {}) {
     if (refreshing) return;
     refreshing = true;
     try {
       data = await request("/api/admin/catalog/status");
+      const previousKey = browserKey;
       render();
+      if (updateDevices && browserKey && browserKey === previousKey) void devices();
       status(!data.enabled ? "Skeniranje nije dostupno u demo načinu ili bez backend vjerodajnica." : data.busy ? "Skeniranje je aktivno. Očitanja i upravljanje su privremeno pauzirani." : "Spremno. Odaberi novi sken ili nastavi spremljeni napredak.");
     } catch (error) { status(error.message, true); }
     finally { refreshing = false; }
@@ -146,12 +151,13 @@
       const result = await request(`/api/admin/catalog/${id}/import`, { deviceKeys });
       selectedDevices.clear();
       importStatus(`Dodano točaka: ${result.added}. Preskočeno postojećih točaka: ${result.skipped}.`);
+      if (selected === id && browserKey) await devices();
     } catch (error) { importStatus(error.message, true); }
     finally { busy = false; controls(); }
   }
   for (const kind of ["start", "pause", "resume"]) get(kind).addEventListener("click", () => void action(kind));
   get("import").addEventListener("click", () => void importDevices());
-  get("refresh").addEventListener("click", () => void refresh());
+  get("refresh").addEventListener("click", () => void refresh({ updateDevices: true }));
   get("confirm").addEventListener("change", controls);
   get("job").addEventListener("change", () => { selected = get("job").value; render(); });
   get("search-form").addEventListener("submit", event => { event.preventDefault(); search = get("search").value.trim(); offset = 0; void devices(); });
@@ -159,5 +165,5 @@
   get("next").addEventListener("click", () => { offset += 50; void devices(); });
   void refresh();
   setInterval(() => { if (!document.hidden && !busy) void refresh(); }, 4000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && !busy) void refresh(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && !busy) void refresh({ updateDevices: true }); });
 }());

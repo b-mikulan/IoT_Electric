@@ -146,7 +146,7 @@ DASHBOARD_WIDGETS_FILE=/app/config/widgets.json
 
 Local Compose supplies `http://middleware:3000`, the shared `MIDDLEWARE_USER`, and a writable volume for SQLite. The dashboard needs the plaintext password because it is an API client. Keep it in the ignored root `.env` or a Docker secret.
 
-Widgets are read-only by default. A widget appears in the **Postavi vrijednost** dropdown only when it explicitly contains `"writable": true`. The first version accepts finite numeric values and sends them from the dashboard backend to the existing middleware `POST /api/values/write` endpoint, so middleware credentials are never exposed to browser JavaScript. The page asks for confirmation and does not update a card optimistically; the normal poll displays the value reported by the controller.
+Widgets without `"writable": true` are read-only. Only widgets with that setting appear in the **Postavi vrijednost** dropdown when visible. The first version accepts finite numeric values and sends them from the dashboard backend to the existing middleware `POST /api/values/write` endpoint, so middleware credentials are never exposed to browser JavaScript. The page asks for confirmation and does not update a card optimistically; the normal poll displays the value reported by the controller.
 
 The round refresh button opens object discovery. An empty search starts at the EWS root, a container ID lists its immediate child containers and values, and a pasted full value ID is resolved through its parent container. Containers can be opened in the result list. **Dodaj** saves a selected value to the database and adds it to the running dashboard immediately. Discovered values are deliberately added as read-only widgets. Enable writing in the widget settings when needed.
 
@@ -418,12 +418,16 @@ older files remain on disk. No automatic retention/deletion runs. Include this
 directory separately in installation backups: portable dashboard backups do not
 contain scan snapshots. Snapshots contain building data, so keep the volume private.
 
-Scanning keeps the results in a separate catalog. To add devices to the dashboard,
+Scanning keeps the results in a separate catalog. A device is marked
+**Na dashboardu** when at least one of its points is already configured, even
+if that point is hidden. To add devices to the dashboard,
 select them in the results and choose **Dodaj odabrane u dashboard** next to the
 download links. The selection stays selected across searches and pages in the same
 snapshot. The dashboard adds the selected devices' native `01/` points directly
 from the saved snapshot, including any missing points on an existing device.
-It keeps the settings of existing points and adds new points as read-only.
+It keeps the settings of existing points and enables dashboard write access by
+default for newly imported points. Actual device commands still require controller
+permission and the user's room write access.
 The result reports how many points were added and how many already existed.
 Downloads are optional. **Organizacija zgrade** uses the configured points and
 their existing metadata, including saved room assignments.
@@ -435,7 +439,7 @@ Admin API (authenticated admin session and JSON for POST):
 | `GET /api/admin/catalog/status` | Availability, current job and snapshot history |
 | `POST /api/admin/catalog/start` | `{confirmPause:true, root:"", profile:"catalog", maxRequests:500}`; use `resumeId` and optional `retryFailed` for resume |
 | `POST /api/admin/catalog/pause` | `{id:"<job-id>"}`; waits for current page asynchronously |
-| `GET /api/admin/catalog/:id/devices?search=...&offset=0` | Offline search, 50 devices per page |
+| `GET /api/admin/catalog/:id/devices?search=...&offset=0` | Offline search, 50 devices per page, with `onDashboard` on each result |
 | `GET /api/admin/catalog/:id/files/:filename` | Download an available snapshot artifact |
 | `POST /api/admin/catalog/:id/import` | Add native points for 1–1000 exact catalog `deviceKeys` from a saved snapshot of the current source. Returns `{ added, skipped }`. |
 

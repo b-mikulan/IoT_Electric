@@ -357,10 +357,10 @@ function createApp({
     broadcast("discovery", autoDiscovery);
   }
 
-  async function addDiscoveredValues(values) {
+  async function addDiscoveredValues(values, options) {
     const stored = await widgetStore.addMany(values.map((item) => ({
       id: item.id, label: item.name, description: item.description, unit: item.unit,
-    })));
+    })), options);
     const added = poller.addWidgets(stored);
     config.widgets.push(...added);
     return { added: added.length, skipped: values.length - added.length };
@@ -420,7 +420,13 @@ function createApp({
     catch (error) { return sendOperationError(response, error, "CATALOG_PAUSE_FAILED", "Skeniranje nije moguće pauzirati."); }
   });
   app.get("/api/admin/catalog/:id/devices", organizationAdmin, async (request, response) => {
-    try { response.set("Cache-Control", "no-store"); return response.json(await buildingScan.devices(request.params.id, request.query.search || "", Number(request.query.offset || 0))); }
+    try {
+      response.set("Cache-Control", "no-store");
+      const page = await buildingScan.devices(request.params.id, request.query.search || "", Number(request.query.offset || 0));
+      const configuredDevices = new Set(config.widgets.map(widget => deriveWidgetGrouping(widget.id).key));
+      const items = page.items.map(device => ({ ...device, onDashboard: configuredDevices.has(device.key) }));
+      return response.json({ ...page, items });
+    }
     catch (error) { return sendOperationError(response, error, "CATALOG_READ_FAILED", "Katalog nije dostupan."); }
   });
   app.post("/api/admin/catalog/:id/import", organizationAdmin, requireJson, express.json({ limit: "8mb" }), async (request, response) => {
@@ -444,7 +450,7 @@ function createApp({
       if (!response.locals.isSessionActive()) {
         return response.status(401).json({ error: "Prijava je istekla.", code: "LOGIN_REQUIRED" });
       }
-      return response.json(await addDiscoveredValues(values));
+      return response.json(await addDiscoveredValues(values, { writable: true }));
     } catch (error) {
       return sendOperationError(response, error, "CATALOG_IMPORT_FAILED", "Odabrane uređaje nije moguće dodati.");
     } finally {

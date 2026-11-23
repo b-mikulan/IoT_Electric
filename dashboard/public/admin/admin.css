@@ -103,6 +103,9 @@
 .catalog-actions { margin-top: 16px; }
 .catalog-search { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .catalog-search .admin-field { flex: 1 1 240px; }
+.catalog-device-heading { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
+.catalog-device-heading > label { min-width: 0; }
+.catalog-device-badge { flex: none; padding: 0 var(--sp-2); border: 1px solid var(--line); border-radius: var(--r-sm); color: var(--ink-2); background: var(--surface-sunken); font-size: var(--fs-xs); font-weight: 600; }
 #catalog-scope { overflow-wrap: anywhere; }
 @media (max-width: 950px) {
   .admin-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }

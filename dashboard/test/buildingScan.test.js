@@ -107,7 +107,8 @@ test("admin API scans, resumes, indexes, and imports only the selected catalog d
   let runtime;
   const dir = directory(t, async () => { if (runtime) { await runtime.buildingScan.shutdown(); runtime.poller.stop(); runtime.database.close(); } }), calls = [];
   const deviceKey = "Fixture/Items/B105";
-  const existingPoint = { id: `01/${deviceKey}/Values/BlndPos`, label: "Custom position", writable: true, visible: false };
+  const otherDeviceKey = "Fixture/Other/Items/B105";
+  const existingPoint = { id: `01/${deviceKey}/Values/BlndPos`, label: "Custom position", group: otherDeviceKey, writable: false, visible: false };
   const newPoint = `01/${deviceKey}/Values/BlndVal`;
   let respond;
   const upstream = await listen(t, http.createServer((req, res) => {
@@ -123,7 +124,7 @@ test("admin API scans, resumes, indexes, and imports only the selected catalog d
       { id: existingPoint.id, name: "Controller position" },
       { id: newPoint, name: "Position feedback", description: "Fixture reading", unit: "%", writeable: true },
       { id: `11/${deviceKey}/Values/BlndVal/State`, name: "State" },
-    ] : [{ id: "01/root", name: "Temperature", unit: "°C" }];
+    ] : [{ id: `01/${otherDeviceKey}/Values/BlndPos`, name: "Other controller position", unit: "%" }];
     const send = () => res.end(JSON.stringify({
       containers: [{ containerItems: root ? [] : [{ id: `00/${deviceKey}`, name: "B105" }], valueItems }],
       errors: [], status: { moreDataAvailable: false }, complete: true,
@@ -187,9 +188,13 @@ test("admin API scans, resumes, indexes, and imports only the selected catalog d
   assert.equal(completed.state, "completed", JSON.stringify(completed));
   assert.deepEqual(calls, ["", `00/${deviceKey}`]);
   assert.equal(completed.catalog.points, 4);
-  const devices = await get(`/api/admin/catalog/${job.id}/devices`);
-  assert.equal(devices.status, 200);
-  assert.ok((await devices.json()).items.some(device => device.key === deviceKey));
+  async function dashboardPresence() {
+    const devices = await get(`/api/admin/catalog/${job.id}/devices`);
+    assert.equal(devices.status, 200);
+    return Object.fromEntries((await devices.json()).items.map(device => [device.key, device.onDashboard]));
+  }
+  assert.deepEqual(await dashboardPresence(), { [deviceKey]: true, [otherDeviceKey]: false },
+    "a hidden configured point marks only its exact device owner, regardless of its custom group");
   const download = await get(`/api/admin/catalog/${job.id}/files/inventory.csv`);
   assert.equal(download.status, 200);
   assert.ok((await download.text()).includes(newPoint));
@@ -237,8 +242,12 @@ test("admin API scans, resumes, indexes, and imports only the selected catalog d
   assert.equal(stored[1].label, "Position feedback");
   assert.equal(stored[1].description, "Fixture reading");
   assert.equal(stored[1].unit, "%");
-  assert.equal(runtime.config.widgets.find(point => point.id === newPoint).writable, false);
-  assert.deepEqual(runtime.poller.getSnapshot().widgets.map(point => point.id), [existingPoint.id, newPoint]);
+  assert.equal(stored[1].writable, true);
+  assert.equal(runtime.config.widgets.find(point => point.id === newPoint).writable, true);
+  assert.deepEqual(runtime.poller.getSnapshot().widgets.map(({ id, writable }) => ({ id, writable })), [
+    { id: existingPoint.id, writable: false },
+    { id: newPoint, writable: true },
+  ]);
 
   const repeat = await post(importPath, selection);
   assert.equal(repeat.status, 200);
@@ -246,6 +255,15 @@ test("admin API scans, resumes, indexes, and imports only the selected catalog d
   assert.equal(repeated.added, 0);
   assert.equal(repeated.skipped, 2);
   assert.deepEqual(runtime.database.readWidgets(), stored);
+
+  const importOther = await post(importPath, { deviceKeys: [otherDeviceKey] });
+  assert.equal(importOther.status, 200);
+  assert.deepEqual(await dashboardPresence(), { [deviceKey]: true, [otherDeviceKey]: true });
+  const removed = await request("/api/devices", {
+    method: "DELETE", headers: { cookie, "Content-Type": "application/json" }, body: JSON.stringify({ key: deviceKey }),
+  });
+  assert.equal(removed.status, 200);
+  assert.deepEqual(await dashboardPresence(), { [deviceKey]: false, [otherDeviceKey]: true });
   assert.deepEqual(calls, ["", `00/${deviceKey}`], "import uses the saved catalog without a controller browse");
 });
 

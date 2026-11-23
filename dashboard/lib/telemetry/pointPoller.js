@@ -456,7 +456,6 @@ class PointPoller extends EventEmitter {
     const added = widgets.map(normalizeWidget).filter((widget) => {
       if (ids.has(widget.id)) return false;
       ids.add(widget.id);
-      widget.writable = false;
       return true;
     });
     if (added.length === 0) return [];

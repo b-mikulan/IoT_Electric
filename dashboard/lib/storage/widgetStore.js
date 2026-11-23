@@ -46,7 +46,9 @@ class WidgetStore {
   }
 
   add(widget) { return this.withExclusive(() => this.#add(widget)); }
-  addMany(widgets) { return this.withExclusive(() => this.#addMany(widgets)); }
+  addMany(widgets, { writable = false } = {}) {
+    return this.withExclusive(() => this.#addMany(widgets, writable));
+  }
   setVisibility(id, visible) { return this.withExclusive(() => this.#setVisibility(id, visible)); }
   updateSettings(id, settings) { return this.withExclusive(() => this.#updateSettings(id, settings)); }
   remove(id) { return this.withExclusive(() => this.#remove(id)); }
@@ -139,7 +141,7 @@ class WidgetStore {
     return storedWidget;
   }
 
-  async #addMany(widgets) {
+  async #addMany(widgets, writable) {
     this.#assertEnabled();
     const rawWidgets = await this.#readWidgets();
     const ids = new Set(rawWidgets.map((widget) => String(widget?.id || "").trim()));
@@ -153,6 +155,7 @@ class WidgetStore {
         label: String(widget?.label || id),
         description: String(widget?.description || "PLC vrijednost"),
         unit: String(widget?.unit || ""),
+        ...(writable === true ? { writable: true } : {}),
         ...(widget?.group === undefined ? {} : { group: widget.group }),
       });
     }
