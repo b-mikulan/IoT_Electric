@@ -357,6 +357,15 @@ function createApp({
     broadcast("discovery", autoDiscovery);
   }
 
+  async function addDiscoveredValues(values) {
+    const stored = await widgetStore.addMany(values.map((item) => ({
+      id: item.id, label: item.name, description: item.description, unit: item.unit,
+    })));
+    const added = poller.addWidgets(stored);
+    config.widgets.push(...added);
+    return { added: added.length, skipped: values.length - added.length };
+  }
+
   async function runAutoDiscovery(containerId) {
     try {
       const { values, tree, warnings } = await poller.discoverAllValues({
@@ -364,12 +373,8 @@ function createApp({
         onProgress: (progress) => updateAutoDiscovery(progress),
       });
       updateAutoDiscovery({ phase: "saving", pending: 0, found: values.length });
-      const stored = await widgetStore.addMany(values.map((item) => ({
-        id: item.id, label: item.name, description: item.description, unit: item.unit,
-      })));
-      const added = poller.addWidgets(stored);
-      config.widgets.push(...added);
-      updateAutoDiscovery({ state: "done", added: added.length, skipped: values.length - added.length, tree, warnings });
+      const counts = await addDiscoveredValues(values);
+      updateAutoDiscovery({ state: "done", ...counts, tree, warnings });
     } catch (error) {
       updateAutoDiscovery({ state: "error", error: error?.code ? error.message : "Automatsko dodavanje nije uspjelo. Provjeri vezu i mogućnost spremanja widgeta." });
     }
@@ -395,9 +400,13 @@ function createApp({
     }
     return next();
   };
+  const catalogImportEnabled = () => Boolean(buildingScan && !config.demoMode && widgetStore?.enabled);
   app.get("/api/admin/catalog/status", organizationAdmin, (request, response) => {
-    try { response.set("Cache-Control", "no-store"); return response.json(buildingScan?.status() || { enabled: false, busy: false, jobs: [] }); }
-    catch (error) { return sendOperationError(response, error, "CATALOG_STATUS_FAILED", "Stanje skeniranja nije dostupno."); }
+    try {
+      response.set("Cache-Control", "no-store");
+      const status = buildingScan?.status() || { enabled: false, busy: false, jobs: [] };
+      return response.json({ ...status, importEnabled: catalogImportEnabled() });
+    } catch (error) { return sendOperationError(response, error, "CATALOG_STATUS_FAILED", "Stanje skeniranja nije dostupno."); }
   });
   app.post("/api/admin/catalog/start", organizationAdmin, requireJson, express.json({ limit: "8kb" }), (request, response) => {
     try {
@@ -413,6 +422,34 @@ function createApp({
   app.get("/api/admin/catalog/:id/devices", organizationAdmin, async (request, response) => {
     try { response.set("Cache-Control", "no-store"); return response.json(await buildingScan.devices(request.params.id, request.query.search || "", Number(request.query.offset || 0))); }
     catch (error) { return sendOperationError(response, error, "CATALOG_READ_FAILED", "Katalog nije dostupan."); }
+  });
+  app.post("/api/admin/catalog/:id/import", organizationAdmin, requireJson, express.json({ limit: "8mb" }), async (request, response) => {
+    const { deviceKeys } = request.body || {};
+    if (!Array.isArray(deviceKeys) || deviceKeys.length === 0 || deviceKeys.length > 1000
+      || deviceKeys.some(key => typeof key !== "string" || !key.trim() || key.length > 4096 || /[\0\r\n]/.test(key))
+      || new Set(deviceKeys).size !== deviceKeys.length) {
+      return response.status(400).json({ error: "Odaberi od 1 do 1000 različitih uređaja iz kataloga.", code: "INVALID_CATALOG_SELECTION" });
+    }
+    if (!catalogImportEnabled()) {
+      return response.status(409).json({ error: "Dodavanje iz kataloga zahtijeva stvarni način rada i trajnu pohranu.", code: "CATALOG_IMPORT_UNAVAILABLE" });
+    }
+    if (activeConfigurationRequests > 1 || clearingWidgets || autoDiscovery.state === "running") {
+      return response.status(409).json({ error: "Pričekaj završetak promjene konfiguracije ili otkrivanja pa pokušaj ponovno.", code: "WIDGET_OPERATION_IN_PROGRESS" });
+    }
+    // Prevent concurrent configuration changes or rescanning the snapshot while
+    // the selected points are resolved and persisted.
+    transferBusy = true;
+    try {
+      const values = await buildingScan.importPoints(request.params.id, deviceKeys);
+      if (!response.locals.isSessionActive()) {
+        return response.status(401).json({ error: "Prijava je istekla.", code: "LOGIN_REQUIRED" });
+      }
+      return response.json(await addDiscoveredValues(values));
+    } catch (error) {
+      return sendOperationError(response, error, "CATALOG_IMPORT_FAILED", "Odabrane uređaje nije moguće dodati.");
+    } finally {
+      transferBusy = false;
+    }
   });
   app.get("/api/admin/catalog/:id/files/:filename", organizationAdmin, (request, response) => {
     try { response.set("Cache-Control", "no-store"); const file = buildingScan.download(request.params.id, request.params.filename); return response.download(path.basename(file), request.params.filename, { root: path.dirname(file) }); }

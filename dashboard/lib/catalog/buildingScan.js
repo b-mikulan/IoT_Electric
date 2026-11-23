@@ -58,6 +58,7 @@ class BuildingScan extends EventEmitter {
     visible.files = this.active?.job.id === job.id ? [] : [
       ...(job.exportsReady ? ["inventory.csv", "topology.json"] : []), "checkpoint.sqlite", ...(job.catalog ? ["catalog.sqlite"] : []),
     ].filter(file => fs.existsSync(path.join(dir, file)));
+    visible.importable = !this.busy && !this.closing && job.source === this.source() && visible.files.includes("catalog.sqlite");
     return visible;
   }
   status() {
@@ -175,7 +176,20 @@ class BuildingScan extends EventEmitter {
     const job = this.read(id);
     if (this.active?.job.id === id || !job.catalog) throw failure("Katalog za ovu snimku još nije spremljen.");
     if (typeof search !== "string" || search.length > 200 || !Number.isSafeInteger(offset) || offset < 0) throw failure("Neispravna pretraga kataloga.", 400);
-    return this.workerImpl({ operation: "devices", database: path.join(this.jobPath(id), "catalog.sqlite"), search, offset });
+    return this.workerImpl({ operation: "devices", database: path.join(this.jobPath(id), "catalog.sqlite"), snapshotId: job.catalog.snapshotId, search, offset });
+  }
+  async importPoints(id, deviceKeys) {
+    const job = this.publicJob(this.read(id));
+    if (!job.importable) throw failure("Uvoz zahtijeva spremljeni katalog s trenutačnog izvora i zaustavljeno skeniranje.");
+    const result = await this.workerImpl({ operation: "importPoints", database: path.join(this.jobPath(id), "catalog.sqlite"), snapshotId: job.catalog.snapshotId, deviceKeys });
+    if (result.unknownDevice) throw failure("Odabrani uređaj nije pronađen u ovoj snimci. Osvježi popis i ponovno odaberi uređaje.", 400, "CATALOG_DEVICE_NOT_FOUND");
+    if (result.tooMany) throw failure("Odaberi uređaje s ukupno najviše 50000 točaka.", 409, "CATALOG_IMPORT_LIMIT");
+    // WidgetStore trims new IDs. Refuse unsupported IDs before persistence so
+    // an imported point always addresses exactly the object found in the scan.
+    if (result.points.some(({ id }) => id !== id.trim() || id.length > 4096 || /[\0\r\n]/.test(id))) {
+      throw failure("Odabir sadrži EWS ID koji dashboard ne može spremiti bez izmjene.", 400, "CATALOG_POINT_ID_UNSUPPORTED");
+    }
+    return result.points;
   }
   download(id, filename) {
     const job = this.publicJob(this.read(id));

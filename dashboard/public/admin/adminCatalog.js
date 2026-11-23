@@ -3,6 +3,8 @@
   const { request } = globalThis.IoTAdmin;
   const get = name => document.getElementById(`catalog-${name}`);
   const states = { starting: "Priprema", running: "Skeniranje", stopping: "Pauziranje", indexing: "Spremanje kataloga", paused: "Pauzirano", interrupted: "Prekinuto", partial: "Potrebna provjera", failed: "Greška", completed: "Završeno" };
+  const maxSelection = 1000;
+  const selectedDevices = new Set();
   let data = { jobs: [], enabled: false, busy: false }, selected = "", busy = false, refreshing = false, offset = 0, search = "", browserKey = "", deviceRequest = 0;
   const node = (tag, text, className) => {
     const element = document.createElement(tag);
@@ -15,6 +17,26 @@
     get("status").textContent = message;
     get("status").classList.toggle("is-error", error);
   }
+  function importStatus(message, error = false) {
+    get("import-status").textContent = message;
+    get("import-status").classList.toggle("is-error", error);
+  }
+  const canSelectDevices = () => browserKey !== "" && data.importEnabled && job()?.importable && !data.busy && !busy;
+  function selectionControls() {
+    const enabled = canSelectDevices();
+    const full = selectedDevices.size >= maxSelection;
+    get("import").disabled = !enabled || selectedDevices.size === 0;
+    const summary = get("selected");
+    let message = `Odabrano uređaja: ${selectedDevices.size}.`;
+    if (data.busy) message += " Dodavanje je dostupno kad skeniranje stane.";
+    else if (!data.importEnabled || !job()?.importable) message += " Dodavanje iz ove snimke nije dostupno.";
+    else if (full) message += ` Dosegnut je limit od ${maxSelection} uređaja po dodavanju.`;
+    if (summary.textContent !== message) summary.textContent = message;
+    for (const checkbox of get("devices").querySelectorAll('input[type="checkbox"]')) {
+      checkbox.checked = selectedDevices.has(checkbox.value);
+      checkbox.disabled = !enabled || (full && !checkbox.checked);
+    }
+  }
   function controls() {
     const confirmed = get("confirm").checked;
     get("start").disabled = busy || data.busy || !data.enabled || !confirmed;
@@ -23,6 +45,7 @@
     get("pause").disabled = busy || !data.busy || ["stopping", "indexing"].includes(active?.state);
     for (const name of ["root", "profile", "limit", "confirm", "retry"]) get(name).disabled = busy || data.busy;
     get("job").disabled = busy;
+    selectionControls();
   }
   async function devices() {
     const current = job(), version = ++deviceRequest;
@@ -35,9 +58,20 @@
       get("devices-status").textContent = page.total ? `Prikaz ${offset + 1}–${offset + page.items.length} od ${page.total} uređaja.` : "Nema uređaja za odabranu pretragu.";
       for (const device of page.items) {
         const row = node("article", undefined, "organization-item");
-        row.append(node("strong", device.label || device.key), node("p", `${device.type} · ${device.room_label || "Bez prepoznate prostorije"}`, "admin-hint"), node("code", device.key));
+        const label = node("label", undefined, "admin-checkbox");
+        const checkbox = node("input");
+        checkbox.type = "checkbox";
+        checkbox.value = device.key;
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) selectedDevices.add(device.key);
+          else selectedDevices.delete(device.key);
+          selectionControls();
+        });
+        label.append(checkbox, node("strong", device.label || device.key));
+        row.append(label, node("p", `${device.type} · ${device.room_label || "Bez prepoznate prostorije"}`, "admin-hint"), node("code", device.key));
         get("devices").append(row);
       }
+      selectionControls();
       get("prev").disabled = offset === 0;
       get("next").disabled = offset + page.items.length >= page.total;
     } catch (error) { if (version === deviceRequest) get("devices-status").textContent = error.message; }
@@ -52,6 +86,17 @@
     if (!job()) selected = data.activeId || data.jobs[0]?.id || "";
     get("job").value = selected;
     const current = job();
+    const browsable = Boolean(current?.catalog) && current.id !== data.activeId;
+    get("browser").hidden = get("import").hidden = get("selected").hidden = !browsable;
+    const key = browsable ? `${current.id}:${current.catalog.snapshotId}` : "";
+    if (key !== browserKey) {
+      browserKey = key;
+      ++deviceRequest;
+      offset = 0;
+      selectedDevices.clear();
+      importStatus("");
+      if (browsable) void devices();
+    }
     controls();
     if (!current) return;
     get("message").textContent = `${states[current.state] || current.state}: ${current.message}`;
@@ -65,13 +110,6 @@
       const link = node("a", `Preuzmi ${file}`, "admin-text-button");
       link.href = `/api/admin/catalog/${current.id}/files/${encodeURIComponent(file)}`; return link;
     }));
-    const browsable = Boolean(current.catalog) && current.id !== data.activeId;
-    get("browser").hidden = !browsable;
-    const key = browsable ? `${current.id}:${current.catalog.snapshotId}` : "";
-    if (key !== browserKey) {
-      browserKey = key; ++deviceRequest; offset = 0;
-      if (browsable) void devices();
-    }
   }
   async function refresh() {
     if (refreshing) return;
@@ -97,7 +135,22 @@
     } catch (error) { status(error.message, true); }
     finally { busy = false; controls(); }
   }
+  async function importDevices() {
+    if (!canSelectDevices() || !selectedDevices.size) return;
+    const id = selected;
+    const deviceKeys = [...selectedDevices];
+    busy = true;
+    controls();
+    importStatus("Dodajem mjerne točke odabranih uređaja…");
+    try {
+      const result = await request(`/api/admin/catalog/${id}/import`, { deviceKeys });
+      selectedDevices.clear();
+      importStatus(`Dodano točaka: ${result.added}. Preskočeno postojećih točaka: ${result.skipped}.`);
+    } catch (error) { importStatus(error.message, true); }
+    finally { busy = false; controls(); }
+  }
   for (const kind of ["start", "pause", "resume"]) get(kind).addEventListener("click", () => void action(kind));
+  get("import").addEventListener("click", () => void importDevices());
   get("refresh").addEventListener("click", () => void refresh());
   get("confirm").addEventListener("change", controls);
   get("job").addEventListener("change", () => { selected = get("job").value; render(); });

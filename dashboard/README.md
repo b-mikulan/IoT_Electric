@@ -418,10 +418,15 @@ older files remain on disk. No automatic retention/deletion runs. Include this
 directory separately in installation backups: portable dashboard backups do not
 contain scan snapshots. Snapshots contain building data, so keep the volume private.
 
-Scanning does not add points to active polling or change manual room assignments.
-Use existing discovery to add selected points; **Organizacija zgrade** continues
-to work from configured points and their existing metadata. The scan's catalog
-is a separate inventory, with no automatic transfer into organization proposals.
+Scanning keeps the results in a separate catalog. To add devices to the dashboard,
+select them in the results and choose **Dodaj odabrane u dashboard** next to the
+download links. The selection stays selected across searches and pages in the same
+snapshot. The dashboard adds the selected devices' native `01/` points directly
+from the saved snapshot, including any missing points on an existing device.
+It keeps the settings of existing points and adds new points as read-only.
+The result reports how many points were added and how many already existed.
+Downloads are optional. **Organizacija zgrade** uses the configured points and
+their existing metadata, including saved room assignments.
 
 Admin API (authenticated admin session and JSON for POST):
 
@@ -432,6 +437,7 @@ Admin API (authenticated admin session and JSON for POST):
 | `POST /api/admin/catalog/pause` | `{id:"<job-id>"}`; waits for current page asynchronously |
 | `GET /api/admin/catalog/:id/devices?search=...&offset=0` | Offline search, 50 devices per page |
 | `GET /api/admin/catalog/:id/files/:filename` | Download an available snapshot artifact |
+| `POST /api/admin/catalog/:id/import` | Add native points for 1–1000 exact catalog `deviceKeys` from a saved snapshot of the current source. Returns `{ added, skipped }`. |
 
 ## Docker
 

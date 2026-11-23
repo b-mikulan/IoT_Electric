@@ -103,9 +103,12 @@ test("missing Python releases polling and reports a safe failure", async t => {
   assert.equal(released, true);
 });
 
-test("admin API runs Python scan, budgets and resumes pages, indexes catalog, protects operations and downloads", { timeout: 30000 }, async t => {
+test("admin API scans, resumes, indexes, and imports only the selected catalog devices", { timeout: 30000 }, async t => {
   let runtime;
   const dir = directory(t, async () => { if (runtime) { await runtime.buildingScan.shutdown(); runtime.poller.stop(); runtime.database.close(); } }), calls = [];
+  const deviceKey = "Fixture/Items/B105";
+  const existingPoint = { id: `01/${deviceKey}/Values/BlndPos`, label: "Custom position", writable: true, visible: false };
+  const newPoint = `01/${deviceKey}/Values/BlndVal`;
   let respond;
   const upstream = await listen(t, http.createServer((req, res) => {
     const url = new URL(req.url, "http://fixture");
@@ -116,12 +119,20 @@ test("admin API runs Python scan, budgets and resumes pages, indexes catalog, pr
     const root = url.searchParams.get("id"); calls.push(root);
     assert.equal(url.searchParams.get("allPages"), "false");
     assert.equal(url.searchParams.get("metadata"), "false");
-    const send = () => res.end(JSON.stringify({ containers: [{ containerItems: root ? [] : [{ id: "00/A", name: "Room" }], valueItems: [{ id: root ? "01/A/temperature" : "01/root", name: "Temperature", unit: "°C" }] }], errors: [], status: { moreDataAvailable: false }, complete: true }));
+    const valueItems = root ? [
+      { id: existingPoint.id, name: "Controller position" },
+      { id: newPoint, name: "Position feedback", description: "Fixture reading", unit: "%", writeable: true },
+      { id: `11/${deviceKey}/Values/BlndVal/State`, name: "State" },
+    ] : [{ id: "01/root", name: "Temperature", unit: "°C" }];
+    const send = () => res.end(JSON.stringify({
+      containers: [{ containerItems: root ? [] : [{ id: `00/${deviceKey}`, name: "B105" }], valueItems }],
+      errors: [], status: { moreDataAvailable: false }, complete: true,
+    }));
     if (calls.length === 1) respond = send; else send();
   }));
   runtime = createRuntime({ DEMO_MODE: "false", MIDDLEWARE_URL: upstream, MIDDLEWARE_USER: config.username, MIDDLEWARE_PASSWORD: config.password,
     DASHBOARD_ADMIN_USER: "admin", DASHBOARD_ADMIN_PASSWORD: "fixture-admin", DASHBOARD_LOGIN_USER: "user", DASHBOARD_LOGIN_PASSWORD: "fixture-user-password",
-    DASHBOARD_USERS_FILE: path.join(dir, "users.json"), DASHBOARD_DB_FILE: path.join(dir, "dashboard.sqlite"), WIDGETS_JSON: "[]" });
+    DASHBOARD_USERS_FILE: path.join(dir, "users.json"), DASHBOARD_DB_FILE: path.join(dir, "dashboard.sqlite"), WIDGETS_JSON: JSON.stringify([existingPoint]) });
   runtime.buildingScan.delay = 0;
   runtime.poller.setPaused(true);
   const base = await listen(t, http.createServer(runtime.app));
@@ -137,6 +148,8 @@ test("admin API runs Python scan, budgets and resumes pages, indexes catalog, pr
   const started = await post("/api/admin/catalog/start", { confirmPause: true, maxRequests: 1, profile: "full" });
   assert.equal(started.status, 202, await started.clone().text());
   const job = await started.json(), done = runtime.buildingScan.active.done;
+  const importPath = `/api/admin/catalog/${job.id}/import`;
+  const selection = { deviceKeys: [deviceKey] };
   try {
     const deadline = Date.now() + 5000;
     while (!respond && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
@@ -146,6 +159,7 @@ test("admin API runs Python scan, budgets and resumes pages, indexes catalog, pr
     assert.equal((await post("/api/dashboard/settings", {})).status, 409);
     assert.equal((await post("/api/admin/organization/apply", {})).status, 409);
     assert.equal((await post("/api/admin/users", {})).status, 409);
+    assert.equal((await post(importPath, selection)).status, 409);
     assert.equal((await get("/api/devices/metadata")).status, 200);
     assert.equal((await get(`/api/admin/catalog/${job.id}/files/checkpoint.sqlite`)).status, 404);
   } finally { respond?.(); }
@@ -171,16 +185,68 @@ test("admin API runs Python scan, budgets and resumes pages, indexes catalog, pr
   await runtime.buildingScan.active.done;
   const completed = runtime.buildingScan.read(job.id);
   assert.equal(completed.state, "completed", JSON.stringify(completed));
-  assert.deepEqual(calls, ["", "00/A"]);
-  assert.equal(completed.catalog.points, 2);
+  assert.deepEqual(calls, ["", `00/${deviceKey}`]);
+  assert.equal(completed.catalog.points, 4);
   const devices = await get(`/api/admin/catalog/${job.id}/devices`);
   assert.equal(devices.status, 200);
-  assert.ok(Array.isArray((await devices.json()).items));
+  assert.ok((await devices.json()).items.some(device => device.key === deviceKey));
   const download = await get(`/api/admin/catalog/${job.id}/files/inventory.csv`);
-  assert.equal(download.status, 200); assert.match(await download.text(), /01\/A\/temperature/);
+  assert.equal(download.status, 200);
+  assert.ok((await download.text()).includes(newPoint));
   assert.equal((await get(`/api/admin/catalog/${job.id}/files/inventory.csv`, userCookie)).status, 403);
   assert.equal((await get(`/api/admin/catalog/${job.id}/files/job.json`)).status, 404);
-  assert.deepEqual(runtime.config.widgets, []);
+  assert.equal((await request(importPath, { method: "POST" })).status, 401);
+  assert.equal((await post(importPath, selection, userCookie)).status, 403);
+  const beforeImport = runtime.database.readWidgets();
+  assert.deepEqual(beforeImport.map(point => point.id), [existingPoint.id]);
+  assert.equal((await post(importPath, { deviceKeys: [] })).status, 400);
+  assert.equal((await post(importPath, { deviceKeys: [deviceKey, deviceKey] })).status, 400);
+  const unknownDevice = await post(importPath, { deviceKeys: [deviceKey, "Fixture/Items/Missing"] });
+  assert.equal(unknownDevice.status, 400);
+  assert.equal((await unknownDevice.json()).code, "CATALOG_DEVICE_NOT_FOUND");
+  assert.deepEqual(runtime.database.readWidgets(), beforeImport, "an invalid selection must not import its valid subset");
+
+  const addMany = runtime.widgetStore.addMany.bind(runtime.widgetStore);
+  let releaseImport, saveEntered;
+  const saveStarted = new Promise(resolve => { saveEntered = resolve; });
+  const saveBlocked = new Promise(resolve => { releaseImport = resolve; });
+  runtime.widgetStore.addMany = async (...args) => {
+    saveEntered();
+    await saveBlocked;
+    return addMany(...args);
+  };
+  const pending = post(importPath, selection);
+  const reachedSave = await Promise.race([saveStarted.then(() => true), pending.then(() => false)]);
+  try {
+    assert.equal(reachedSave, true, "the valid import must reach the widget store");
+    assert.equal((await post("/api/admin/catalog/start", { confirmPause: true })).status, 409);
+    assert.equal((await post("/api/widgets/visibility", { id: existingPoint.id, visible: true })).status, 409);
+  } finally {
+    releaseImport();
+    await pending;
+    runtime.widgetStore.addMany = addMany;
+  }
+  const imported = await pending;
+  assert.equal(imported.status, 200, await imported.clone().text());
+  const result = await imported.json();
+  assert.equal(result.added, 1);
+  assert.equal(result.skipped, 1);
+  const stored = runtime.database.readWidgets();
+  assert.deepEqual(stored.map(point => point.id), [existingPoint.id, newPoint]);
+  assert.deepEqual(stored[0], beforeImport[0], "an existing point retains its label, visibility, and write permission");
+  assert.equal(stored[1].label, "Position feedback");
+  assert.equal(stored[1].description, "Fixture reading");
+  assert.equal(stored[1].unit, "%");
+  assert.equal(runtime.config.widgets.find(point => point.id === newPoint).writable, false);
+  assert.deepEqual(runtime.poller.getSnapshot().widgets.map(point => point.id), [existingPoint.id, newPoint]);
+
+  const repeat = await post(importPath, selection);
+  assert.equal(repeat.status, 200);
+  const repeated = await repeat.json();
+  assert.equal(repeated.added, 0);
+  assert.equal(repeated.skipped, 2);
+  assert.deepEqual(runtime.database.readWidgets(), stored);
+  assert.deepEqual(calls, ["", `00/${deviceKey}`], "import uses the saved catalog without a controller browse");
 });
 
 test("a controller read keeps the scan from starting after its browser disconnects", async t => {

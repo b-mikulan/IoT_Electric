@@ -170,7 +170,7 @@ function sendAdminPage(response) {
         <div class="admin-section-heading"><div><h2 id="catalog-title">Skeniranje zgrade</h2><p>Izradi katalog dostupnih uređaja i točaka iz kontrolera.</p></div></div>
         <div class="admin-card admin-system-card">
           <p class="admin-warning">Skeniranje privremeno pauzira očitanja i upravljanje za sve korisnike ovog dashboarda. Nakon pauze ili završetka skena vraća se prethodno stanje osvježavanja. Zatvaranje stranice ne prekida skeniranje.</p>
-          <p class="admin-hint">Rezultat je zasebna snimka kataloga. Dodavanje točaka na dashboard i organizacija postojećih uređaja ostaju zasebni koraci.</p>
+          <p class="admin-hint">Nakon skena možeš odabrati uređaje iz snimke i dodati njihove mjerne točke u dashboard.</p>
           <div class="admin-account-fields">
             <div class="admin-field"><label class="admin-label" for="catalog-profile">Obuhvat novog skena</label><select id="catalog-profile"><option value="catalog">Uređaji i točke (preporučeno)</option><option value="full">Sve dostupne grane</option></select><p class="admin-hint">Preporučeni obuhvat preskače programe, grafike i druge tehničke grane.</p></div>
             <div class="admin-field"><label class="admin-label" for="catalog-limit">Zahtjevi po pokretanju / nastavku</label><select id="catalog-limit"><option value="500">Do 500 zahtjeva</option><option value="2000">Do 2000 zahtjeva</option><option value="0">Bez ograničenja</option></select><p class="admin-hint">Jedan zahtjev u trenutku, uz najmanje 3 sekunde razmaka. Na limitu se napredak sprema za nastavak.</p></div>
@@ -188,7 +188,12 @@ function sendAdminPage(response) {
             <dl id="catalog-counts" class="admin-system-details" aria-label="Napredak skeniranja"></dl>
             <p id="catalog-coverage" class="admin-hint"></p>
             <div class="admin-actions catalog-actions"><button id="catalog-resume" class="admin-button secondary" type="button" disabled>Nastavi odabrani sken</button><label class="admin-checkbox"><input id="catalog-retry" type="checkbox"><span>Ponovi i neuspjele grane</span></label></div>
-            <div id="catalog-downloads" class="admin-actions catalog-actions" aria-label="Preuzimanje snimke"></div>
+            <div class="admin-actions catalog-actions">
+              <div id="catalog-downloads" class="admin-actions" role="group" aria-label="Preuzimanje snimke"></div>
+              <button id="catalog-import" class="admin-button" type="button" aria-describedby="catalog-selected" hidden disabled>Dodaj odabrane u dashboard</button>
+            </div>
+            <p id="catalog-selected" class="admin-hint" role="status" hidden></p>
+            <p id="catalog-import-status" class="admin-status" role="status"></p>
             <div id="catalog-browser" class="admin-form-footer" hidden>
               <h3>Uređaji u snimci</h3>
               <form id="catalog-search-form" class="catalog-search"><div class="admin-field"><label class="admin-label" for="catalog-search">Naziv, prostorija ili putanja</label><input id="catalog-search" type="search" maxlength="200" autocomplete="off"></div><button class="admin-button secondary" type="submit">Pretraži</button></form>
