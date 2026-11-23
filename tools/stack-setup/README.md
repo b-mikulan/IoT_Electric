@@ -16,7 +16,7 @@ sudo bash tools/stack-setup/prepare-instance.sh \
   --middleware-port 3100 \
   --dashboard-port 3101 \
   --ews-url 'https://cnus.iot-electric.hr:60588/EcoStruxure/DataExchange' \
-  --ews-user 'KORISNIK_NOVOG_EWS_SERVERA'
+  --ews-user 'KORISNIK_NOVOG_EWS_SERVERA'   --admin-user admin
 ```
 
 Skripta će pitati za **EWS lozinku** (unos se ne prikazuje) i **ID prve vrijednosti**.
@@ -40,6 +40,10 @@ Bez `--widgets` skripta traži prvu vrijednost za početnu konfiguraciju.
 Postojeći `widgets.json` može sadržavati i prazan `[]`; dashboard tada čeka dodavanje vrijednosti.
 Nakon deploya ostale vrijednosti dodaješ kroz discovery na dashboardu.
 
+`--admin-user` zadaje administratora dashboarda (zadano `admin`). Skripta mu
+generira lozinku i upisuje oba podatka u `.env` i `portainer.env` kao
+`DASHBOARD_ADMIN_USER` i `DASHBOARD_ADMIN_PASSWORD`.
+
 Shell skripta koristi Node >=24 ako je instaliran. Inače pokrene kratkotrajni
 `node:24-alpine` container i ukloni ga nakon pripreme. Ne treba `npm install`.
 Za prvi takav poziv Docker mora moći povući Node image. Pokreće se sa `sudo` radi prava nad folderima.
@@ -59,6 +63,7 @@ Za prvi takav poziv Docker mora moći povući Node image. Pokreće se sa `sudo` 
 
 - Svaka instanca ima vlastiti folder, middleware korisnika i novu nasumičnu lozinku.
 - Middleware dobiva scrypt hash, a dashboard odgovarajuću običnu lozinku.
+- Administrator dashboarda dobiva vlastitu nasumičnu lozinku.
 - `dashboard-config` pripada UID/GID `1000:1000`, s pravima `750`; widget datoteka ima `640`.
   To omogućuje spremanje kroz discovery i uređivanje widgeta u dashboardu.
 - `.env`, `portainer.env`, Compose i upute imaju prava `600`; lozinke se ne ispisuju.
@@ -95,6 +100,16 @@ Skripta ne provjerava dostupnost image taga i EWS vezu. Nova EWS CA, ako je potr
 mora biti uključena u middleware image kao u postojećem Dockerfileu.
 
 Za API/Swagger login pročitaj `MIDDLEWARE_USER` i `DASHBOARD_MIDDLEWARE_PASSWORD` iz `.env`.
+Za prijavu u dashboard pročitaj `DASHBOARD_ADMIN_USER` i `DASHBOARD_ADMIN_PASSWORD` iz `.env`.
+Administrator ne postoji u bazi, nego samo kroz te varijable stacka. Zato ih ne briši
+nakon prvog pokretanja: bez njih se na dashboard ne može prijaviti nitko dok
+administrator ne doda druge korisnike. Novu lozinku postavljaš promjenom
+`DASHBOARD_ADMIN_PASSWORD` u Portaineru i updateom stacka. Ostale korisnike
+dodaje administrator kroz **Admin** u dashboardu.
+
+Ako se dashboardu pristupa preko HTTPS-a, u Portaineru dodaj `DASHBOARD_SECURE_COOKIES=true`.
+Iza reverse proxyja dodaj i `DASHBOARD_TRUST_PROXY=1` i `MIDDLEWARE_TRUST_PROXY=1`
+(broj proxyja ispred servisa). Skripta te varijable ne postavlja.
 `DEPLOY.txt` sadrži upute prilagođene pripremljenoj instanci.
 Nakon deploya provjeri `/health`, stvarni read-only API poziv i dashboard `/ready`.
 

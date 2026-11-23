@@ -25,16 +25,18 @@ Opcije:
   --middleware-port PORT   Vanjski middleware port (zadano 3000).
   --dashboard-port PORT    Vanjski dashboard port (zadano 3001).
   --image-tag TAG          Obavezno; vec objavljena verzija obje slike, bez v.
+  --admin-user KORISNIK    Administrator dashboarda (zadano admin); lozinka se generira.
   --connection-file FILE  JSON s url, username, password za pripremu bez pitanja.
   --help                  Ove upute.
 
-EWS lozinka unosi se skriveno. Skripta ne deploya stack i ne mijenja
+EWS lozinka unosi se skriveno. Lozinke za middleware i administratora
+dashboarda generiraju se i spremaju u .env i portainer.env. Skripta ne deploya stack i ne mijenja
 postojecu instancu. Node >=24 ili Docker potreban je za shell wrapper.
 `;
 
 function parseArgs(args) {
   const allowed = new Set(["name", "base-dir", "ews-url", "ews-user", "point-id",
-    "widgets", "middleware-port", "dashboard-port", "image-tag", "connection-file"]);
+    "widgets", "middleware-port", "dashboard-port", "image-tag", "connection-file", "admin-user"]);
   const options = {};
   for (let i = 0; i < args.length; i += 1) {
     if (args[i] === "--help") return { help: true };
@@ -84,6 +86,10 @@ function validateOptions(options) {
   if (!imageTag || !/^[\w][\w.-]{0,127}$/.test(imageTag)) {
     throw new Error("Zadaj --image-tag s vec objavljenom verzijom obje slike, npr. 0.5.0 (bez v).");
   }
+  const adminUser = (options["admin-user"] ?? "admin").trim().normalize("NFC");
+  if (!adminUser || adminUser.length > 128 || /[\x00-\x1f\x7f]/.test(adminUser)) {
+    throw new Error("--admin-user mora biti neprazno korisnicko ime do 128 znakova u jednom retku.");
+  }
   const baseDir = path.resolve(options["base-dir"] || "/opt/iot-electric");
   const instanceDir = path.join(baseDir, options.name);
   if (fs.existsSync(instanceDir)) {
@@ -104,7 +110,7 @@ function validateOptions(options) {
       }
     }
   }
-  return { middlewarePort, dashboardPort, imageTag, baseDir, instanceDir };
+  return { middlewarePort, dashboardPort, imageTag, adminUser, baseDir, instanceDir };
 }
 
 async function checkPorts(ports) {
@@ -170,6 +176,8 @@ function prepareInstance(options, connection) {
   }
   parseWidgets(JSON.stringify(widgets), false);
   const password = randomBytes(24).toString("base64url");
+  // The dashboard administrator exists only through these variables, never in the database.
+  const adminPassword = randomBytes(18).toString("base64url");
   const configDir = path.join(settings.instanceDir, "dashboard-config");
   const env = {
     COMPOSE_PROJECT_NAME: options.name,
@@ -183,6 +191,8 @@ function prepareInstance(options, connection) {
     MIDDLEWARE_PASSWORD_HASH: createPasswordHash(password),
     DASHBOARD_MIDDLEWARE_PASSWORD: password,
     DASHBOARD_MIDDLEWARE_PASSWORD_FILE: "",
+    DASHBOARD_ADMIN_USER: settings.adminUser,
+    DASHBOARD_ADMIN_PASSWORD: adminPassword,
     DASHBOARD_DEMO_MODE: "false",
     DASHBOARD_POLL_INTERVAL_MS: "15000",
     DASHBOARD_MIDDLEWARE_TIMEOUT_MS: "10000",
@@ -211,6 +221,15 @@ docker compose logs -f middleware dashboard
 
 Middleware korisnik: ${env.MIDDLEWARE_USER}
 Lozinka: DASHBOARD_MIDDLEWARE_PASSWORD u .env (za Swagger /api-docs).
+
+Administrator dashboarda: ${env.DASHBOARD_ADMIN_USER}
+Lozinka: DASHBOARD_ADMIN_PASSWORD u .env. Administrator postoji samo kroz
+te varijable stacka; ne brisi ih nakon prvog pokretanja. Za novu lozinku
+promijeni DASHBOARD_ADMIN_PASSWORD u Portaineru i napravi update stacka.
+Ostale korisnike dodaje administrator u dashboardu (Admin).
+
+Ako se dashboardu pristupa preko HTTPS-a, dodaj DASHBOARD_SECURE_COOKIES=true.
+Iza reverse proxyja dodaj i DASHBOARD_TRUST_PROXY=1 i MIDDLEWARE_TRUST_PROXY=1.
 
 .env i portainer.env sadrze lozinke; cuvaj ih kao privatne fajlove.
 Za promjenu postavki nakon deploya azuriraj varijable u Portaineru.

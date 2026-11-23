@@ -8,6 +8,7 @@ const { spawnSync } = require("node:child_process");
 const dotenv = require("dotenv");
 const { verifyPassword } = require("../middleware/middlewareAuth");
 const { loadConfig } = require("../dashboard/lib/config");
+const { DashboardUsers, validPassword, verifyPassword: verifyDashboardPassword } = require("../dashboard/lib/auth/dashboardUsers");
 const { prepareInstance, validateOptions, checkPorts, checkPublishedPorts } = require("../tools/stack-setup/prepare-instance");
 
 const connection = { url: "https://controller.example:60588/EcoStruxure/DataExchange", username: "ews-user", password: "test$Password#with=equals" };
@@ -42,6 +43,14 @@ test("prepares usable live configuration, matching credentials and independent i
   assert.equal(config.demoMode, false);
   assert.equal(config.widgets[0].id, options["point-id"]);
   assert.equal(config.widgets[0].writable, false);
+  assert.equal(env.DASHBOARD_ADMIN_USER, "admin");
+  assert.equal(validPassword(env.DASHBOARD_ADMIN_PASSWORD), true);
+  const users = new DashboardUsers(path.join(first.instanceDir, "dashboard-config/dashboard-users.json"), {
+    DASHBOARD_ADMIN_USER: env.DASHBOARD_ADMIN_USER, DASHBOARD_ADMIN_PASSWORD: env.DASHBOARD_ADMIN_PASSWORD });
+  assert.equal(users.hasAccounts, true);
+  const admin = users.find("admin");
+  assert.equal(admin.role, "admin");
+  assert.equal(await verifyDashboardPassword(env.DASHBOARD_ADMIN_PASSWORD, admin.passwordHash), true);
   assert.equal(env.DASHBOARD_CONFIG_SOURCE, path.join(first.instanceDir, "dashboard-config").split(path.sep).join("/"));
   const compose = fs.readFileSync(path.join(first.instanceDir, "docker-compose.yml"), "utf8");
   assert.match(compose, /\$\{MIDDLEWARE_HOST_PORT:-3000\}:3000/);
@@ -55,6 +64,10 @@ test("prepares usable live configuration, matching credentials and independent i
   const secondEnv = portainerEnv(path.join(second.instanceDir, "portainer.env"));
   assert.notEqual(secondEnv.MIDDLEWARE_USER, env.MIDDLEWARE_USER);
   assert.notEqual(secondEnv.DASHBOARD_MIDDLEWARE_PASSWORD, env.DASHBOARD_MIDDLEWARE_PASSWORD);
+  assert.notEqual(secondEnv.DASHBOARD_ADMIN_PASSWORD, env.DASHBOARD_ADMIN_PASSWORD);
+  const third = prepareInstance({ ...options, name: "third", "admin-user": " Voditelj ",
+    "middleware-port": "3200", "dashboard-port": "3201" }, connection);
+  assert.equal(portainerEnv(path.join(third.instanceDir, "portainer.env")).DASHBOARD_ADMIN_USER, "Voditelj");
   assert.notEqual(secondEnv.DASHBOARD_CONFIG_SOURCE, env.DASHBOARD_CONFIG_SOURCE);
 });
 
@@ -75,6 +88,9 @@ test("validates names, ports, URLs and widget files before creating an instance"
     assert.throws(() => validateOptions({ ...options, name }), /--name/);
   }
   assert.throws(() => validateOptions({ ...options, "image-tag": "" }), /--image-tag/);
+  for (const adminUser of ["  ", "a\tb", "x".repeat(129)]) {
+    assert.throws(() => validateOptions({ ...options, "admin-user": adminUser }), /--admin-user/);
+  }
   assert.throws(() => validateOptions({ ...options, "middleware-port": "0" }), /65535/);
   assert.throws(() => validateOptions({ ...options, "dashboard-port": "3000" }), /razliciti/);
   assert.throws(() => prepareInstance(options, { ...connection, url: "ftp://controller.example" }), /http/);
@@ -135,7 +151,8 @@ test("CLI preparation and errors never print secrets", (t) => {
   });
   assert.equal(valid.status, 0, valid.stderr);
   const generated = portainerEnv(path.join(options["base-dir"], "valid/portainer.env"));
-  for (const secret of [connection.password, generated.DASHBOARD_MIDDLEWARE_PASSWORD, generated.MIDDLEWARE_PASSWORD_HASH]) {
+  for (const secret of [connection.password, generated.DASHBOARD_MIDDLEWARE_PASSWORD, generated.MIDDLEWARE_PASSWORD_HASH,
+    generated.DASHBOARD_ADMIN_PASSWORD]) {
     assert.equal((valid.stdout + valid.stderr).includes(secret), false);
   }
   assert.equal(fs.existsSync(path.join(options["base-dir"], "valid/dashboard-config/widgets.json")), true);
