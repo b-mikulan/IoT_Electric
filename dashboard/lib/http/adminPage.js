@@ -53,7 +53,6 @@ function sendAdminPage(response) {
       <section id="users" class="admin-section" aria-labelledby="admin-users-title">
         <div class="admin-section-heading">
           <div><h2 id="admin-users-title">Korisnici i prava pristupa</h2><p>Korisnici mogu pregledavati samo prostorije koje im dodijeliš.</p></div>
-          <button id="admin-new" class="admin-button" type="button" disabled>+ Novi korisnik</button>
         </div>
         <div class="admin-users-layout">
           <aside class="admin-card admin-user-browser" aria-label="Popis korisnika">
@@ -63,6 +62,7 @@ function sendAdminPage(response) {
             <div id="admin-users" class="admin-users-list"></div>
             <p id="admin-users-empty" class="admin-empty" hidden>Nema korisnika.</p>
             <button id="admin-users-retry" class="admin-button secondary" type="button" hidden>Pokušaj ponovno</button>
+            <button id="admin-new" class="admin-button secondary admin-users-new" type="button" disabled>+ Novi korisnik</button>
             <p class="admin-account-note">Administratorski račun postavlja se na serveru i ne prikazuje se na ovom popisu.</p>
           </aside>
           <div class="admin-card admin-user-editor">

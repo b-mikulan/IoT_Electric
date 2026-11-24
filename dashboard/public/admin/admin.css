@@ -33,6 +33,8 @@
 .admin-page fieldset:disabled { opacity: .55; }
 .admin-page fieldset:disabled input { cursor: not-allowed; }
 .admin-users-list { margin-top: 16px; max-height: 520px; overflow-y: auto; padding: 3px; }
+/* Below the list, so it reads as adding another account, not the one being edited. */
+.admin-users-new { width: 100%; margin-top: 12px; }
 .admin-user-option { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: var(--sp-3); margin-bottom: 6px; text-align: left; border: 1px solid var(--line-soft); border-radius: var(--r-sm); color: var(--ink); background: var(--surface); overflow-wrap: anywhere; }
 .admin-user-option:hover { background: var(--surface-sunken); border-color: var(--line); }
 .admin-user-option.is-selected { border-color: var(--action-line); background: var(--action-tint); box-shadow: inset 3px 0 0 var(--action); }
