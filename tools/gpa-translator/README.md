@@ -251,6 +251,10 @@ Drugi prioritetni rječnik možete odabrati argumentom
 `--defaults putanja/do/defaults.hr.json`; za isključivanje pripremite JSON s
 `schema_version: 1` i praznim popisom `rules`.
 
+## R1 updater
+
+Alat za ažuriranje balkonske rasvjete, korisnika i lozinke računa `User` nalazi se u podmapi `r1_updater`. [Upute za pokretanje](r1_updater/README.md)
+
 ## Spremanje i provjere
 
 Izlazna datoteka mora biti nova. Izvorni arhiv ostaje sačuvan. Mijenjaju se samo
