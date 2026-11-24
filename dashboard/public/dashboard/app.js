@@ -303,23 +303,24 @@ async function refreshDeviceScope(target) {
   }
 }
 
+// Colours are token names (styles.css), so the icons follow the light or dark theme.
 function visualForUnit(unit = "") {
   const normalized = unit.trim().toLowerCase();
 
   if (normalized.includes("°c") || normalized === "c") {
-    return { icon: "🌡", color: "#A2512A", soft: "#F7EDE7" };
+    return { icon: "🌡", color: "var(--tone-rust)", soft: "var(--tone-rust-tint)" };
   }
   if (normalized === "%" || normalized.includes("rh")) {
-    return { icon: "💧", color: "#3F7891", soft: "#EBF2F5" };
+    return { icon: "💧", color: "var(--tone-teal)", soft: "var(--tone-teal-tint)" };
   }
   if (normalized.includes("kw") || normalized.includes("w")) {
-    return { icon: "⚡", color: "#87683C", soft: "#F5F0E7" };
+    return { icon: "⚡", color: "var(--tone-ochre)", soft: "var(--tone-ochre-tint)" };
   }
   if (normalized.includes("v") || normalized.includes("a")) {
-    return { icon: "⌁", color: "#75609A", soft: "#F1EEF6" };
+    return { icon: "⌁", color: "var(--tone-violet)", soft: "var(--tone-violet-tint)" };
   }
 
-  return { icon: "●", color: "#3E474C", soft: "#EEF0EF" };
+  return { icon: "●", color: "var(--tone-neutral)", soft: "var(--tone-neutral-tint)" };
 }
 
 function widgetGroupName(widget) {

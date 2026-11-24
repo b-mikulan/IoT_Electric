@@ -24,6 +24,7 @@ function sendPage(response, title, content, status = 200, script = "") {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>${title} · IoT Electric</title>
     <link rel="icon" href="/favicon.svg">
+    <script src="/theme.js"></script>
     <link rel="stylesheet" href="/styles.css">
     ${script}
   </head>
@@ -103,7 +104,7 @@ function createDashboardAuth(env, users) {
 
   const isDataRequest = request => /^\/(?:api|events)(?:\/|$)/i.test(request.path);
 
-  router.get(["/health", "/ready", "/styles.css", "/favicon.svg"], (request, response, next) => next("router"));
+  router.get(["/health", "/ready", "/styles.css", "/theme.js", "/favicon.svg"], (request, response, next) => next("router"));
 
   router.use((request, response, next) => {
     response.set("Cache-Control", "no-store");

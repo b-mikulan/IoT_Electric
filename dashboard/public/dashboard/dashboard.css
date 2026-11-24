@@ -40,7 +40,7 @@
 .dashboard-page .discovery-header h2 { font-size: var(--fs-xl); font-weight: 600; }
 .dashboard-page .discovery-dialog :is(input[type="text"], input[type="search"], input[type="number"], select) { box-sizing: border-box; width: 100%; min-width: 0; height: var(--control-h); min-height: var(--control-h); margin: 0; padding: 0 12px; color: var(--ink); background-color: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-sm); box-shadow: none; font: inherit; font-size: var(--fs-base); font-weight: 400; }
 .dashboard-page .discovery-dialog input[readonly] { color: var(--muted); background: var(--surface-sunken); }
-.dashboard-page select:not([multiple]) { appearance: none; padding-right: 36px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235A646A' stroke-width='1.6'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-size: 16px 16px; background-position: right 12px center; }
+.dashboard-page select:not([multiple]) { appearance: none; padding-right: 36px; background-image: var(--select-arrow); background-repeat: no-repeat; background-size: 16px 16px; background-position: right 12px center; }
 .dashboard-page .discovery-dialog :is(input, select):focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--action); box-shadow: none; }
 .dashboard-page .discovery-dialog input::placeholder { color: var(--muted-2); }
 .dashboard-page :is(.settings-field, .discovery-field) label, .dashboard-page .room-field-label { margin-bottom: 6px; color: var(--ink-2); font-size: var(--fs-sm); font-weight: 600; }
@@ -59,8 +59,8 @@
 .dashboard-page .settings-check > span::before, .dashboard-page .settings-check > span::after { display: none; }
 .dashboard-page .settings-actions { align-items: center; flex-wrap: wrap; }
 .dashboard-page .device-settings-tools .danger-action, .dashboard-page .danger-action.btn-flat { color: var(--error); }
-.dashboard-page .danger-action.btn.filled { color: #fff; background: var(--error); }
-.dashboard-page .room-delete-actions .btn.filled { color: #fff; background: var(--error); }
+.dashboard-page .danger-action.btn.filled { color: var(--on-alarm); background: var(--error); }
+.dashboard-page .room-delete-actions .btn.filled { color: var(--on-alarm); background: var(--error); }
 .dashboard-page .general-button { border-radius: var(--r-sm); min-height: var(--control-h); }
 .dashboard-page .general-input-unit input { padding-right: 88px; }
 .dashboard-page .general-input-unit > span { right: 32px; }

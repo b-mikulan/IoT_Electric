@@ -3,7 +3,7 @@
 .transfer-panel { padding: var(--sp-5) var(--sp-6) var(--sp-6); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow-card); }
 .transfer-panel h2 { margin: var(--sp-3) 0 var(--sp-3); font-size: var(--fs-xl); font-weight: 600; letter-spacing: 0; }
 .transfer-panel p { line-height: 1.6; }
-.transfer-step { display: inline-grid; place-items: center; width: 28px; height: 28px; color: #fff; background: var(--anthracite); border-radius: var(--r-sm); font-family: var(--font-din); font-weight: 600; }
+.transfer-step { display: inline-grid; place-items: center; width: 28px; height: 28px; color: var(--surface); background: var(--ink); border-radius: var(--r-sm); font-family: var(--font-din); font-weight: 600; }
 .transfer-button { display: inline-flex; justify-content: center; align-items: center; min-height: var(--control-h); padding: 0 var(--sp-4); border: 1px solid var(--action); border-radius: var(--r-sm); background: var(--action); color: var(--on-action); font: inherit; font-size: var(--fs-base); font-weight: 600; text-decoration: none; cursor: pointer; text-decoration: none; }
 .transfer-button:hover { background: var(--action-strong); border-color: var(--action-strong); color: var(--on-action); }
 .transfer-button:disabled { opacity: .5; cursor: default; }

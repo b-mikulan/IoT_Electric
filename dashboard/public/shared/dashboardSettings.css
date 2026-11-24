@@ -15,7 +15,7 @@
 .general-settings-fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
 .general-settings-fields label { display: flex; flex-direction: column; gap: 6px; color: var(--ink-2); font-size: var(--fs-sm); font-weight: 600; }
 .general-settings-fields input, .general-settings-fields select { box-sizing: border-box; width: 100%; min-width: 0; height: var(--control-h); margin: 0; padding: 0 var(--sp-3); border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: var(--fs-base); box-shadow: none; }
-.general-settings-fields select { appearance: none; padding-right: 36px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235A646A' stroke-width='1.6'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+.general-settings-fields select { appearance: none; padding-right: 36px; background-image: var(--select-arrow); background-repeat: no-repeat; background-position: right 12px center; }
 .general-input-unit { display: flex; align-items: center; position: relative; }
 .general-input-unit input { padding-right: 68px; }
 .general-input-unit > span { position: absolute; right: 12px; color: var(--muted); font-size: var(--fs-xs); font-weight: 400; pointer-events: none; }

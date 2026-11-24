@@ -19,7 +19,7 @@
 .dc-type-field { width: 180px; }
 .dc-filter-label { display: block; margin-bottom: 6px; font-size: var(--fs-xs, .75rem); font-weight: 600; color: var(--dc-muted); }
 .device-cards-section input.dc-search, .device-cards-section select.dc-type-filter { display: block; box-sizing: border-box; width: 100%; height: var(--control-h, 40px); margin: 0; padding: 0 12px; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--dc-ink); font: inherit; font-size: var(--fs-sm, .8125rem); box-shadow: none; }
-.device-cards-section select.dc-type-filter { appearance: none; padding-right: 38px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m2 2 4 4 4-4' fill='none' stroke='%235A646A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-size: 12px 8px; background-position: right 14px center; }
+.device-cards-section select.dc-type-filter { appearance: none; padding-right: 38px; background-image: var(--select-arrow, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235A646A' stroke-width='1.6'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E")); background-repeat: no-repeat; background-size: 16px 16px; background-position: right 12px center; }
 .dc-room-panel { margin-top: 14px; }
 .room-create-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(140px, .65fr) auto; align-items: end; gap: 12px; }
 .room-create-grid input, .room-create-grid select { box-sizing: border-box; width: 100%; height: var(--control-h, 40px); margin: 0; padding: 0 11px; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); font: inherit; font-size: var(--fs-base, .875rem); }
@@ -35,7 +35,7 @@
 .dc-management button, .dc-selection-actions button { border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--ink-2, #3E474C); padding: 9px 12px; font: inherit; font-size: var(--fs-xs, .75rem); cursor: pointer; }
 .dc-selection-actions { padding: 12px; border-radius: var(--r-md, 8px); background: var(--surface, #FFFFFF); }
 .dc-selection-count { font-size: var(--fs-xs, .75rem); font-weight: 600; color: var(--ink-2, #3E474C); }
-.dc-selection-actions .dc-move-selection { background: var(--action, #1C5D99); color: #fff; border-color: var(--action, #1C5D99); }
+.dc-selection-actions .dc-move-selection { background: var(--action, #1C5D99); color: var(--on-action, #FFFFFF); border-color: var(--action, #1C5D99); }
 .dc-management-status { color: var(--ink-2, #3E474C); font-size: var(--fs-sm, .8125rem); }
 .dc-card-selection { display: flex; gap: 9px; align-items: center; padding: 0 0 14px; font-size: var(--fs-xs, .75rem); color: var(--ink-2, #3E474C); cursor: pointer; }
 .device-cards-section .dc-card-selection > span { padding-left: 0; height: auto; line-height: 1.5; font-size: inherit; }
@@ -78,15 +78,15 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .room-delete-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .dc-room-panel > summary { width: fit-content; color: var(--ink-2, #3E474C); font-size: var(--fs-xs, .75rem); cursor: pointer; }
 .dc-floor-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.dc-floor-filter { display: inline-flex; align-items: center; gap: 9px; border: 1px solid var(--line, #CBD1CF); border-radius: var(--r-sm, 4px); padding: 8px 12px; background: #fff; color: var(--ink-2, #3E474C); font: inherit; font-size: var(--fs-sm, .8125rem); cursor: pointer; }
-.dc-floor-filter[aria-pressed="true"] { color: #fff; background: var(--dc-accent); border-color: var(--dc-accent); }
+.dc-floor-filter { display: inline-flex; align-items: center; gap: 9px; border: 1px solid var(--line, #CBD1CF); border-radius: var(--r-sm, 4px); padding: 8px 12px; background: var(--surface, #FFFFFF); color: var(--ink-2, #3E474C); font: inherit; font-size: var(--fs-sm, .8125rem); cursor: pointer; }
+.dc-floor-filter[aria-pressed="true"] { color: var(--on-action, #FFFFFF); background: var(--dc-accent); border-color: var(--dc-accent); }
 .dc-floor-count { display: inline-grid; place-items: center; min-width: 20px; padding: 2px 5px; border-radius: var(--r-sm, 4px); background: var(--surface-sunken, #F4F6F5); color: var(--ink-2, #3E474C); font-size: var(--fs-xs, .75rem); line-height: 1.2; }
-.dc-floor-filter[aria-pressed="true"] .dc-floor-count { background: #ffffff26; color: #fff; }
+.dc-floor-filter[aria-pressed="true"] .dc-floor-count { background: color-mix(in srgb, var(--on-action, #FFFFFF) 15%, transparent); color: var(--on-action, #FFFFFF); }
 .dc-room-list-label { margin: 16px 0 8px; font-size: var(--fs-xs, .75rem); font-weight: 600; color: var(--ink-2, #3E474C); }
 .dc-floor-hint { margin: 12px 0 0; font-size: var(--fs-xs, .75rem); color: var(--dc-muted); }
 .dc-room-filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .dc-room-filter { border: 1px solid var(--line, #CBD1CF); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); padding: 8px 15px; color: var(--muted, #5A646A); font: inherit; font-size: var(--fs-sm, .8125rem); cursor: pointer; }
-.dc-room-filter[aria-pressed="true"] { color: #fff; border-color: var(--dc-accent); background: var(--dc-accent); }
+.dc-room-filter[aria-pressed="true"] { color: var(--on-action, #FFFFFF); border-color: var(--dc-accent); background: var(--dc-accent); }
 .dc-summary { font-size: var(--fs-xs, .75rem); color: var(--dc-muted); margin: 16px 0; }
 .dc-read-warning { margin: 0 0 16px; padding: 10px 13px; border-radius: var(--r-sm, 4px); background: var(--warn-tint, #FCF0D6); color: var(--warn-ink, #7A4E00); border-left: 3px solid var(--warn, #B7790A); font-size: var(--fs-xs, .75rem); line-height: 1.5; }
 .dc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; gap: 18px; }
@@ -115,11 +115,11 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-load-button { padding: 11px 20px; border: 1px solid var(--line, #CBD1CF); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--ink, #23292D); font: inherit; font-weight: 600; cursor: pointer; }
 .dc-load-button:hover, .dc-load-button:focus-visible { color: var(--action-strong, #154A7B); background: var(--action-tint, #E3EDF7); border-color: var(--action, #1C5D99); }
 .dc-card-top { display: flex; align-items: center; gap: 11px; position: relative; }
-.dc-device-icon { width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center; background: #F1F4EC; color: #5E7A3A; border-radius: var(--r-sm, 4px); }
+.dc-device-icon { width: 40px; height: 40px; flex: 0 0 40px; display: grid; place-items: center; background: var(--tone-olive-tint, #F1F4EC); color: var(--tone-olive, #5E7A3A); border-radius: var(--r-sm, 4px); }
 .dc-device-icon svg { width: 24px; height: 24px; }
-.dc-type-climate .dc-device-icon { color: #3F7891; background: #EBF2F5; }
-.dc-type-blind .dc-device-icon { color: #75609A; background: #F1EEF6; }
-.dc-type-sensor .dc-device-icon, .dc-type-zone .dc-device-icon { color: #87683C; background: #F5F0E7; }
+.dc-type-climate .dc-device-icon { color: var(--tone-teal, #3F7891); background: var(--tone-teal-tint, #EBF2F5); }
+.dc-type-blind .dc-device-icon { color: var(--tone-violet, #75609A); background: var(--tone-violet-tint, #F1EEF6); }
+.dc-type-sensor .dc-device-icon, .dc-type-zone .dc-device-icon { color: var(--tone-ochre, #87683C); background: var(--tone-ochre-tint, #F5F0E7); }
 .dc-type-generic .dc-device-icon { color: var(--muted, #5A646A); background: var(--surface-sunken, #F4F6F5); }
 .dc-identity { flex: 1; min-width: 0; }
 .dc-card-title { margin: 0; font-family: var(--dc-din); font-size: var(--fs-md, 1rem); line-height: 1.3; letter-spacing: 0; font-weight: 600; overflow-wrap: anywhere; }
@@ -155,7 +155,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 0; border-radius: var(--r-sm, 4px); padding: 10px 12px; width: 100%; background: var(--surface-sunken, #F4F6F5); color: var(--ink-2, #3E474C); cursor: pointer; }
 .dc-toggle-label { font-size: var(--fs-xs, .75rem); }
 .dc-toggle-track { display: inline-flex; align-items: center; padding: 3px; width: 40px; height: 24px; background: var(--line-strong, #858F92); border-radius: 999px; flex: 0 0 40px; transition: background-color .22s ease, box-shadow .22s ease; }
-.dc-toggle-thumb { height: 18px; width: 18px; border-radius: 50%; background: white; box-shadow: 0 1px 3px #0002; transition: transform .42s var(--dc-spring), box-shadow .2s ease; }
+.dc-toggle-thumb { height: 18px; width: 18px; border-radius: 50%; background: var(--control-thumb, #FFFFFF); box-shadow: 0 1px 3px #0002; transition: transform .42s var(--dc-spring), box-shadow .2s ease; }
 .dc-toggle[aria-pressed="true"] .dc-toggle-track { background: var(--dc-accent); }
 .dc-toggle[aria-pressed="true"] .dc-toggle-thumb { transform: translateX(16px); }
 .dc-control { width: 100%; }
@@ -163,8 +163,8 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .dc-control-label { color: var(--ink-2, #3E474C); font-size: var(--fs-xs, .75rem); font-weight: 500; }
 .dc-control-output { color: var(--ink, #23292D); font-family: var(--dc-din); font-size: var(--fs-sm, .8125rem); font-weight: 600; font-variant-numeric: tabular-nums; }
 .device-cards-section .dc-range { appearance: none; -webkit-appearance: none; margin: 13px 0 8px; padding: 0; border: 0; outline: none; height: 5px; width: 100%; border-radius: 999px; background: linear-gradient(to right, var(--dc-accent) 0%, var(--dc-accent) var(--dc-range-fill, 0%), var(--surface-sunken-2, #E4E8E7) var(--dc-range-fill, 0%), var(--surface-sunken-2, #E4E8E7) 100%); box-shadow: none; cursor: pointer; }
-.device-cards-section .dc-range::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border: 3px solid #fff; border-radius: 50%; background: var(--dc-accent); box-shadow: 0 1px 6px #0003; }
-.device-cards-section .dc-range::-moz-range-thumb { width: 12px; height: 12px; border: 3px solid #fff; border-radius: 50%; background: var(--dc-accent); box-shadow: 0 1px 6px #0003; }
+.device-cards-section .dc-range::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border: 3px solid var(--control-thumb, #FFFFFF); border-radius: 50%; background: var(--dc-accent); box-shadow: 0 1px 6px #0003; }
+.device-cards-section .dc-range::-moz-range-thumb { width: 12px; height: 12px; border: 3px solid var(--control-thumb, #FFFFFF); border-radius: 50%; background: var(--dc-accent); box-shadow: 0 1px 6px #0003; }
 .dc-draft-line { margin: 8px 0 0; font-size: var(--fs-xs, .75rem); color: var(--muted, #5A646A); }
 .dc-temperature-control { border-top: 1px solid var(--line-soft, #E1E5E4); padding-top: 14px; }
 .dc-stepper { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0 0; }
@@ -247,7 +247,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 .device-cards-section button:disabled, .device-cards-section input:disabled, .device-cards-section select:disabled { cursor: not-allowed; opacity: .48; }
 .device-cards-section button:focus-visible, .device-cards-section input:focus-visible, .device-cards-section select:focus-visible, .dc-details > summary:focus-visible { outline: 2px solid var(--dc-accent); outline-offset: 4px; }
 .dc-toggle:focus { background-color: var(--surface-sunken, #F4F6F5); }
-.dc-room-filter:focus, .dc-floor-filter:focus, .dc-step-button:focus { background-color: #fff; }
+.dc-room-filter:focus, .dc-floor-filter:focus, .dc-step-button:focus { background-color: var(--surface, #FFFFFF); }
 .dc-floor-filter[aria-pressed="true"]:focus { background-color: var(--dc-accent); }
 .dc-room-filter[aria-pressed="true"]:focus { background-color: var(--dc-ink); }
 .dc-reset:focus { background-color: transparent; }

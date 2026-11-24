@@ -73,6 +73,9 @@
     finally { $("trend-catalog-reload").disabled = false; }
   }
   let chart;
+  let chartInput = null;
+  // The chart reads its colours once, so redraw it when the theme changes.
+  document.addEventListener("iot-themechange", () => { if (chartInput) drawChart(...chartInput); });
   function status(id, message, error = false) {
     $(id).textContent = message;
     $(id).classList.toggle("telemetry-error", error);
@@ -86,6 +89,7 @@
   function drawChart(rows, unit) {
     chart?.destroy();
     chart = null;
+    chartInput = [rows, unit];
     const points = rows.map((row) => {
       const numeric = (typeof row.value === "number" || typeof row.value === "string" && row.value.trim() !== "") && Number.isFinite(Number(row.value));
       return { x: Date.parse(row.timestamp), y: numeric ? Number(row.value) : null };
@@ -100,11 +104,12 @@
     const chartInk = tokens.getPropertyValue("--ink").trim() || "#23292D";
     const chartMuted = tokens.getPropertyValue("--muted").trim() || "#5A646A";
     const chartGrid = tokens.getPropertyValue("--line-soft").trim() || "#E1E5E4";
+    Chart.defaults.color = chartMuted;
     chart = new Chart($("history-chart"), {
       type: "line", data: { datasets: [{ label: unit && unit !== "none" ? `Vrijednost (${unit})` : "Vrijednost", data: points, borderColor: chartInk, backgroundColor: chartInk, borderWidth: 1.5, pointRadius: points.length > 200 ? 0 : 2, spanGaps: false }] },
       options: { responsive: true, maintainAspectRatio: false, animation: false, parsing: false,
         scales: { x: { type: "linear", grid: { color: chartGrid }, ticks: { color: chartMuted, maxTicksLimit: innerWidth < 600 ? 3 : 6, maxRotation: 0, callback: (value) => formatTime(new Date(value).toISOString()) }, title: { display: true, text: "Vrijeme", color: chartMuted } }, y: { grid: { color: chartGrid }, ticks: { color: chartMuted } } },
-        plugins: { tooltip: { callbacks: { title: (items) => items.length ? formatTime(new Date(items[0].parsed.x).toISOString()) : "" } } },
+        plugins: { legend: { labels: { color: chartInk } }, tooltip: { callbacks: { title: (items) => items.length ? formatTime(new Date(items[0].parsed.x).toISOString()) : "" } } },
       },
     });
   }

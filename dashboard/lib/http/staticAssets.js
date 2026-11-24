@@ -15,7 +15,7 @@ const assetsByFolder = {
   admin: ["admin.css", "adminApi.js", "adminUsers.js", "adminSystem.js", "adminOrganization.js", "adminCatalog.js"],
   dashboard: ["app.js", "dashboard.css"],
   devices: ["deviceCards.css", "deviceCards.js", "deviceModel.js", "widgetGrouping.js"],
-  shared: ["dashboardSettings.css", "dashboardSettings.js", "dashboardTheme.css", "favicon.svg", "styles.css"],
+  shared: ["dashboardSettings.css", "dashboardSettings.js", "dashboardTheme.css", "favicon.svg", "styles.css", "theme.js"],
   transfer: ["transfer.css", "transfer.js"],
   trends: ["trends.css", "trends.js"],
 };

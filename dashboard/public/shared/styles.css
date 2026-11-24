@@ -45,7 +45,27 @@
   --alarm-ink: #9E2A22;
   --alarm-tint: #FBE5E3;
   --alarm-line: #E7A39C;
+  --on-alarm: #FFFFFF;
   --idle: #8A9498;
+
+  /* Controls: switch thumbs and slider rims sit on the track colour. */
+  --control-thumb: #FFFFFF;
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235A646A' stroke-width='1.6'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  --backdrop: rgba(20, 26, 30, .55);
+
+  /* Muted category tones for unit and device-type icons. Not signal colours. */
+  --tone-rust: #A2512A;
+  --tone-rust-tint: #F7EDE7;
+  --tone-teal: #3F7891;
+  --tone-teal-tint: #EBF2F5;
+  --tone-ochre: #87683C;
+  --tone-ochre-tint: #F5F0E7;
+  --tone-violet: #75609A;
+  --tone-violet-tint: #F1EEF6;
+  --tone-olive: #5E7A3A;
+  --tone-olive-tint: #F1F4EC;
+  --tone-neutral: #3E474C;
+  --tone-neutral-tint: #EEF0EF;
 
   /* Type */
   --font-ui: "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
@@ -91,7 +111,7 @@
   --md-sys-color-primary-container-light: var(--action-tint);
   --md-sys-color-on-primary-container-light: var(--action-strong);
   --md-sys-color-secondary-light: var(--ink-2);
-  --md-sys-color-on-secondary-light: #FFFFFF;
+  --md-sys-color-on-secondary-light: var(--surface);
   --md-sys-color-secondary-container-light: var(--surface-sunken-2);
   --md-sys-color-on-secondary-container-light: var(--ink);
   --md-sys-color-tertiary-light: var(--ink-2);
@@ -110,6 +130,124 @@
   --md-sys-color-outline-variant-light: var(--line);
   --md-sys-color-surface-tint-light: var(--action);
   --md-sys-color-inverse-primary-light: var(--action-line);
+}
+
+/*
+  Dark theme: the same tokens with night values. theme.js sets data-theme on
+  <html> before the first paint; without JavaScript the system preference
+  applies. Keep both blocks identical (a test compares them).
+*/
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --anthracite: #0C1012;
+    --canvas: #151A1D;
+    --surface: #1E2428;
+    --surface-sunken: #191F22;
+    --surface-sunken-2: #2A3136;
+    --ink: #E4E9EB;
+    --ink-2: #C6CED2;
+    --muted: #9DA8AE;
+    --muted-2: #8A959B;
+    --line-soft: #2C3438;
+    --line: #3A4449;
+    --line-strong: #77838A;
+    --action: #78B0E6;
+    --action-strong: #A3C9EF;
+    --action-tint: #1C3045;
+    --action-line: #3E6890;
+    --on-action: #0B1724;
+    --focus: #8DBEEE;
+    --focus-ring: rgba(141, 190, 238, .35);
+    --ok: #4FAF68;
+    --ok-ink: #80CF95;
+    --ok-tint: #173023;
+    --ok-line: #2F6B43;
+    --warn: #D6A13A;
+    --warn-ink: #EBC06A;
+    --warn-tint: #33290F;
+    --warn-line: #7A5C1C;
+    --alarm: #E8695E;
+    --alarm-ink: #F59A90;
+    --alarm-tint: #3A1D1B;
+    --alarm-line: #8C3D36;
+    --on-alarm: #1A0B0A;
+    --idle: #7F8A90;
+    --control-thumb: #11161A;
+    --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%239DA8AE' stroke-width='1.6'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+    --backdrop: rgba(0, 0, 0, .65);
+    --tone-rust: #E0A07F;
+    --tone-rust-tint: #33241D;
+    --tone-teal: #8EC0D6;
+    --tone-teal-tint: #1B2A31;
+    --tone-ochre: #D2B585;
+    --tone-ochre-tint: #2F281C;
+    --tone-violet: #BCAADB;
+    --tone-violet-tint: #29243A;
+    --tone-olive: #AFC88C;
+    --tone-olive-tint: #232B1C;
+    --tone-neutral: #C6CED2;
+    --tone-neutral-tint: #2A3136;
+    --shadow-tint: rgba(0, 0, 0, .25);
+    --shadow-card: 0 1px 0 rgba(0, 0, 0, .35);
+    --shadow-raised: 0 2px 8px rgba(0, 0, 0, .45);
+    --shadow-dialog: 0 18px 48px rgba(0, 0, 0, .6);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --anthracite: #0C1012;
+  --canvas: #151A1D;
+  --surface: #1E2428;
+  --surface-sunken: #191F22;
+  --surface-sunken-2: #2A3136;
+  --ink: #E4E9EB;
+  --ink-2: #C6CED2;
+  --muted: #9DA8AE;
+  --muted-2: #8A959B;
+  --line-soft: #2C3438;
+  --line: #3A4449;
+  --line-strong: #77838A;
+  --action: #78B0E6;
+  --action-strong: #A3C9EF;
+  --action-tint: #1C3045;
+  --action-line: #3E6890;
+  --on-action: #0B1724;
+  --focus: #8DBEEE;
+  --focus-ring: rgba(141, 190, 238, .35);
+  --ok: #4FAF68;
+  --ok-ink: #80CF95;
+  --ok-tint: #173023;
+  --ok-line: #2F6B43;
+  --warn: #D6A13A;
+  --warn-ink: #EBC06A;
+  --warn-tint: #33290F;
+  --warn-line: #7A5C1C;
+  --alarm: #E8695E;
+  --alarm-ink: #F59A90;
+  --alarm-tint: #3A1D1B;
+  --alarm-line: #8C3D36;
+  --on-alarm: #1A0B0A;
+  --idle: #7F8A90;
+  --control-thumb: #11161A;
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%239DA8AE' stroke-width='1.6'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  --backdrop: rgba(0, 0, 0, .65);
+  --tone-rust: #E0A07F;
+  --tone-rust-tint: #33241D;
+  --tone-teal: #8EC0D6;
+  --tone-teal-tint: #1B2A31;
+  --tone-ochre: #D2B585;
+  --tone-ochre-tint: #2F281C;
+  --tone-violet: #BCAADB;
+  --tone-violet-tint: #29243A;
+  --tone-olive: #AFC88C;
+  --tone-olive-tint: #232B1C;
+  --tone-neutral: #C6CED2;
+  --tone-neutral-tint: #2A3136;
+  --shadow-tint: rgba(0, 0, 0, .25);
+  --shadow-card: 0 1px 0 rgba(0, 0, 0, .35);
+  --shadow-raised: 0 2px 8px rgba(0, 0, 0, .45);
+  --shadow-dialog: 0 18px 48px rgba(0, 0, 0, .6);
 }
 
 /* One visible focus ring for every control. */
@@ -172,7 +310,7 @@ a:hover {
 
 .automatic-discovery .btn {
   background: var(--brand);
-  color: #fff;
+  color: var(--on-action);
   height: auto;
   min-height: 40px;
   line-height: 1.4;
@@ -188,6 +326,8 @@ a:hover {
 .dashboard-auth-page {
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: var(--sp-4);
   padding: var(--sp-5) var(--sp-4);
   border-top: 4px solid var(--anthracite);
 }
@@ -707,8 +847,8 @@ h1 {
   border-color: var(--action);
 }
 
-.admin-button.danger { color: #fff; background: var(--alarm); border-color: var(--alarm); }
-.admin-button.danger:hover { color: #fff; background: var(--alarm-ink); border-color: var(--alarm-ink); }
+.admin-button.danger { color: var(--on-alarm); background: var(--alarm); border-color: var(--alarm); }
+.admin-button.danger:hover { color: var(--on-alarm); background: var(--alarm-ink); border-color: var(--alarm-ink); }
 
 :is(.trends-open, .admin-button, .general-button, .general-settings-open, .refresh-pause):disabled {
   opacity: .5;
@@ -720,6 +860,75 @@ h1 {
   color: var(--warn-ink);
   background: var(--warn-tint);
   border-color: var(--warn-line);
+}
+
+/* theme.js sets this for the moment it swaps themes, so colours change at once. */
+.theme-changing *,
+.theme-changing *::before,
+.theme-changing *::after {
+  transition: none !important;
+}
+
+/*
+  Theme switch (light, dark, system), added by theme.js to the header actions
+  or under the sign-in panel. The chosen option is filled and aria-pressed.
+*/
+.theme-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  height: var(--control-h);
+  padding: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+.theme-option {
+  display: grid;
+  place-items: center;
+  width: var(--control-h-sm);
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.theme-option svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.theme-option:hover,
+.theme-option:focus {
+  color: var(--action-strong);
+  background: var(--action-tint);
+}
+.theme-option[aria-pressed="true"] {
+  color: var(--on-action);
+  background: var(--action);
+}
+.app-header .theme-switch {
+  border-color: rgba(255, 255, 255, .4);
+  background: transparent;
+}
+.app-header .theme-option {
+  color: rgba(255, 255, 255, .75);
+}
+.app-header .theme-option:is(:hover, :focus) {
+  color: #fff;
+  background: rgba(255, 255, 255, .1);
+}
+.app-header .theme-option[aria-pressed="true"] {
+  color: var(--anthracite);
+  background: #fff;
 }
 
 .discovery-open,
@@ -823,7 +1032,7 @@ h1 {
 .widgets-clear-controls { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .widgets-clear-controls .discovery-status:empty { display: none; }
 .danger-action { color: var(--error); }
-.settings-delete-actions .btn { color: #fff; }
+.settings-delete-actions .btn { color: var(--on-alarm); }
 .group-management { display: flex; align-items: end; gap: 10px; margin-top: 14px; }
 .group-management .discovery-field { flex: 1 1 0; }
 .group-management .browser-default { width: 100%; max-width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: var(--r-sm); }
@@ -979,7 +1188,7 @@ h1 {
 }
 
 .discovery-dialog::backdrop {
-  background: rgba(20, 26, 30, .55);
+  background: var(--backdrop);
 }
 
 .discovery-shell {
@@ -1242,7 +1451,7 @@ h1 {
   width: 21px;
   height: 21px;
   display: block;
-  background: #fff;
+  background: var(--control-thumb);
   border-radius: 50%;
   box-shadow: 0 1px 3px rgba(20, 26, 30, .3);
   transition: transform 160ms ease;
@@ -1301,11 +1510,11 @@ h1 {
 }
 #device-room-form select {
   appearance: none; padding-right: 36px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235A646A' stroke-width='1.6'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-image: var(--select-arrow);
   background-repeat: no-repeat; background-position: right 12px center;
 }
 #device-room-form :is(input, select):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-#device-room-form .settings-actions .btn { color: #fff; border-radius: var(--r-sm); }
+#device-room-form .settings-actions .btn { color: var(--on-action); border-radius: var(--r-sm); }
 
 #settings-point {
   width: 100%;
@@ -1355,7 +1564,7 @@ h1 {
 .device-settings-tools { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 7px; padding-top: 12px; border-top: 1px solid var(--border); }
 .device-settings-tools .btn-flat { height: auto; padding: 7px 9px; line-height: 1.5; font-size: var(--fs-xs); text-transform: none; color: var(--brand); }
 .device-settings-form .settings-actions { padding-top: 0; }
-.device-settings-form .settings-actions .btn { color: #fff; }
+.device-settings-form .settings-actions .btn { color: var(--on-action); }
 @media (max-width: 650px) {
   .device-settings-dialog { width: calc(100% - 20px); }
   .device-settings-dialog .discovery-shell { max-height: 90vh; }
@@ -1418,7 +1627,7 @@ h1 {
 }
 
 .settings-delete-actions .btn {
-  color: var(--on-action);
+  color: var(--on-alarm);
   background: var(--alarm);
   border-color: var(--alarm);
 }
@@ -1652,7 +1861,7 @@ h1 {
   position: fixed;
   right: 20px;
   bottom: 20px;
-  color: #fff;
+  color: var(--on-alarm);
   background: var(--error);
 }
 
