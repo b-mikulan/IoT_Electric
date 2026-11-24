@@ -322,6 +322,21 @@ a:hover {
   display: none !important;
 }
 
+/* Outlined fields with a legend (Materialize fieldset.form-field). Materialize
+   sizes the control for a 12 px legend; ours is taller, which pushed the text
+   below the middle. The legend gets a fixed line box and the control fills the
+   space from the legend's centre line to the bottom border, so the text sits
+   in the visual middle whatever the legend's font. */
+fieldset.form-field { --field-legend-line: 16px; }
+fieldset.form-field legend { line-height: var(--field-legend-line); }
+fieldset.form-field input,
+fieldset.form-field select {
+  align-self: stretch;
+  height: auto;
+  max-height: none;
+  margin-top: calc(-0.5 * var(--field-legend-line));
+}
+
 /* Sign-in and password pages: one panel on the enclosure grey. */
 .dashboard-auth-page {
   display: grid;

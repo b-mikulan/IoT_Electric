@@ -6,7 +6,7 @@
 .dashboard-page .dc-type-field { width: 210px; flex: 0 0 210px; }
 .dashboard-page .dc-search-tools .form-field { min-width: 0; background: var(--surface); }
 .dashboard-page .dc-search-tools legend { color: var(--ink-2); font-size: var(--fs-sm); font-weight: 600; }
-.dashboard-page .dc-search-tools :is(input.dc-search, select.dc-type-filter) { height: var(--mw-calc-input-height); max-height: var(--mw-calc-input-height); margin-top: calc(-1 * var(--half-lbl)); padding-left: calc(var(--mw-padding-left) - var(--mw-border-width)); border: 0; border-radius: 0; background-color: transparent; font-size: var(--fs-base); }
+.dashboard-page .dc-search-tools :is(input.dc-search, select.dc-type-filter) { align-self: stretch; height: auto; max-height: none; margin-top: calc(-0.5 * var(--field-legend-line, 16px)); padding-left: calc(var(--mw-padding-left) - var(--mw-border-width)); border: 0; border-radius: 0; background-color: transparent; font-size: var(--fs-base); }
 .dashboard-page .dc-search-tools .dc-search::placeholder { color: var(--muted-2); font-size: var(--fs-base); }
 .dashboard-page .dc-search-tools :is(input, select):focus-visible { outline: none; }
 .dashboard-page .dc-header-actions { min-height: 0; }
