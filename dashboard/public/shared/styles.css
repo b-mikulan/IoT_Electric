@@ -658,6 +658,17 @@ body:has(#refresh-pause.is-paused) .app-header { border-bottom-color: var(--warn
 }
 
 .connection-dot.is-online { background: #5FBF7A; }
+
+/* Control mode beside the data state, one status instead of two badges. */
+.connection-mode {
+  font-weight: 400;
+  opacity: .85;
+}
+
+.connection-mode::before {
+  content: "·";
+  margin-right: var(--sp-2);
+}
 .connection-dot.is-offline { background: #F06A5E; }
 
 .dashboard-shell {

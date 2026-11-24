@@ -288,8 +288,8 @@ Pravila:
 
 | Element | Izgled | Kada |
 | --- | --- | --- |
-| Lampica (`.connection-dot`) | Krug od 10 px | Stanje veze u zaglavlju |
-| Demo oznaka (`.demo-badge`) | Jantarna, lampica i tekst "Demo podaci" | Uvijek kad podaci nisu s kontrolera |
+| Status zaglavlja (`.connection`) | Lampica (`.connection-dot`, krug od 10 px), stanje podataka i način upravljanja (`.connection-mode`), npr. "Podaci uživo · Stvarno upravljanje" ili "· Samo pregled" | Stvarni podaci. Način upravljanja je samo ovdje, ne i iznad kartica |
+| Demo oznaka (`.demo-badge`) | Jantarna, lampica i tekst "Demo podaci · simulacija upravljanja" | Uvijek kad podaci nisu s kontrolera; tada zamjenjuje status zaglavlja |
 | Chip izvora (`.telemetry-source.chip`) | Jantarni za demo ili nepoznat izvor, zeleni (`.is-live`) za kontroler | Izvor podataka na stranici trendova; postavlja ga svaki odgovor trendova (`demoMode`) |
 | Obavijest | Uvučena površina s lijevim rubom u boji stanja | Rezultat radnje, upozorenje, greška |
 

@@ -135,7 +135,8 @@
     return ({ 0: "U redu", 1: "Nesigurno očitanje", 2: "Forsirano", 3: "Izvan mreže", 4: "Greška" })[String(point?.state)] || "Stanje nije poznato";
   }
 
-  function create({ container, onWrite, onSettings, onRooms, onMove, onRefresh, readOnly = false, controlDeviceKeys = new Set() }) {
+  // showModeBadge: false when the page header already shows the control mode.
+  function create({ container, onWrite, onSettings, onRooms, onMove, onRefresh, readOnly = false, controlDeviceKeys = new Set(), showModeBadge = true }) {
     const canControl = device => !readOnly || controlDeviceKeys.has(device.key);
     if (!container || typeof container.append !== "function") throw new TypeError("Device cards need a DOM container.");
     const cards = new Map();
@@ -198,6 +199,7 @@
       reset.hidden = true;
       announce.textContent = "Simulacija je vraćena na trenutačna očitanja.";
     });
+    simulationBadge.hidden = !showModeBadge;
     headerActions.append(simulationBadge, reset);
     const searchTools = el("div", "dc-search-tools");
     const searchField = el("fieldset", "form-field dc-search-field");

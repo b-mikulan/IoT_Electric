@@ -8,6 +8,11 @@ const errorMessage = document.querySelector("#error-message");
 const lastSync = document.querySelector("#last-sync");
 const connectionDot = document.querySelector("#connection-dot");
 const connectionLabel = document.querySelector("#connection-label");
+const connectionMode = document.querySelector("#connection-mode");
+const connectionStatus = document.querySelector(".page-header-status .connection");
+// Live data and the control mode share one header status. Demo pages show the
+// amber demo badge instead, which already says controls only simulate.
+let controlModeText = "";
 const pollInterval = document.querySelector("#poll-interval");
 const controlPanel = document.querySelector("#control-panel");
 const writeForm = document.querySelector("#write-form");
@@ -823,6 +828,8 @@ function showStatus(status = {}) {
     : isOffline
       ? "Veza prekinuta"
       : isEmpty ? "Nema konfiguriranih točaka" : "Povezivanje…";
+  connectionMode.textContent = controlModeText;
+  connectionMode.hidden = !controlModeText || isOffline || isEmpty;
 
   if (isEmpty) lastSync.textContent = "Dodaj vrijednost kroz pretragu za početak praćenja";
 
@@ -2450,8 +2457,13 @@ async function boot() {
       onRooms: openRoomsDialog,
       onMove: openBulkRoomDialog,
       onRefresh: readOnly && deviceDemoMode ? undefined : refreshDeviceScope,
+      showModeBadge: false,
     });
     demoBadge.hidden = !config.demoMode;
+    connectionStatus.hidden = config.demoMode === true;
+    const hasControl = !readOnly || controlDeviceKeys.size > 0;
+    controlModeText = config.demoMode ? "" : hasControl ? "Stvarno upravljanje" : "Samo pregled";
+    connectionMode.title = hasControl ? "Aktivne kontrole mijenjaju stvarne uređaje u zgradi." : "Ovaj račun može samo pregledavati uređaje.";
     widgetEditingEnabled = config.widgetEditingEnabled === true;
     deviceSettingsEnabled = config.deviceSettingsEnabled === true;
     cardSettingsEnabled = config.cardSettingsEnabled === true;
