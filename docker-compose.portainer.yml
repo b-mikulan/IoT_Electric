@@ -10,6 +10,10 @@ services:
       EWS_PASSWORD: "${EWS_PASSWORD:-}"
       EWS_CONTAINER_TIMEOUT_MS: "${EWS_CONTAINER_TIMEOUT_MS:-8000}"
       EWS_REQUEST_TIMEOUT_MS: "${EWS_REQUEST_TIMEOUT_MS:-30000}"
+      # Extra controller CA or self-signed certificate: PEM (escaped line breaks
+      # allowed) or base64 PEM, or a path to a mounted PEM file.
+      EWS_CA_CERT: "${EWS_CA_CERT:-}"
+      EWS_CA_FILE: "${EWS_CA_FILE:-}"
       TRUST_PROXY: "${MIDDLEWARE_TRUST_PROXY:-}"
       MIDDLEWARE_USER: "${MIDDLEWARE_USER:-iot-electric}"
       MIDDLEWARE_PASSWORD_HASH: "${MIDDLEWARE_PASSWORD_HASH:-}"

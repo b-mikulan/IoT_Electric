@@ -105,7 +105,7 @@ function startRuntime(env, config, users, database, storageRoot) {
   const deviceMetadata = new DeviceMetadataClient(config, { catalog: database?.readDocument("metadata") });
   const buildingScan = new BuildingScan({ directory: path.join(storageRoot, "building-scans"), config, poller,
     ...(env.DASHBOARD_SCAN_PYTHON && { python: env.DASHBOARD_SCAN_PYTHON }), caFile: env.DASHBOARD_SCAN_CA_FILE || undefined });
-  const app = createApp({ poller, config, dashboardAuth, widgetStore, deviceWidgetStore, dashboardSettings, dashboardTransfer, deviceMetadata, buildingScan });
+  const app = createApp({ poller, config, dashboardAuth, widgetStore, deviceWidgetStore, dashboardSettings, dashboardTransfer, deviceMetadata, buildingScan, database });
 
   return { app, config, poller, widgetStore, deviceWidgetStore, database, buildingScan };
 }

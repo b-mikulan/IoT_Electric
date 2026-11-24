@@ -17,6 +17,10 @@ RUN npm ci --omit=dev
 
 COPY middleware ./middleware
 
+# Set by the release workflow from the version tag; shown by /health.
+ARG APP_VERSION=
+ENV APP_VERSION=${APP_VERSION}
+
 EXPOSE 3000
 
 CMD ["node", "middleware/server.js"]

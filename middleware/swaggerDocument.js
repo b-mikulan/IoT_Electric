@@ -29,7 +29,7 @@ const swaggerDocument = {
         security: [],
         responses: {
           200: {
-            description: "Middleware process is running",
+            description: "Middleware process is running. Release images also return their version.",
           },
         },
       },

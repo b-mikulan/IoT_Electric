@@ -98,15 +98,14 @@ For new Portainer instances, see [Docker images and Portainer](#docker-images-an
 ## Start locally with Docker
 
 1. Copy `.env.example` to `.env`.
-2. Install the local development and test dependencies, then generate middleware credentials:
+2. Install the local development and test dependencies:
 
    ```sh
    npm ci
    npm ci --prefix dashboard
-   npm run auth:generate
    ```
 
-3. Put the generated `MIDDLEWARE_USER` and `MIDDLEWARE_PASSWORD_HASH` in `.env`. Save the displayed plaintext password in a password manager; it cannot be recovered from the hash.
+3. Choose the middleware credentials. With Docker Compose you can leave `MIDDLEWARE_USER` and `MIDDLEWARE_PASSWORD_HASH` out of `.env`: the middleware then generates a password for `iot-electric` in the `middleware-credentials` volume, as in the Portainer stack. For your own credentials, or for `npm start` without Docker, run `npm run auth:generate`, put the generated `MIDDLEWARE_USER` and `MIDDLEWARE_PASSWORD_HASH` in `.env` and the plaintext password in `DASHBOARD_MIDDLEWARE_PASSWORD`. Save that password in a password manager; it cannot be recovered from the hash.
 4. Add the controller connection:
 
    ```env
@@ -189,8 +188,11 @@ The stack sets up the rest on its first start:
 - The dashboard keeps its database in the `dashboard-config` volume and starts with no points.
 - Demo mode is off by default in this file; set `DASHBOARD_DEMO_MODE=true` for a demo stack. The dashboard waits for a healthy middleware, so a demo stack still needs `EWS_URL`, `EWS_USER` and `EWS_PASSWORD`; placeholder values are enough because demo mode never calls the middleware. `EWS_URL` has no default, so a missing value stops the deployment with an error instead of connecting to another controller.
 - The administrator exists only through `DASHBOARD_ADMIN_USER` and `DASHBOARD_ADMIN_PASSWORD`; keep them in the stack after the first start.
+- **Admin → Sustav i konfiguracija → Stanje instalacije** shows both versions, whether the middleware is reachable and how many points exist. **Provjeri vezu s kontrolerom** sends one read-only request to the controller. **Preuzmi backup baze** downloads a full copy of the dashboard database, including accounts; to restore it, stop the stack and replace `dashboard.sqlite` in the `dashboard-config` volume.
 
-Behind HTTPS also set `DASHBOARD_SECURE_COOKIES=true`, and behind a reverse proxy `DASHBOARD_TRUST_PROXY=1` (see [Security status](#security-status)). A controller with a different certificate authority still needs that CA in the middleware image. Private GHCR packages require read-only package credentials in Portainer.
+The middleware stays published on `MIDDLEWARE_HOST_PORT` for other clients, such as Swagger, Postman or a standalone service. Such a client signs in as `MIDDLEWARE_USER` with the generated password, or with the explicit credentials when the stack sets them. Each image reports its release version: the middleware in `GET /health`, the dashboard on the Admin page.
+
+Behind HTTPS also set `DASHBOARD_SECURE_COOKIES=true`, and behind a reverse proxy `DASHBOARD_TRUST_PROXY=1` (see [Security status](#security-status)). For a controller with a different certificate authority or a self-signed certificate, set `EWS_CA_CERT` (see below). Private GHCR packages require read-only package credentials in Portainer.
 
 Automatic middleware credentials need images from the release that introduced them; older images stop with a missing `MIDDLEWARE_PASSWORD_HASH` error. Existing stacks that rely on the former `EWS_URL` or demo-mode defaults must set those variables before redeploying with this file.
 
@@ -202,4 +204,4 @@ Successfully verified credentials are remembered for five minutes as a keyed fin
 
 The current Compose configuration is intended for an isolated test server. Use HTTPS for both services in production and set `DASHBOARD_SECURE_COOKIES=true` for the dashboard. Behind a reverse proxy also set `DASHBOARD_TRUST_PROXY` (and `MIDDLEWARE_TRUST_PROXY` if the middleware is proxied) to the number of proxy hops, usually `1`; otherwise all clients share the proxy's address and one person's failed logins throttle everyone.
 
-The middleware image installs the project CA certificate from `middleware/root_certificate_iotelectric.crt`. Replace it when the target controller uses a different CA. If no private CA is needed, remove the certificate `COPY`, `update-ca-certificates`, and `NODE_EXTRA_CA_CERTS` lines from the Dockerfile together.
+The middleware image installs the project CA certificate from `middleware/root_certificate_iotelectric.crt`. For a controller with a different CA or a self-signed certificate, set `EWS_CA_CERT` instead of rebuilding the image. It accepts the PEM certificate with real or escaped (`\n`) line breaks, or the whole PEM encoded as base64, which suits a single-line Portainer variable. `EWS_CA_FILE` can name a mounted PEM file instead. The certificates are added to the built-in one, and an invalid value stops the middleware at startup with an error.

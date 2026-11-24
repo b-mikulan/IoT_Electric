@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { randomUUID } = require("node:crypto");
-const { DatabaseSync } = require("node:sqlite");
+const { DatabaseSync, backup } = require("node:sqlite");
 
 class DashboardDatabase {
   #db;
@@ -50,6 +50,9 @@ class DashboardDatabase {
   }
 
   close() { this.#db.close(); }
+
+  // Online copy of the whole database, consistent even while it is in use.
+  backup(destination) { return backup(this.#db, destination); }
 
   transaction(operation) {
     if (this.#transactionActive) return operation();

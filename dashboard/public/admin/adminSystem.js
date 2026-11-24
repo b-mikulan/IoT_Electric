@@ -70,7 +70,47 @@
       report("transfer", null);
     } catch (error) { report("transfer", `Prijenos postavki nije dostupan. ${error.message}`); }
   }
-  function loadSystem() { void Promise.all([loadHealth(), loadSessions(), loadSettings(), loadTransfer()]); }
+  const pointText = count => `${count} ${count % 10 === 1 && count % 100 !== 11 ? "točka" : count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14) ? "točke" : "točaka"}`;
+  let demoMode = false;
+  async function loadInstallation() {
+    try {
+      const data = await request("/api/admin/system");
+      demoMode = data.demoMode;
+      element("install-dashboard-version").textContent = data.dashboardVersion || "Nepoznata (lokalni build)";
+      const middleware = data.middleware;
+      element("install-middleware").textContent = data.demoMode ? "Demo način · ne koristi se"
+        : middleware.reachable ? `Dostupan · verzija ${middleware.version || "nepoznata"}` : middleware.error || "Nije dostupan";
+      element("install-middleware").classList.toggle("is-error", !data.demoMode && !middleware.reachable);
+      element("install-points").textContent = data.demoMode ? "Demo podaci"
+        : data.pointCount ? pointText(data.pointCount) : "Još nema točaka. Dodaj ih kroz Dodavanje mjernih točaka.";
+      const warning = element("install-version-warning");
+      warning.hidden = !data.versionMismatch;
+      warning.textContent = data.versionMismatch ? `Dashboard (${data.dashboardVersion}) i middleware (${middleware.version}) imaju različite verzije. Postavi isti IMAGE_TAG za oba servisa.` : "";
+      const hints = element("install-hints");
+      hints.replaceChildren(...data.hints.map(text => Object.assign(document.createElement("li"), { textContent: text })));
+      hints.hidden = data.hints.length === 0;
+      element("install-controller-check").disabled = data.demoMode;
+      element("install-backup").hidden = !data.backupAvailable;
+      report("installation", null);
+    } catch (error) { report("installation", `Stanje instalacije nije dostupno. ${error.message}`); }
+  }
+  element("install-controller-check").addEventListener("click", async () => {
+    const button = element("install-controller-check");
+    const status = element("install-controller-status");
+    button.disabled = true;
+    status.classList.remove("is-error", "is-success");
+    status.textContent = "Provjeravam vezu s kontrolerom…";
+    try {
+      const result = await request("/api/admin/system/controller-check", {});
+      status.textContent = result.message;
+      status.classList.toggle("is-success", result.state === "connected");
+      status.classList.toggle("is-error", !["connected", "demo"].includes(result.state));
+    } catch (error) {
+      status.textContent = error.message;
+      status.classList.add("is-error");
+    } finally { button.disabled = demoMode; }
+  });
+  function loadSystem() { void Promise.all([loadHealth(), loadSessions(), loadSettings(), loadTransfer(), loadInstallation()]); }
   element("admin-system-retry").addEventListener("click", loadSystem);
   document.addEventListener("admin-sessions-refresh", loadSessions);
   const events = new EventSource("/api/dashboard/events");

@@ -17,6 +17,7 @@ const { createStaticAssets } = require("./lib/http/staticAssets");
 const { trackDashboardStream } = require("./lib/auth/dashboardAuth");
 const { createRoomIndex, scopeRooms } = require("./lib/auth/roomAccess");
 const { proposeOrganization, applyOrganizationSelection } = require("./lib/devices/organizationProposal");
+const { controllerCheck, systemStatus, sendDatabaseBackup } = require("./lib/http/systemStatus");
 
 function publicWidget(widget) {
   const { id, label, description, unit, precision, writable, visible } = widget;
@@ -122,6 +123,9 @@ function createApp({
   dashboardTransfer = new DashboardTransfer(config),
   dashboardSettings = new DashboardSettingsStore(config),
   buildingScan,
+  database,
+  version = process.env.APP_VERSION?.trim(),
+  secureCookies = process.env.DASHBOARD_SECURE_COOKIES === "true",
 }) {
   if (!poller) throw new Error("A point poller is required.");
   if (!config) throw new Error("Dashboard configuration is required.");
@@ -150,7 +154,7 @@ function createApp({
   poller.setWriteRefreshResolver?.(id => resolveRefreshScope(config.widgets, refreshModelOptions(), id, config.afterWriteScope));
   app.disable("x-powered-by");
   // Without this, everyone behind a reverse proxy shares one login-throttle address.
-  if (config.trustProxy) app.set("trust proxy", /^d+$/.test(config.trustProxy) ? Number(config.trustProxy) : config.trustProxy);
+  if (config.trustProxy) app.set("trust proxy", /^\d+$/.test(config.trustProxy) ? Number(config.trustProxy) : config.trustProxy);
   if (dashboardAuth) app.use(dashboardAuth.router);
 
   // Reserve dashboard/controller access for one paced topology reader. Existing
@@ -219,7 +223,9 @@ function createApp({
       if (response.locals.dashboardSession?.role !== "admin") return response.status(403).json({ code: "ADMIN_REQUIRED" });
       // User grants affect organization previews. These routes precede the
       // general configuration gate, so account operations participate here.
-      if (!request.path.startsWith("/organization") && !request.path.startsWith("/catalog/")) {
+      // System checks and backups read only; a backup download must not hold off an import.
+      if (!request.path.startsWith("/organization") && !request.path.startsWith("/catalog/")
+        && !request.path.startsWith("/system") && request.path !== "/backup") {
         if (transferBusy) return response.status(409).json({ error: "Promjena konfiguracije je u tijeku.", code: "TRANSFER_IN_PROGRESS" });
         activeConfigurationRequests++;
         let released = false;
@@ -400,6 +406,21 @@ function createApp({
     }
     return next();
   };
+  app.get("/api/admin/system", organizationAdmin, async (request, response) => {
+    response.set("Cache-Control", "no-store");
+    response.json(await systemStatus({ request, config, version, secureCookies, database,
+      pointCount: config.demoMode ? 0 : config.widgets.length }));
+  });
+  app.post("/api/admin/system/controller-check", organizationAdmin, async (request, response) => {
+    if (config.demoMode) return response.json({ state: "demo", message: "Demo način ne kontaktira middleware ni kontroler." });
+    try { return response.json(await controllerWork(() => controllerCheck(config))); }
+    catch (error) { return response.status(error.status || 500).json({ error: error.message, code: error.code }); }
+  });
+  app.get("/api/admin/backup", organizationAdmin, async (request, response) => {
+    if (!database) return response.status(404).json({ error: "Potpuni backup postoji samo uz SQLite bazu.", code: "BACKUP_UNAVAILABLE" });
+    try { await sendDatabaseBackup(response, database); }
+    catch { response.status(500).json({ error: "Backup baze nije uspio.", code: "BACKUP_FAILED" }); }
+  });
   const catalogImportEnabled = () => Boolean(buildingScan && !config.demoMode && widgetStore?.enabled);
   app.get("/api/admin/catalog/status", organizationAdmin, (request, response) => {
     try {

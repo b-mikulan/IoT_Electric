@@ -10,6 +10,7 @@ function createApp({
   ews,
   middlewareAuth = createMiddlewareAuth(),
   swaggerDocument = defaultSwaggerDocument,
+  version = process.env.APP_VERSION?.trim(),
 } = {}) {
   if (!ews) {
     throw new Error("An EWS client is required to create the application.");
@@ -19,7 +20,7 @@ function createApp({
   // Behind a reverse proxy, set TRUST_PROXY (hop count such as 1, or an address
   // list) so login throttling sees the real client address, not the proxy's.
   const trustProxy = process.env.TRUST_PROXY?.trim();
-  if (trustProxy) app.set("trust proxy", /^d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+  if (trustProxy) app.set("trust proxy", /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
 
   app.use(express.json());
   // When the REST client gives up, stop the controller call made on its behalf.
@@ -31,7 +32,8 @@ function createApp({
   });
 
   app.get("/health", (req, res) => {
-    res.json({ status: "ok" });
+    // APP_VERSION is set at image build time from the release tag.
+    res.json({ status: "ok", ...(version && { version }) });
   });
 
   app.use(

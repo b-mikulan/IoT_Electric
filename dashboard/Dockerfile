@@ -16,6 +16,10 @@ COPY dashboard/public ./public
 COPY catalog /app/catalog
 COPY tools/ews-topology/map_topology.py tools/ews-topology/pruning.py tools/ews-topology/admin_scan.py /app/tools/ews-topology/
 
+# Set by the release workflow from the version tag; shown on the Admin page.
+ARG APP_VERSION=
+ENV APP_VERSION=${APP_VERSION}
+
 WORKDIR /app
 RUN mkdir -p /app/config && chown node:node /app/config \
     && ln -s /app/config /app/dashboard/config

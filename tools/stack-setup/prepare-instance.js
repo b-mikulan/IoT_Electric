@@ -239,7 +239,7 @@ Iza reverse proxyja dodaj i DASHBOARD_TRUST_PROXY=1 i MIDDLEWARE_TRUST_PROXY=1.
 .env i portainer.env sadrze lozinke; cuvaj ih kao privatne fajlove.
 Za promjenu postavki nakon deploya azuriraj varijable u Portaineru.
 Promjena lokalnog .env ne azurira varijable postojeceg Portainer stacka.
-EWS/TLS vezu provjeri nakon deploya. Slike koriste CA iz middleware Dockerfilea.
+EWS/TLS vezu provjeri nakon deploya (Admin > Stanje instalacije). Za drugi CA kontrolera dodaj EWS_CA_CERT.
 `;
   fs.mkdirSync(settings.baseDir, { recursive: true, mode: 0o755 });
   const staging = fs.mkdtempSync(path.join(settings.baseDir, `.setup-${options.name}-`));

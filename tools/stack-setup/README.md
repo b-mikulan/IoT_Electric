@@ -105,8 +105,8 @@ Izvori: [Portainer stack setup](https://docs.portainer.io/sts/user/docker/stacks
 [Compose .env pravila](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/).
 
 Ako su GHCR imagei privatni, koristi već podešen GHCR registry u Portaineru.
-Skripta ne provjerava dostupnost image taga i EWS vezu. Nova EWS CA, ako je potrebna,
-mora biti uključena u middleware image kao u postojećem Dockerfileu.
+Skripta ne provjerava dostupnost image taga i EWS vezu. Za kontroler s drugim CA-om
+ili samopotpisanim certifikatom dodaj u stack `EWS_CA_CERT` (PEM ili PEM kodiran u base64).
 
 Za API/Swagger login pročitaj `MIDDLEWARE_USER` i `DASHBOARD_MIDDLEWARE_PASSWORD` iz `.env`.
 Za prijavu u dashboard pročitaj `DASHBOARD_ADMIN_USER` i `DASHBOARD_ADMIN_PASSWORD` iz `.env`.

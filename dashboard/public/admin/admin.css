@@ -101,6 +101,11 @@
 .admin-skip { position: absolute; top: 8px; left: 8px; z-index: 2; transform: translateY(-150%); padding: 12px; background: var(--surface); color: var(--action); border: 2px solid var(--action); border-radius: var(--r-sm); }
 .admin-skip:focus { transform: translateY(0); }
 .catalog-actions { margin-top: 16px; }
+.install-hints { padding-inline-start: 28px; }
+.install-check { margin-top: 20px; }
+#install-backup { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); }
+#install-backup h3 { margin-top: 0; }
+#install-middleware.is-error { color: var(--error); }
 .catalog-import-notice:not(:empty) {
   padding: var(--sp-2) var(--sp-3);
   border-inline-start: 3px solid var(--idle);

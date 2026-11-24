@@ -128,6 +128,25 @@ function sendAdminPage(response) {
           <p id="admin-system-status" class="admin-status" role="status" aria-live="polite"></p>
           <button id="admin-system-retry" class="admin-button secondary" type="button" hidden>Pokušaj ponovno</button>
         </div>
+        <div class="admin-card admin-system-card">
+          <h3>Stanje instalacije</h3>
+          <dl class="admin-system-details">
+            <div><dt>Verzija dashboarda</dt><dd id="install-dashboard-version">—</dd></div>
+            <div><dt>Middleware</dt><dd id="install-middleware">—</dd></div>
+            <div><dt>Mjerne točke</dt><dd id="install-points">—</dd></div>
+          </dl>
+          <p id="install-version-warning" class="admin-warning" hidden></p>
+          <ul id="install-hints" class="admin-warning install-hints" hidden></ul>
+          <div class="admin-actions install-check"><button id="install-controller-check" class="admin-button secondary" type="button" disabled>Provjeri vezu s kontrolerom</button></div>
+          <p class="admin-hint">Provjera šalje jedan zahtjev za čitanje podataka o servisu kontrolera. Ne mijenja vrijednosti.</p>
+          <p id="install-controller-status" class="admin-status" role="status" aria-live="polite"></p>
+          <div id="install-backup" hidden>
+            <h3>Backup baze</h3>
+            <p class="admin-hint">Potpuna kopija baze dashboarda: mjerne točke, uređaji, prostorije, postavke i korisnički računi s lozinkama u obliku hasha. Ne sadrži administratora iz varijabli stacka, middleware lozinku ni snimke skeniranja. Čuvaj datoteku kao povjerljivu.</p>
+            <a id="install-backup-link" class="admin-button secondary" href="/api/admin/backup" download>Preuzmi backup baze</a>
+            <p class="admin-hint">Za povrat zaustavi stack i zamijeni <code>dashboard.sqlite</code> u volumeu konfiguracije preuzetom datotekom.</p>
+          </div>
+        </div>
         <div class="admin-shortcuts">
           <a id="admin-rooms-link" class="admin-card admin-shortcut" href="/#rooms" hidden><span class="admin-shortcut-heading">Prostorije i katovi <span aria-hidden="true">↗</span></span><span>Uredi organizaciju zgrade i raspored uređaja po prostorijama.</span></a>
           <a id="admin-visibility-link" class="admin-card admin-shortcut" href="/#visibility" hidden><span class="admin-shortcut-heading">Vidljivost podataka <span aria-hidden="true">↗</span></span><span>Odaberi koje se mjerne točke prikazuju na dashboardu.</span></a>
