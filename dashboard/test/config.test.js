@@ -152,3 +152,19 @@ test("configures bounded sequential reads while retaining the existing defaults"
   for (const value of ["0", "501", "NaN", "1.5"]) assert.throws(() => loadConfig({ READ_BATCH_SIZE: value }), /READ_BATCH_SIZE/);
   for (const value of ["-1", "60001", "NaN"]) assert.throws(() => loadConfig({ READ_BATCH_DELAY_MS: value }), /READ_BATCH_DELAY_MS/);
 });
+
+test("reads the middleware password file and tolerates its absence only in demo mode", (t) => {
+  const fs = require("node:fs");
+  const os = require("node:os");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "dashboard-password-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const file = path.join(directory, "middleware-password");
+  const real = { DEMO_MODE: "false", MIDDLEWARE_USER: "iot-electric", MIDDLEWARE_PASSWORD_FILE: file, WIDGETS_JSON: "[]" };
+
+  assert.equal(loadConfig({ ...real, DEMO_MODE: "true" }).password, "");
+  assert.throws(() => loadConfig(real), /Unable to read MIDDLEWARE_PASSWORD_FILE/);
+  fs.writeFileSync(file, "generated-secret\n");
+  assert.equal(loadConfig(real).password, "generated-secret");
+  // An explicit password, as in stacks prepared by the setup script, wins.
+  assert.equal(loadConfig({ ...real, MIDDLEWARE_PASSWORD: "explicit" }).password, "explicit");
+});

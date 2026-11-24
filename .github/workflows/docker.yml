@@ -53,7 +53,9 @@ jobs:
       - name: Validate Docker Compose files
         run: |
           docker compose config --quiet
-          docker compose -f docker-compose.portainer.yml config --quiet
+          # The Portainer stack requires EWS_URL; any value validates the file.
+          EWS_URL=https://controller.example/EcoStruxure/DataExchange \
+            docker compose -f docker-compose.portainer.yml config --quiet
 
   image:
     name: Build ${{ matrix.name }} image

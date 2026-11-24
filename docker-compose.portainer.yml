@@ -5,14 +5,25 @@ services:
       - "${MIDDLEWARE_HOST_PORT:-3000}:3000"
     environment:
       PORT: "3000"
-      EWS_URL: "${EWS_URL:-https://bms.iot-electric.hr/EcoStruxure/DataExchange}"
+      EWS_URL: "${EWS_URL:?Set EWS_URL to the controller's full EcoStruxure DataExchange endpoint}"
       EWS_USER: "${EWS_USER:-}"
       EWS_PASSWORD: "${EWS_PASSWORD:-}"
       EWS_CONTAINER_TIMEOUT_MS: "${EWS_CONTAINER_TIMEOUT_MS:-8000}"
       EWS_REQUEST_TIMEOUT_MS: "${EWS_REQUEST_TIMEOUT_MS:-30000}"
       TRUST_PROXY: "${MIDDLEWARE_TRUST_PROXY:-}"
-      MIDDLEWARE_USER: "${MIDDLEWARE_USER:-}"
+      MIDDLEWARE_USER: "${MIDDLEWARE_USER:-iot-electric}"
       MIDDLEWARE_PASSWORD_HASH: "${MIDDLEWARE_PASSWORD_HASH:-}"
+      # Without MIDDLEWARE_PASSWORD_HASH the middleware creates a random
+      # password here on its first start and the dashboard reads it.
+      MIDDLEWARE_GENERATED_PASSWORD_FILE: "/run/iot-electric/middleware-password"
+    volumes:
+      - "middleware-credentials:/run/iot-electric:rw"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     restart: unless-stopped
 
   dashboard:
@@ -30,23 +41,26 @@ services:
       DASHBOARD_SECURE_COOKIES: "${DASHBOARD_SECURE_COOKIES:-false}"
       TRUST_PROXY: "${DASHBOARD_TRUST_PROXY:-}"
       MIDDLEWARE_URL: "http://middleware:3000"
-      MIDDLEWARE_USER: "${MIDDLEWARE_USER:-}"
+      MIDDLEWARE_USER: "${MIDDLEWARE_USER:-iot-electric}"
       MIDDLEWARE_PASSWORD: "${DASHBOARD_MIDDLEWARE_PASSWORD:-}"
-      MIDDLEWARE_PASSWORD_FILE: "${DASHBOARD_MIDDLEWARE_PASSWORD_FILE:-}"
+      MIDDLEWARE_PASSWORD_FILE: "${DASHBOARD_MIDDLEWARE_PASSWORD_FILE:-/run/iot-electric/middleware-password}"
       POLL_INTERVAL_MS: "${DASHBOARD_POLL_INTERVAL_MS:-15000}"
       READ_BATCH_SIZE: "${DASHBOARD_READ_BATCH_SIZE:-500}"
       READ_BATCH_DELAY_MS: "${DASHBOARD_READ_BATCH_DELAY_MS:-0}"
       MIDDLEWARE_TIMEOUT_MS: "${DASHBOARD_MIDDLEWARE_TIMEOUT_MS:-10000}"
-      DEMO_MODE: "${DASHBOARD_DEMO_MODE:-true}"
+      DEMO_MODE: "${DASHBOARD_DEMO_MODE:-false}"
       WIDGETS_FILE: "${DASHBOARD_WIDGETS_FILE:-}"
       DEVICE_WIDGETS_FILE: "${DASHBOARD_DEVICE_WIDGETS_FILE:-}"
       DEVICE_METADATA_FILE: "${DASHBOARD_DEVICE_METADATA_FILE:-}"
       WIDGETS_JSON: "${DASHBOARD_WIDGETS_JSON:-}"
     volumes:
       - "${DASHBOARD_CONFIG_SOURCE:-dashboard-config}:/app/config:rw"
+      - "middleware-credentials:/run/iot-electric:ro"
     depends_on:
-      - middleware
+      middleware:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   dashboard-config:
+  middleware-credentials:

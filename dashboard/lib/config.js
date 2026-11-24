@@ -66,7 +66,7 @@ function parseBoundedInteger(value, fallback, name, minimum, maximum) {
   return parsed;
 }
 
-function readMiddlewarePassword(env) {
+function readMiddlewarePassword(env, demoMode) {
   if (env.MIDDLEWARE_PASSWORD) return String(env.MIDDLEWARE_PASSWORD);
   if (!env.MIDDLEWARE_PASSWORD_FILE) return "";
 
@@ -75,6 +75,9 @@ function readMiddlewarePassword(env) {
       .readFileSync(String(env.MIDDLEWARE_PASSWORD_FILE), "utf8")
       .replace(/\r?\n$/, "");
   } catch (error) {
+    // The Portainer stack always names the middleware's generated file. A demo
+    // stack never contacts the middleware, which may not have created it.
+    if (demoMode && error.code === "ENOENT") return "";
     throw new Error(`Unable to read MIDDLEWARE_PASSWORD_FILE: ${error.message}`);
   }
 }
@@ -192,7 +195,7 @@ function loadConfig(env = process.env, { rawWidgets = readWidgetConfiguration(en
   const demoMode = parseBoolean(env.DEMO_MODE, !rawWidgets && (!allowEmptyWidgets || !inlineWidgets && !widgetsFile));
   const parsedWidgets = parseWidgets(rawWidgets || (allowEmptyWidgets && !demoMode ? "[]" : ""), demoMode);
   const widgets = allowEmptyWidgets && demoMode && !parsedWidgets.length ? DEFAULT_DEMO_WIDGETS.map(normalizeWidget) : parsedWidgets;
-  const password = readMiddlewarePassword(env);
+  const password = readMiddlewarePassword(env, demoMode);
   const port = Number(env.PORT || 3001);
 
   if (!Number.isInteger(port) || port < 1 || port > 65_535) {

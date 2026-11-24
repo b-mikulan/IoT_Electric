@@ -93,7 +93,7 @@ Local project inputs are organized as follows:
 
 See [tools/gpa-translator/README.md](tools/gpa-translator/README.md) for the GPA tool.
 
-For new Linux/Portainer instances, use [tools/stack-setup/README.md](tools/stack-setup/README.md).
+For new Portainer instances, see [Docker images and Portainer](#docker-images-and-portainer). The optional [tools/stack-setup/README.md](tools/stack-setup/README.md) helper prepares an instance folder for the Docker Compose CLI.
 
 ## Start locally with Docker
 
@@ -129,7 +129,7 @@ Each service uses its own credentials:
 - `MIDDLEWARE_USER` and its generated password let Swagger, Postman, or the dashboard call the REST API.
 - The dashboard administrator signs in from a browser and manages regular accounts and room access on **Admin**.
 
-The dashboard needs the middleware's plaintext password because it is an API client. Keep it only in the untracked `.env`, a Portainer secret, or a Docker secret. Compose injects credentials at container start; they are not baked into either image.
+The dashboard needs the middleware's plaintext password because it is an API client. Keep it only in the untracked `.env`, a Portainer secret, or a Docker secret. Compose injects credentials at container start; they are not baked into either image. The Portainer stack can instead generate the password into its `middleware-credentials` volume (see [New Portainer stack](#new-portainer-stack)). To replace a generated password, delete `/run/iot-electric/middleware-password` in the middleware container, then restart the middleware and afterwards the dashboard, which reads the password only at startup.
 
 ## Useful commands
 
@@ -162,7 +162,37 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-In Portainer, deploy `docker-compose.portainer.yml` and set `IMAGE_TAG=1.0.0`. Portainer pulls the published images directly, so the server does not need a Git clone or a manual build. Private GHCR packages require read-only package credentials in Portainer.
+### New Portainer stack
+
+Portainer pulls the published images directly, so the server needs no Git clone, manual build or preparation script.
+
+1. **Stacks → Add stack**. Choose **Repository** with this repository's URL and the Compose path `docker-compose.portainer.yml`, or paste that file into **Web editor**.
+2. Add the environment variables:
+
+   ```env
+   IMAGE_TAG=1.0.0
+   EWS_URL=https://controller.example/EcoStruxure/DataExchange
+   EWS_USER=controller_username
+   EWS_PASSWORD=controller_password
+   DASHBOARD_ADMIN_USER=admin
+   DASHBOARD_ADMIN_PASSWORD=choose_a_password
+   # Only when another stack on the same Docker host already uses 3000/3001:
+   # MIDDLEWARE_HOST_PORT=3100
+   # DASHBOARD_HOST_PORT=3101
+   ```
+
+3. **Deploy the stack**, then sign in to the dashboard as the administrator and add points through discovery.
+
+The stack sets up the rest on its first start:
+
+- Without `MIDDLEWARE_PASSWORD_HASH`, the middleware creates a random password for the user `iot-electric` in the `middleware-credentials` volume. The dashboard reads it from there, and the dashboard starts only after the middleware is healthy. The password is kept across restarts and image updates. For Swagger or Postman access, read `/run/iot-electric/middleware-password` through the middleware container's Portainer console, or set your own `MIDDLEWARE_USER`, `MIDDLEWARE_PASSWORD_HASH` and `DASHBOARD_MIDDLEWARE_PASSWORD`, which always take precedence.
+- The dashboard keeps its database in the `dashboard-config` volume and starts with no points.
+- Demo mode is off by default in this file; set `DASHBOARD_DEMO_MODE=true` for a demo stack. The dashboard waits for a healthy middleware, so a demo stack still needs `EWS_URL`, `EWS_USER` and `EWS_PASSWORD`; placeholder values are enough because demo mode never calls the middleware. `EWS_URL` has no default, so a missing value stops the deployment with an error instead of connecting to another controller.
+- The administrator exists only through `DASHBOARD_ADMIN_USER` and `DASHBOARD_ADMIN_PASSWORD`; keep them in the stack after the first start.
+
+Behind HTTPS also set `DASHBOARD_SECURE_COOKIES=true`, and behind a reverse proxy `DASHBOARD_TRUST_PROXY=1` (see [Security status](#security-status)). A controller with a different certificate authority still needs that CA in the middleware image. Private GHCR packages require read-only package credentials in Portainer.
+
+Automatic middleware credentials need images from the release that introduced them; older images stop with a missing `MIDDLEWARE_PASSWORD_HASH` error. Existing stacks that rely on the former `EWS_URL` or demo-mode defaults must set those variables before redeploying with this file.
 
 ## Security status
 

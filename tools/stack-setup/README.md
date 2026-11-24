@@ -2,6 +2,13 @@
 
 Za postojeći Linux server s Dockerom i Portainerom (Docker Standalone).
 Skripta priprema foldere i datoteke; stack zatim deployaš u Portaineru kao dosad.
+
+Za novi Portainer stack skripta više nije potrebna: Portainer može deployati
+`docker-compose.portainer.yml` izravno iz repozitorija, a middleware vjerodajnice
+i konfiguracijski volume slože se pri prvom pokretanju. Upute su u glavnom
+[README.md](../../README.md#new-portainer-stack). Skripta ostaje za instance koje
+se pokreću Docker Compose CLI-jem na serveru ili za koje želiš unaprijed
+generirane vjerodajnice u datotekama.
 Radi iz bilo kojeg radnog foldera, a izvornu konfiguraciju uzima iz ovog repozitorija.
 Ne instalira Docker/Portainer i ne mijenja postojeće stackove ili firewall.
 
