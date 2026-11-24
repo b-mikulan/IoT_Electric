@@ -862,11 +862,22 @@ h1 {
   border-color: var(--warn-line);
 }
 
-/* theme.js sets this for the moment it swaps themes, so colours change at once. */
+/* theme.js sets this for the moment it swaps themes, so colours change at once.
+   It is used when the viewer prefers reduced motion. */
 .theme-changing *,
 .theme-changing *::before,
 .theme-changing *::after {
   transition: none !important;
+}
+
+/* Otherwise theme.js sets this for a moment, so every colour fades together
+   instead of each control running its own colour transition. */
+.theme-animating,
+.theme-animating *,
+.theme-animating *::before,
+.theme-animating *::after {
+  transition: background-color 220ms ease, color 220ms ease, border-color 220ms ease, outline-color 220ms ease,
+    fill 220ms ease, stroke 220ms ease, box-shadow 220ms ease !important;
 }
 
 /*

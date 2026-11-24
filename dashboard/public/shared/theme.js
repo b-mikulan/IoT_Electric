@@ -50,15 +50,26 @@
     }
   }
 
+  const reducedMotion = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+  const fadeMs = 220;
+  let fadeTimer = 0;
+
   function apply() {
     const next = resolve(choice);
     const switching = Boolean(theme) && next !== theme;
-    // Swap every colour at once instead of letting each control's colour transition run.
-    if (switching) root.classList.add("theme-changing");
+    // A short, uniform fade between themes; an instant swap for reduced motion.
+    // The first paint never animates.
+    const instant = switching && reducedMotion?.matches;
+    if (instant) root.classList.add("theme-changing");
+    if (switching && !instant) {
+      clearTimeout(fadeTimer);
+      root.classList.add("theme-animating");
+      fadeTimer = setTimeout(() => root.classList.remove("theme-animating"), fadeMs + 80);
+    }
     root.dataset.theme = next;
     root.dataset.themeChoice = choice;
     syncSwitches();
-    if (switching) {
+    if (instant) {
       void document.body?.offsetHeight; // Apply the new colours while transitions are off.
       root.classList.remove("theme-changing");
     }

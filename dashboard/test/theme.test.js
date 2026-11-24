@@ -81,7 +81,7 @@ for (const [themeName, tokens, extraPairs] of [["light", lightTokens, []], ["dar
   });
 }
 
-function loadTheme({ stored, systemDark = false, storageThrows = false } = {}) {
+function loadTheme({ stored, systemDark = false, storageThrows = false, reducedMotion = false } = {}) {
   const store = new Map(stored ? [["iotElectric.dashboard.theme", stored]] : []);
   const localStorage = {
     getItem(key) { if (storageThrows) throw new Error("blocked"); return store.has(key) ? store.get(key) : null; },
@@ -89,9 +89,18 @@ function loadTheme({ stored, systemDark = false, storageThrows = false } = {}) {
     removeItem(key) { if (storageThrows) throw new Error("blocked"); store.delete(key); },
   };
   const events = [];
+  const classes = new Set();
+  const classLog = [];
+  const timers = [];
   const document = {
     readyState: "loading",
-    documentElement: { dataset: {}, classList: { add() {}, remove() {} } },
+    documentElement: {
+      dataset: {},
+      classList: {
+        add(name) { classes.add(name); classLog.push(`+${name}`); },
+        remove(name) { classes.delete(name); classLog.push(`-${name}`); },
+      },
+    },
     body: null,
     addEventListener() {},
     dispatchEvent(event) { events.push(event.detail); },
@@ -100,12 +109,31 @@ function loadTheme({ stored, systemDark = false, storageThrows = false } = {}) {
   };
   const window = {
     localStorage,
-    matchMedia: () => ({ matches: systemDark, addEventListener() {} }),
+    matchMedia: (query) => ({ matches: query.includes("reduced-motion") ? reducedMotion : systemDark, addEventListener() {} }),
     addEventListener() {},
   };
-  vm.runInNewContext(themeScript, { window, document, CustomEvent });
-  return { root: document.documentElement, theme: window.IoTTheme, store, events };
+  const setTimeout = (callback, ms) => timers.push({ callback, ms });
+  vm.runInNewContext(themeScript, { window, document, CustomEvent, setTimeout, clearTimeout() {} });
+  const runTimers = () => { for (const timer of timers.splice(0)) timer.callback(); };
+  return { root: document.documentElement, theme: window.IoTTheme, store, events, classes, classLog, timers, runTimers };
 }
+
+test("theme.js fades between themes, but not on first paint or for reduced motion", () => {
+  const page = loadTheme();
+  assert.deepEqual(page.classLog, []);
+  page.theme.set("dark");
+  assert.equal(page.classes.has("theme-animating"), true);
+  assert.ok(page.timers[0].ms >= 220);
+  page.runTimers();
+  assert.equal(page.classes.has("theme-animating"), false);
+  page.theme.set("dark");
+  assert.deepEqual(page.timers, []);
+
+  const reduced = loadTheme({ reducedMotion: true });
+  reduced.theme.set("dark");
+  assert.deepEqual(reduced.classLog, ["+theme-changing", "-theme-changing"]);
+  assert.deepEqual(reduced.timers, []);
+});
 
 test("theme.js applies the stored or system theme before the page renders", () => {
   assert.equal(loadTheme({ stored: "dark" }).root.dataset.theme, "dark");
