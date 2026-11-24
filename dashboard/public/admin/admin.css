@@ -80,6 +80,8 @@
 .admin-overview .is-error { color: var(--error); }
 .admin-status.is-success { color: var(--ok-ink); }
 .admin-system-card { padding: 24px; }
+/* Same gap as between the shortcut cards below. */
+.admin-system-card + .admin-system-card { margin-top: 16px; }
 .admin-system-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
 .admin-system-details { display: flex; gap: 24px 60px; flex-wrap: wrap; margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--border); }
 .admin-system-details dt { color: var(--muted); font-size: var(--fs-xs); }
