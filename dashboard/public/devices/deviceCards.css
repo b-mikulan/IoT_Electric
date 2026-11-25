@@ -298,3 +298,108 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 }
 
 .device-cards-section .dc-refresh-button:disabled { cursor: wait; opacity: .6; }
+
+/* Tile view. Each top-level card shows a compact tile; one card at a time
+   opens as a bottom sheet with its full controls. Rows inside group and zone
+   cards keep their row layout. "On" is shown with the light's own tone, never
+   with the green, amber or red state colours. */
+.dc-view-switch { display: inline-flex; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); overflow: hidden; }
+.dc-view-option { min-height: 32px; padding: 0 12px; border: 0; background: transparent; color: var(--dc-ink); font: inherit; font-size: var(--fs-xs, .75rem); font-weight: 600; cursor: pointer; }
+.dc-view-option + .dc-view-option { border-left: 1px solid var(--line-strong, #858F92); }
+.dc-view-option[aria-pressed="true"] { background: var(--action-tint, #E3EDF7); color: var(--action-strong, #154A7B); }
+.dc-view-option:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: -2px; }
+.dc-tile, .dc-sheet-close { display: none; }
+.dc-sheet-backdrop { position: fixed; inset: 0; z-index: 1000; background: var(--backdrop, rgba(20, 26, 30, .55)); }
+.dc-sheet-backdrop[hidden] { display: none; }
+
+.device-cards-section.dc-view-tiles .dc-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) { position: relative; display: flex; flex-direction: column; gap: 10px; height: 116px; margin: 0; padding: 12px; overflow: hidden; background: var(--surface-sunken, #F4F6F5); }
+/* Every tile has the same height; only bulk selection, which adds a checkbox row, lets it grow. */
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open):has(> .dc-card-selection:not([hidden])) { height: auto; min-height: 116px; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) > :is(.dc-card-body, .dc-state-line, .dc-command-status, .dc-refresh-status, .dc-details, .dc-group-members) { display: none; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-card-top { gap: 10px; padding-right: 46px; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) :is(.dc-room, .dc-group-note, .dc-card-actions, .dc-type-label) { display: none; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-device-icon { width: 34px; height: 34px; flex-basis: 34px; border-radius: 50%; background: var(--surface-sunken-2, #E4E8E7); color: var(--muted, #5A646A); }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-device-icon svg { width: 20px; height: 20px; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-card-title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: var(--fs-base, .875rem); }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-card-selection { position: relative; z-index: 2; padding-bottom: 0; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open):is(.dc-type-climate, .dc-type-sensor, .dc-type-zone, .dc-type-blind, .dc-type-generic) { background: var(--surface, #FFFFFF); }
+.dc-view-tiles .dc-grid > .dc-card.dc-tile-on:not(.dc-sheet-open) { background: var(--surface, #FFFFFF); border-color: var(--line-strong, #858F92); }
+.dc-view-tiles .dc-grid > .dc-card.dc-tile-on:not(.dc-sheet-open) .dc-device-icon { background: var(--tone-ochre-tint, #F5F0E7); color: var(--tone-ochre, #87683C); }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-tile { display: flex; flex-direction: column; gap: 2px; margin-top: auto; }
+.dc-tile-open { position: absolute; inset: 0; z-index: 1; width: 100%; padding: 0; border: 0; border-radius: inherit; background: transparent; cursor: pointer; }
+.dc-tile-open:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 2px; }
+.dc-tile-value { font-family: var(--dc-din); font-size: 1.5rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.dc-tile-value[hidden] { display: none; }
+.dc-tile-state { color: var(--muted, #5A646A); font-size: var(--fs-xs, .75rem); line-height: 1.35; }
+.dc-tile-state-error { color: var(--alarm-ink, #9E2A22); }
+.dc-tile-quick { position: absolute; top: 10px; right: 10px; z-index: 2; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--line-strong, #858F92); border-radius: 50%; background: var(--surface, #FFFFFF); color: var(--dc-ink); cursor: pointer; }
+.dc-tile-quick[hidden] { display: none; }
+.dc-tile-quick svg { width: 20px; height: 20px; }
+.dc-tile-quick[aria-pressed="true"] { border-color: var(--tone-ochre, #87683C); background: var(--tone-ochre-tint, #F5F0E7); color: var(--tone-ochre, #87683C); }
+.dc-tile-quick:disabled { cursor: not-allowed; opacity: .5; }
+.dc-tile-quick:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 2px; }
+
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1001; max-width: 640px; max-height: 88vh; margin: 0 auto; overflow-y: auto; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgba(0, 0, 0, .2); }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-sheet-close { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; margin-left: auto; padding: 0; border: 1px solid var(--line, #CBD1CF); border-radius: 50%; background: transparent; color: var(--dc-ink); cursor: pointer; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-sheet-close svg { width: 18px; height: 18px; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-type-label { display: none; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-range { height: 12px; margin: 18px 0 12px; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-range::-webkit-slider-thumb { width: 30px; height: 30px; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-range::-moz-range-thumb { width: 24px; height: 24px; }
+@media (max-width: 650px) {
+  .device-cards-section.dc-view-tiles .dc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}
+.dc-tile-blind { position: absolute; top: 10px; right: 10px; bottom: 10px; z-index: 2; display: flex; flex-direction: column; gap: 6px; width: 40px; }
+.dc-tile-blind[hidden], .device-cards-section:not(.dc-view-tiles) .dc-tile-blind { display: none; }
+.dc-tile-step { display: grid; place-items: center; flex: 1 1 0; width: 40px; min-height: 0; padding: 0; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--dc-ink); cursor: pointer; }
+.dc-tile-step svg { width: 20px; height: 20px; }
+.dc-tile-step:disabled { cursor: not-allowed; opacity: .5; }
+.dc-tile-step:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 2px; }
+.dc-view-tiles .dc-grid > .dc-card.dc-type-blind:not(.dc-sheet-open) :is(.dc-card-top, .dc-tile-state) { padding-right: 46px; }
+
+/* Bottom sheet details: a drag-handle line, a command chip in the header and,
+   for lights and blinds, a large vertical slider beside the readings and
+   preset buttons. Only the sheet's own card is affected, never the rows of
+   lights or sensors listed inside it. */
+.dc-presets, .dc-sheet-chip { display: none; }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open { padding-top: 26px; }
+/* The handle is a wide touch target around a small pill; dragging it (or the
+   header) down closes the sheet, see dragStart in deviceCards.js. */
+.dc-sheet-handle { display: none; }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open > .dc-sheet-handle { display: block; position: absolute; top: 0; left: 0; right: 0; height: 26px; cursor: grab; touch-action: none; }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open > .dc-sheet-handle::before { content: ""; position: absolute; top: 9px; left: 50%; width: 40px; height: 4px; margin-left: -20px; border-radius: 2px; background: var(--line-strong, #858F92); }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open > .dc-sheet-handle:active { cursor: grabbing; }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open > .dc-card-top { touch-action: none; }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open { animation: dc-sheet-in 220ms ease-out; }
+.dc-sheet-backdrop:not([hidden]) { animation: dc-sheet-fade 220ms ease-out; }
+@keyframes dc-sheet-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes dc-sheet-fade { from { opacity: 0; } to { opacity: 1; } }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-top .dc-sheet-chip:not([hidden]) { display: inline-flex; margin-top: 6px; padding: 2px 8px; border-radius: var(--r-sm, 4px); font-size: var(--fs-xs, .75rem); font-weight: 600; color: var(--action-strong, #154A7B); background: var(--action-tint, #E3EDF7); }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-sheet-chip[data-status="readback"] { color: var(--ok-ink, #1E6B3A); background: var(--ok-tint, #E3F1E7); }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-sheet-chip[data-status="error"] { color: var(--alarm-ink, #9E2A22); background: var(--alarm-tint, #FBE5E3); }
+.dc-view-tiles .dc-card.dc-sheet-open:is(.dc-type-light, .dc-type-lightGroup, .dc-type-blind) > .dc-card-body:has(> :is(.dc-control-brightnessSet, .dc-control-positionSet)) { display: grid; grid-template-columns: 96px minmax(0, 1fr); column-gap: 22px; row-gap: 12px; align-items: start; }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > * { grid-column: 2; }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) { grid-column: 1; grid-row: 1 / span 12; display: flex; flex-direction: column; align-items: center; }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-control-heading { flex-direction: column; gap: 2px; margin: 0 0 8px; text-align: center; }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-control-output { font-size: var(--fs-lg, 1.25rem); }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-control-hint { display: none; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range { writing-mode: vertical-lr; width: 88px; height: 220px; margin: 0; border-radius: 16px; cursor: pointer; }
+/* Brightness grows from the bottom; a blind closes from the top, as it does on the window. */
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > .dc-control-brightnessSet .dc-range { direction: rtl; background: linear-gradient(to top, var(--tone-ochre, #87683C) 0%, var(--tone-ochre, #87683C) var(--dc-range-fill, 0%), var(--surface-sunken-2, #E4E8E7) var(--dc-range-fill, 0%), var(--surface-sunken-2, #E4E8E7) 100%); }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > .dc-control-positionSet .dc-range { direction: ltr; background: linear-gradient(to bottom, var(--tone-teal, #3F7891) 0%, var(--tone-teal, #3F7891) var(--dc-range-fill, 0%), var(--surface-sunken-2, #E4E8E7) var(--dc-range-fill, 0%), var(--surface-sunken-2, #E4E8E7) 100%); }
+/* Like a phone's control-centre slider, the fill edge is the handle: the thumb
+   spans the whole width and is invisible, so it never looks offset. */
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range::-webkit-slider-thumb { width: 88px; height: 24px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range::-moz-range-thumb { width: 88px; height: 24px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range:disabled { cursor: not-allowed; opacity: .6; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 3px; }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > .dc-presets { display: flex; flex-direction: column; gap: 8px; }
+.dc-preset { min-height: 40px; padding: 0 12px; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: transparent; color: var(--dc-ink); font: inherit; font-size: var(--fs-sm, .8125rem); font-weight: 600; cursor: pointer; }
+.dc-preset[aria-pressed="true"] { border-color: var(--action, #1C5D99); background: var(--action-tint, #E3EDF7); color: var(--action-strong, #154A7B); }
+.dc-preset:disabled { cursor: not-allowed; opacity: .5; }
+.dc-preset:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 2px; }
+/* Materialize draws its own 3 px track on every range; the large slider paints the whole input instead. */
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range::-webkit-slider-runnable-track { width: 100%; height: 100%; background: transparent; border: 0; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range::-moz-range-track { width: 100%; height: 100%; background: transparent; border: 0; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range::-webkit-slider-thumb { margin: 0; }

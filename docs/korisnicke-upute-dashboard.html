@@ -321,6 +321,111 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 
 .device-cards-section .dc-refresh-button:disabled { cursor: wait; opacity: .6; }
 
+/* Tile view. Each top-level card shows a compact tile; one card at a time
+   opens as a bottom sheet with its full controls. Rows inside group and zone
+   cards keep their row layout. "On" is shown with the light's own tone, never
+   with the green, amber or red state colours. */
+.dc-view-switch { display: inline-flex; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); overflow: hidden; }
+.dc-view-option { min-height: 32px; padding: 0 12px; border: 0; background: transparent; color: var(--dc-ink); font: inherit; font-size: var(--fs-xs, .75rem); font-weight: 600; cursor: pointer; }
+.dc-view-option + .dc-view-option { border-left: 1px solid var(--line-strong, #858F92); }
+.dc-view-option[aria-pressed="true"] { background: var(--action-tint, #E3EDF7); color: var(--action-strong, #154A7B); }
+.dc-view-option:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: -2px; }
+.dc-tile, .dc-sheet-close { display: none; }
+.dc-sheet-backdrop { position: fixed; inset: 0; z-index: 1000; background: var(--backdrop, rgba(20, 26, 30, .55)); }
+.dc-sheet-backdrop[hidden] { display: none; }
+
+.device-cards-section.dc-view-tiles .dc-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) { position: relative; display: flex; flex-direction: column; gap: 10px; height: 116px; margin: 0; padding: 12px; overflow: hidden; background: var(--surface-sunken, #F4F6F5); }
+/* Every tile has the same height; only bulk selection, which adds a checkbox row, lets it grow. */
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open):has(> .dc-card-selection:not([hidden])) { height: auto; min-height: 116px; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) > :is(.dc-card-body, .dc-state-line, .dc-command-status, .dc-refresh-status, .dc-details, .dc-group-members) { display: none; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-card-top { gap: 10px; padding-right: 46px; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) :is(.dc-room, .dc-group-note, .dc-card-actions, .dc-type-label) { display: none; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-device-icon { width: 34px; height: 34px; flex-basis: 34px; border-radius: 50%; background: var(--surface-sunken-2, #E4E8E7); color: var(--muted, #5A646A); }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-device-icon svg { width: 20px; height: 20px; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-card-title { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: var(--fs-base, .875rem); }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-card-selection { position: relative; z-index: 2; padding-bottom: 0; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open):is(.dc-type-climate, .dc-type-sensor, .dc-type-zone, .dc-type-blind, .dc-type-generic) { background: var(--surface, #FFFFFF); }
+.dc-view-tiles .dc-grid > .dc-card.dc-tile-on:not(.dc-sheet-open) { background: var(--surface, #FFFFFF); border-color: var(--line-strong, #858F92); }
+.dc-view-tiles .dc-grid > .dc-card.dc-tile-on:not(.dc-sheet-open) .dc-device-icon { background: var(--tone-ochre-tint, #F5F0E7); color: var(--tone-ochre, #87683C); }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-tile { display: flex; flex-direction: column; gap: 2px; margin-top: auto; }
+.dc-tile-open { position: absolute; inset: 0; z-index: 1; width: 100%; padding: 0; border: 0; border-radius: inherit; background: transparent; cursor: pointer; }
+.dc-tile-open:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 2px; }
+.dc-tile-value { font-family: var(--dc-din); font-size: 1.5rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.dc-tile-value[hidden] { display: none; }
+.dc-tile-state { color: var(--muted, #5A646A); font-size: var(--fs-xs, .75rem); line-height: 1.35; }
+.dc-tile-state-error { color: var(--alarm-ink, #9E2A22); }
+.dc-tile-quick { position: absolute; top: 10px; right: 10px; z-index: 2; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--line-strong, #858F92); border-radius: 50%; background: var(--surface, #FFFFFF); color: var(--dc-ink); cursor: pointer; }
+.dc-tile-quick[hidden] { display: none; }
+.dc-tile-quick svg { width: 20px; height: 20px; }
+.dc-tile-quick[aria-pressed="true"] { border-color: var(--tone-ochre, #87683C); background: var(--tone-ochre-tint, #F5F0E7); color: var(--tone-ochre, #87683C); }
+.dc-tile-quick:disabled { cursor: not-allowed; opacity: .5; }
+.dc-tile-quick:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 2px; }
+
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1001; max-width: 640px; max-height: 88vh; margin: 0 auto; overflow-y: auto; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgba(0, 0, 0, .2); }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-sheet-close { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; margin-left: auto; padding: 0; border: 1px solid var(--line, #CBD1CF); border-radius: 50%; background: transparent; color: var(--dc-ink); cursor: pointer; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-sheet-close svg { width: 18px; height: 18px; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-type-label { display: none; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-range { height: 12px; margin: 18px 0 12px; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-range::-webkit-slider-thumb { width: 30px; height: 30px; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-range::-moz-range-thumb { width: 24px; height: 24px; }
+@media (max-width: 650px) {
+  .device-cards-section.dc-view-tiles .dc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}
+.dc-tile-blind { position: absolute; top: 10px; right: 10px; bottom: 10px; z-index: 2; display: flex; flex-direction: column; gap: 6px; width: 40px; }
+.dc-tile-blind[hidden], .device-cards-section:not(.dc-view-tiles) .dc-tile-blind { display: none; }
+.dc-tile-step { display: grid; place-items: center; flex: 1 1 0; width: 40px; min-height: 0; padding: 0; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: var(--surface, #FFFFFF); color: var(--dc-ink); cursor: pointer; }
+.dc-tile-step svg { width: 20px; height: 20px; }
+.dc-tile-step:disabled { cursor: not-allowed; opacity: .5; }
+.dc-tile-step:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 2px; }
+.dc-view-tiles .dc-grid > .dc-card.dc-type-blind:not(.dc-sheet-open) :is(.dc-card-top, .dc-tile-state) { padding-right: 46px; }
+
+/* Bottom sheet details: a drag-handle line, a command chip in the header and,
+   for lights and blinds, a large vertical slider beside the readings and
+   preset buttons. Only the sheet's own card is affected, never the rows of
+   lights or sensors listed inside it. */
+.dc-presets, .dc-sheet-chip { display: none; }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open { padding-top: 26px; }
+/* The handle is a wide touch target around a small pill; dragging it (or the
+   header) down closes the sheet, see dragStart in deviceCards.js. */
+.dc-sheet-handle { display: none; }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open > .dc-sheet-handle { display: block; position: absolute; top: 0; left: 0; right: 0; height: 26px; cursor: grab; touch-action: none; }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open > .dc-sheet-handle::before { content: ""; position: absolute; top: 9px; left: 50%; width: 40px; height: 4px; margin-left: -20px; border-radius: 2px; background: var(--line-strong, #858F92); }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open > .dc-sheet-handle:active { cursor: grabbing; }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open > .dc-card-top { touch-action: none; }
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open { animation: dc-sheet-in 220ms ease-out; }
+.dc-sheet-backdrop:not([hidden]) { animation: dc-sheet-fade 220ms ease-out; }
+@keyframes dc-sheet-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes dc-sheet-fade { from { opacity: 0; } to { opacity: 1; } }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-top .dc-sheet-chip:not([hidden]) { display: inline-flex; margin-top: 6px; padding: 2px 8px; border-radius: var(--r-sm, 4px); font-size: var(--fs-xs, .75rem); font-weight: 600; color: var(--action-strong, #154A7B); background: var(--action-tint, #E3EDF7); }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-sheet-chip[data-status="readback"] { color: var(--ok-ink, #1E6B3A); background: var(--ok-tint, #E3F1E7); }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-sheet-chip[data-status="error"] { color: var(--alarm-ink, #9E2A22); background: var(--alarm-tint, #FBE5E3); }
+.dc-view-tiles .dc-card.dc-sheet-open:is(.dc-type-light, .dc-type-lightGroup, .dc-type-blind) > .dc-card-body:has(> :is(.dc-control-brightnessSet, .dc-control-positionSet)) { display: grid; grid-template-columns: 96px minmax(0, 1fr); column-gap: 22px; row-gap: 12px; align-items: start; }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > * { grid-column: 2; }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) { grid-column: 1; grid-row: 1 / span 12; display: flex; flex-direction: column; align-items: center; }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-control-heading { flex-direction: column; gap: 2px; margin: 0 0 8px; text-align: center; }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-control-output { font-size: var(--fs-lg, 1.25rem); }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-control-hint { display: none; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range { writing-mode: vertical-lr; width: 88px; height: 220px; margin: 0; border-radius: 16px; cursor: pointer; }
+/* Brightness grows from the bottom; a blind closes from the top, as it does on the window. */
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > .dc-control-brightnessSet .dc-range { direction: rtl; background: linear-gradient(to top, var(--tone-ochre, #87683C) 0%, var(--tone-ochre, #87683C) var(--dc-range-fill, 0%), var(--surface-sunken-2, #E4E8E7) var(--dc-range-fill, 0%), var(--surface-sunken-2, #E4E8E7) 100%); }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > .dc-control-positionSet .dc-range { direction: ltr; background: linear-gradient(to bottom, var(--tone-teal, #3F7891) 0%, var(--tone-teal, #3F7891) var(--dc-range-fill, 0%), var(--surface-sunken-2, #E4E8E7) var(--dc-range-fill, 0%), var(--surface-sunken-2, #E4E8E7) 100%); }
+/* Like a phone's control-centre slider, the fill edge is the handle: the thumb
+   spans the whole width and is invisible, so it never looks offset. */
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range::-webkit-slider-thumb { width: 88px; height: 24px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range::-moz-range-thumb { width: 88px; height: 24px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range:disabled { cursor: not-allowed; opacity: .6; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 3px; }
+.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > .dc-presets { display: flex; flex-direction: column; gap: 8px; }
+.dc-preset { min-height: 40px; padding: 0 12px; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); background: transparent; color: var(--dc-ink); font: inherit; font-size: var(--fs-sm, .8125rem); font-weight: 600; cursor: pointer; }
+.dc-preset[aria-pressed="true"] { border-color: var(--action, #1C5D99); background: var(--action-tint, #E3EDF7); color: var(--action-strong, #154A7B); }
+.dc-preset:disabled { cursor: not-allowed; opacity: .5; }
+.dc-preset:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 2px; }
+/* Materialize draws its own 3 px track on every range; the large slider paints the whole input instead. */
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range::-webkit-slider-runnable-track { width: 100%; height: 100%; background: transparent; border: 0; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range::-moz-range-track { width: 100%; height: 100%; background: transparent; border: 0; }
+.device-cards-section.dc-view-tiles .dc-card.dc-sheet-open > .dc-card-body > :is(.dc-control-brightnessSet, .dc-control-positionSet) .dc-range::-webkit-slider-thumb { margin: 0; }
+
 .guide-demo-cta{display:inline-flex;gap:24px;align-items:center;background:#fff;color:#07554e;padding:11px 17px;border-radius:9px;margin:0 0 24px;font-size:.9rem;font-weight:750;text-decoration:none}
 .guide-demo-link{display:block;border:1px solid #b7d8ca;background:#eff8f3;color:#07554e;border-radius:9px;padding:10px 14px;margin:0 0 22px;font-size:.85rem;text-align:left}
 .contents a.guide-demo-nav{background:#d6eee2;font-weight:750;margin-bottom:10px}
@@ -386,7 +491,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
       <h3>Svijetla ili tamna tema</h3>
       <p>Na kraju gumba u zaglavlju svake stranice, a na prijavi ispod obrasca, nalaze se tri male ikone: sunce za <b>svijetlu temu</b>, mjesec za <b>tamnu temu</b> i zaslon za <b>temu sustava</b>, koja prati postavku računala ili mobitela. Odabrana ikona je ispunjena. Izbor se pamti samo u tom pregledniku i ne mijenja prikaz drugim korisnicima. Boje stanja (zelena, jantarna i crvena) i oznake poput <b>Demo podaci</b> znače isto u obje teme.</p>
       <div class="callout"><strong>Što vam je dostupno ovisi o računu.</strong><p>Korisnički račun može pregledavati i osvježavati očitanja iz dodijeljenih prostorija. Ako je dodijeljeno pravo upravljanja, korisnik može slati naredbe uređajima u toj prostoriji. Trendovi i alarmi dostupni su svim prijavljenim korisnicima za cijelu zgradu. Administratorski račun ima i pristup konfiguraciji i <a href="#administracija">upravljanju korisnicima</a>.</p></div>
-      <p>Očitanja se osvježavaju automatski. Nakon prijave slijedite ove korake za snalaženje u prikazu.</p><div class="quick-grid"><div class="quick"><span class="number">1</span><strong>Provjerite vezu</strong><p>Pogledajte status u zaglavlju i vrijeme „Zadnja uspješna provjera”. Kod prekida veze ostaju vidljiva posljednja očitanja.</p></div><div class="quick"><span class="number">2</span><strong>Pronađite uređaj</strong><p>Upišite naziv ili otvorite odabir kata i prostorije. Po potrebi odaberite i vrstu uređaja.</p></div><div class="quick"><span class="number">3</span><strong>Pregledajte očitanja</strong><p>Otvorite karticu uređaja i pogledajte vrijednosti. Ako imate pravo upravljanja uređajem, možete koristiti dostupne kontrole i pratiti povratnu poruku.</p></div></div><div class="callout amber"><strong>Gumbi za upravljanje šalju stvarne naredbe.</strong><p>Kad u zaglavlju uz <b>Podaci uživo</b> piše <b>Stvarno upravljanje</b>, promjena kontrole utječe na opremu u zgradi. Prikaz označen kao <b>Demo podaci</b> ili <b>Simulacija upravljanja</b> služi isprobavanju.</p></div><p class="inline-note">Na mobitelu se kartice slažu jedna ispod druge. Neki gumbi imaju samo ikonu: zupčanik otvara postavke, a kružne strelice pokraj njega osvježavaju očitanja uređaja.</p></section>
+      <p>Očitanja se osvježavaju automatski. Nakon prijave slijedite ove korake za snalaženje u prikazu.</p><div class="quick-grid"><div class="quick"><span class="number">1</span><strong>Provjerite vezu</strong><p>Pogledajte status u zaglavlju i vrijeme „Zadnja uspješna provjera”. Kod prekida veze ostaju vidljiva posljednja očitanja.</p></div><div class="quick"><span class="number">2</span><strong>Pronađite uređaj</strong><p>Upišite naziv ili otvorite odabir kata i prostorije. Po potrebi odaberite i vrstu uređaja.</p></div><div class="quick"><span class="number">3</span><strong>Pregledajte očitanja</strong><p>Otvorite karticu uređaja i pogledajte vrijednosti. Ako imate pravo upravljanja uređajem, možete koristiti dostupne kontrole i pratiti povratnu poruku.</p></div></div><div class="callout amber"><strong>Gumbi za upravljanje šalju stvarne naredbe.</strong><p>Kad u zaglavlju uz <b>Podaci uživo</b> piše <b>Stvarno upravljanje</b>, promjena kontrole utječe na opremu u zgradi. Prikaz označen kao <b>Demo podaci</b> ili <b>Simulacija upravljanja</b> služi isprobavanju.</p></div><p>Prekidačem <b>Kartice / Pločice</b> pokraj pretrage uređaje možete prikazati kao manje pločice, što je preglednije na mobitelu. Pločica pokazuje stanje uređaja, a kod svjetala kojima smijete upravljati okrugli gumb uključuje ili isključuje svjetlo. Rolete imaju gumbe za podizanje i spuštanje do kraja. Dodir na pločicu otvara sve kontrole i detalje uređaja. Za svjetla i rolete tamo su veliki klizač i gumbi za brze vrijednosti, a oznaka uz naziv pokazuje šalje li se naredba i je li potvrđena. Panel se zatvara povlačenjem ručice na vrhu prema dolje, tipkom Esc, gumbom ✕ ili dodirom izvan panela. Izbor prikaza pamti se u tom pregledniku.</p><p class="inline-note">Na mobitelu se kartice slažu jedna ispod druge. Neki gumbi imaju samo ikonu: zupčanik otvara postavke, a kružne strelice pokraj njega osvježavaju očitanja uređaja.</p></section>
 
     <section class="section" id="pregled"><span class="section-number">02 · Snalaženje</span><h2>Pronađite pravi uređaj</h2><!-- GUIDE-DEMO:shortcut-pregled:START -->
 <button type="button" class="guide-demo-link" data-demo-launch="filter">▶ Isprobaj pretragu i odabir prostorije</button>
@@ -1141,6 +1246,10 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
     settings: ["M10 3h4l.5 2.2 1.5.9 2.2-.6 2 3.5-1.7 1.6v1.8l1.7 1.6-2 3.5-2.2-.6-1.5.9-.5 2.2h-4l-.5-2.2-1.5-.9-2.2.6-2-3.5 1.7-1.6v-1.8L3.8 9l2-3.5 2.2.6 1.5-.9L10 3Z", "M15 11.7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"],
     refresh: ["M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5", "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5"],
     chevron: ["m9 6 6 6-6 6"],
+    power: ["M12 3v8", "M6.3 7.5a8 8 0 1 0 11.4 0"],
+    close: ["M6 6l12 12M18 6 6 18"],
+    up: ["m6 15 6-6 6 6"],
+    down: ["m6 9 6 6 6-6"],
   };
   const roleLabels = {
     brightnessSet: "Zadana svjetlina", brightnessStatus: "Očitana svjetlina",
@@ -1171,6 +1280,16 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
   }
   function writeCollapsedRooms(keys) {
     try { globalThis.localStorage?.setItem(COLLAPSED_ROOMS_KEY, JSON.stringify([...keys])); } catch { /* View preference only. */ }
+  }
+
+  // Cards or compact tiles, remembered per browser like collapsed rooms.
+  // Without a stored choice the full cards are shown.
+  const CARD_VIEW_KEY = "iotElectric.dashboard.cardView";
+  function readCardView() {
+    try { return globalThis.localStorage?.getItem(CARD_VIEW_KEY) === "tiles" ? "tiles" : "cards"; } catch { return "cards"; }
+  }
+  function writeCardView(view) {
+    try { globalThis.localStorage?.setItem(CARD_VIEW_KEY, view); } catch { /* View preference only. */ }
   }
 
   function el(tag, className, text) {
@@ -1265,7 +1384,8 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
     return ({ 0: "U redu", 1: "Nesigurno očitanje", 2: "Forsirano", 3: "Izvan mreže", 4: "Greška" })[String(point?.state)] || "Stanje nije poznato";
   }
 
-  function create({ container, onWrite, onSettings, onRooms, onMove, onRefresh, readOnly = false, controlDeviceKeys = new Set() }) {
+  // showModeBadge: false when the page header already shows the control mode.
+  function create({ container, onWrite, onSettings, onRooms, onMove, onRefresh, readOnly = false, controlDeviceKeys = new Set(), showModeBadge = true }) {
     const canControl = device => !readOnly || controlDeviceKeys.has(device.key);
     if (!container || typeof container.append !== "function") throw new TypeError("Device cards need a DOM container.");
     const cards = new Map();
@@ -1315,8 +1435,15 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
     // of them and every other one holds a mirror card (device key -> parent key -> card).
     const mirrors = new Map();
     let pageDevices = [];
+    // Tile view: each top-level card shows a compact tile, and one card at a
+    // time opens as a sheet with its full controls. Both are the same card, so
+    // commands, permissions and readback are shared.
+    let tileView = readCardView() === "tiles";
+    let openCard = null;
+    let sheetReturnFocus = null;
 
     container.classList.add("device-cards-section");
+    container.classList.toggle("dc-view-tiles", tileView);
     const headerActions = el("div", "dc-header-actions");
     const simulationBadge = el("span", "chip dc-simulation-badge", "Simulacija upravljanja");
     const reset = el("button", "dc-reset", "Vrati simulaciju");
@@ -1328,7 +1455,19 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
       reset.hidden = true;
       announce.textContent = "Simulacija je vraćena na trenutačna očitanja.";
     });
-    headerActions.append(simulationBadge, reset);
+    simulationBadge.hidden = !showModeBadge;
+    const viewSwitch = el("div", "dc-view-switch");
+    viewSwitch.setAttribute("role", "group");
+    viewSwitch.setAttribute("aria-label", "Prikaz uređaja");
+    const viewButtons = [["cards", "Kartice"], ["tiles", "Pločice"]].map(([view, label]) => {
+      const button = el("button", "dc-view-option", label);
+      button.type = "button";
+      button.dataset.view = view;
+      button.addEventListener("click", () => setView(view));
+      viewSwitch.append(button);
+      return button;
+    });
+    headerActions.append(viewSwitch, simulationBadge, reset);
     const searchTools = el("div", "dc-search-tools");
     const searchField = el("fieldset", "form-field dc-search-field");
     const search = el("input", "dc-search");
@@ -1438,14 +1577,88 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
     const emptyTitle = el("h3", "", "Kartice čekaju vrijednosti");
     const emptyDescription = el("p", "", "Dodaj vrijednosti uređaja u postojeći prikaz. Njihove prepoznate funkcije pojavit će se zajedno ovdje.");
     empty.append(icon("generic"), emptyTitle, emptyDescription);
+    const sheetBackdrop = el("div", "dc-sheet-backdrop");
+    sheetBackdrop.hidden = true;
+    sheetBackdrop.addEventListener("click", () => closeSheet());
     const announce = el("div", "dc-sr-only");
     announce.setAttribute("role", "status");
     announce.setAttribute("aria-live", "polite");
-    container.replaceChildren(searchTools, management, selectionActions, managementStatus, roomPanel, scopeActions, scopeStatus, summary, readWarning, grid, loadMore, empty, announce);
+    container.replaceChildren(searchTools, management, selectionActions, managementStatus, roomPanel, scopeActions, scopeStatus, summary, readWarning, grid, loadMore, empty, sheetBackdrop, announce);
+    // Esc closes the sheet wherever focus is, e.g. after a drag left it on the page.
+    const sheetKeydown = (event) => { if (event.key === "Escape" && openCard) { event.preventDefault?.(); closeSheet(); } };
+    container.addEventListener("keydown", sheetKeydown);
+    const pageDocument = globalThis.document;
+    if (typeof pageDocument?.addEventListener === "function") pageDocument.addEventListener("keydown", sheetKeydown);
+    syncViewSwitch();
     const scrollObserver = typeof IntersectionObserver === "function" ? new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting) && !loadMore.hidden) showMore();
     }, { rootMargin: "0px 0px 500px 0px" }) : null;
     scrollObserver?.observe(loadMore);
+
+    function syncViewSwitch() {
+      for (const button of viewButtons) button.setAttribute("aria-pressed", String(button.dataset.view === (tileView ? "tiles" : "cards")));
+    }
+
+    function setView(view) {
+      const next = view === "tiles";
+      if (destroyed || next === tileView) return;
+      closeSheet({ immediate: true });
+      tileView = next;
+      writeCardView(tileView ? "tiles" : "cards");
+      container.classList.toggle("dc-view-tiles", tileView);
+      syncViewSwitch();
+    }
+
+    // The sheet slides in and out. Without matchMedia (tests) or with reduced
+    // motion it opens and closes at once.
+    const SHEET_MS = 220;
+    let closingCard = null;
+    let closeTimer = 0;
+    const sheetMotion = () => typeof globalThis.matchMedia === "function"
+      && !globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function finishClose(card) {
+      clearTimeout(closeTimer);
+      if (closingCard === card) closingCard = null;
+      card.node.classList.toggle("dc-sheet-open", false);
+      for (const name of ["role", "aria-modal", "aria-label"]) card.node.removeAttribute?.(name);
+      card.node.style.transform = card.node.style.transition = "";
+      sheetBackdrop.style.opacity = sheetBackdrop.style.transition = "";
+      if (!openCard) sheetBackdrop.hidden = true;
+    }
+
+    function openSheet(card, returnFocus) {
+      if (destroyed || !tileView || card.node.hidden) return;
+      if (closingCard) finishClose(closingCard);
+      if (openCard && openCard !== card) closeSheet({ immediate: true });
+      openCard = card;
+      sheetReturnFocus = returnFocus || null;
+      card.node.classList.toggle("dc-sheet-open", true);
+      card.node.setAttribute("role", "dialog");
+      card.node.setAttribute("aria-modal", "true");
+      card.node.setAttribute("aria-label", card.device.label);
+      sheetBackdrop.hidden = false;
+      if (typeof card.sheetClose?.focus === "function") card.sheetClose.focus();
+    }
+
+    // Slides the sheet down from where it is (also mid-drag), then restores
+    // the tile. Hidden cards, view changes and destroy close at once.
+    function closeSheet({ immediate = false } = {}) {
+      if (!openCard) return;
+      const card = openCard;
+      openCard = null;
+      const target = sheetReturnFocus;
+      sheetReturnFocus = null;
+      // The tile is visible again only after the sheet has gone, so focus returns then.
+      const restoreFocus = () => { if (!openCard && target?.isConnected !== false && typeof target?.focus === "function") target.focus(); };
+      if (immediate || destroyed || card.node.hidden || !sheetMotion()) { finishClose(card); restoreFocus(); return; }
+      closingCard = card;
+      card.node.style.transition = `transform ${SHEET_MS}ms ease-in`;
+      card.node.style.transform = "translateY(100%)";
+      sheetBackdrop.style.transition = `opacity ${SHEET_MS}ms ease-in`;
+      sheetBackdrop.style.opacity = "0";
+      closeTimer = setTimeout(() => { if (closingCard === card) { finishClose(card); restoreFocus(); } }, SHEET_MS);
+    }
 
     function roomKey(device) {
       return roomId(device.room) ? `room:${roomId(device.room)}` : "unassigned";
@@ -1741,6 +1954,9 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
         if (grid.children[index] !== nodes[index]) grid.insertBefore(nodes[index], grid.children[index] || null);
       }
       for (const device of shownDevices) cards.get(device.key).setMembers(rows.get(device.key).map((row) => row.node));
+      // The sheet belongs to a shown top-level card; filters, collapsed rooms
+      // and removed devices close it.
+      if (openCard && (openCard.node.hidden || !topLevel.has(openCard.device.key) || cards.get(openCard.device.key) !== openCard)) closeSheet({ immediate: true });
       loadMore.hidden = shownEntries.length >= entries.length;
       loadCount.textContent = `Prikazano ${shownDevices.length} od ${visibleTotal} uređaja`;
       loadButton.disabled = loadMore.hidden;
@@ -1911,7 +2127,76 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
         expand.setAttribute("aria-expanded", String(memberOpen));
       };
       expand.addEventListener("click", () => { memberOpen = !memberOpen; syncMemberOpen(); });
-      top.append(expand, deviceIcon, identity, cardActions, type);
+      // Pull the handle (or the sheet's header) down to close the sheet.
+      const sheetHandle = el("div", "dc-sheet-handle");
+      sheetHandle.setAttribute("aria-hidden", "true");
+      let drag = null;
+      const clock = () => globalThis.performance?.now?.() ?? Date.now();
+      function dragStart(event) {
+        if (openCard !== card || drag || (event.button !== undefined && event.button > 0)) return;
+        if (event.target?.closest?.("button, a, input, select, summary, label, textarea")) return;
+        drag = { id: event.pointerId, startY: event.clientY, dy: 0, at: clock(), source: event.currentTarget };
+        event.currentTarget?.setPointerCapture?.(event.pointerId);
+        node.style.transition = "none";
+        sheetBackdrop.style.transition = "none";
+      }
+      function dragMove(event) {
+        if (!drag || event.pointerId !== drag.id) return;
+        drag.dy = Math.max(0, event.clientY - drag.startY);
+        node.style.transform = drag.dy ? `translateY(${drag.dy}px)` : "";
+        sheetBackdrop.style.opacity = String(Math.max(0.15, 1 - drag.dy / 420));
+        event.preventDefault?.();
+      }
+      function dragEnd(event) {
+        if (!drag || event.pointerId !== drag.id) return;
+        const { dy, at, source } = drag;
+        drag = null;
+        source?.releasePointerCapture?.(event.pointerId);
+        const fast = dy > 30 && dy / Math.max(1, clock() - at) > 0.5;
+        if (event.type !== "pointercancel" && (dy > Math.min(140, (node.offsetHeight || 400) * 0.3) || fast)) { closeSheet(); return; }
+        node.style.transition = `transform ${SHEET_MS}ms ease-out`;
+        node.style.transform = "";
+        sheetBackdrop.style.transition = `opacity ${SHEET_MS}ms ease-out`;
+        sheetBackdrop.style.opacity = "";
+      }
+      const sheetClose = el("button", "dc-sheet-close");
+      sheetClose.type = "button";
+      sheetClose.append(icon("close"));
+      sheetClose.addEventListener("click", () => closeSheet());
+      card.sheetClose = sheetClose;
+      const sheetChip = el("span", "dc-sheet-chip");
+      sheetChip.hidden = true;
+      identity.append(sheetChip);
+      top.append(expand, deviceIcon, identity, cardActions, type, sheetClose);
+      // Compact tile, shown instead of the card body in tile view. The open
+      // button and the quick action are siblings, never nested buttons.
+      const tile = el("div", "dc-tile");
+      const tileOpen = el("button", "dc-tile-open");
+      tileOpen.type = "button";
+      tileOpen.setAttribute("aria-haspopup", "dialog");
+      tileOpen.addEventListener("click", () => openSheet(card, tileOpen));
+      const tileValue = el("strong", "dc-tile-value");
+      const tileState = el("span", "dc-tile-state");
+      const tileQuick = el("button", "dc-tile-quick");
+      tileQuick.type = "button";
+      tileQuick.append(icon("power"));
+      tileQuick.addEventListener("click", () => toggleLight());
+      // Blind position 0 % is open (up) and 100 % closed (down).
+      const tileBlind = el("div", "dc-tile-blind");
+      const tileUp = el("button", "dc-tile-step");
+      const tileDown = el("button", "dc-tile-step");
+      tileUp.type = tileDown.type = "button";
+      tileUp.dataset.direction = "up";
+      tileDown.dataset.direction = "down";
+      tileUp.append(icon("up"));
+      tileDown.append(icon("down"));
+      tileUp.addEventListener("click", () => moveBlind("up"));
+      tileDown.addEventListener("click", () => moveBlind("down"));
+      tileBlind.append(tileUp, tileDown);
+      card.tileOpen = tileOpen;
+      card.tileQuick = tileQuick;
+      card.tileState = tileState;
+      tile.append(tileOpen, tileValue, tileState, tileQuick, tileBlind);
       const body = el("div", "dc-card-body");
       const states = el("div", "dc-state-line");
       const details = el("details", "dc-details");
@@ -1937,7 +2222,13 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
         }
         while (membersList.children.length > nodes.length) membersList.children[nodes.length].remove();
       };
-      node.append(selectionLabel, top, body, states, commandStatus, refreshStatus, details, membersPanel);
+      node.append(sheetHandle, selectionLabel, top, tile, body, states, commandStatus, refreshStatus, details, membersPanel);
+      for (const area of [sheetHandle, top]) {
+        area.addEventListener("pointerdown", dragStart);
+        area.addEventListener("pointermove", dragMove);
+        area.addEventListener("pointerup", dragEnd);
+        area.addEventListener("pointercancel", dragEnd);
+      }
 
       const pointFor = (role) => card.device.roles?.[role];
       const draftKey = (role) => `${card.device.key}\u0000${role}`;
@@ -2028,7 +2319,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
           numberControl(role, label);
           return;
         }
-        const wrap = el("div", "dc-control");
+        const wrap = el("div", `dc-control dc-control-${role}`);
         const inputId = `dc-${Math.random().toString(36).slice(2)}`;
         const row = el("div", "dc-control-heading");
         const caption = el("label", "dc-control-label", label);
@@ -2062,6 +2353,29 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
         });
       }
 
+      // The card's switch and the tile's quick button send the same command.
+      function toggleLight() {
+        const role = "brightnessSet";
+        if (!pointFor(role) || !canControl(card.device)) return;
+        const current = numeric(simulatedValue(role));
+        const maximum = Number(pointFor(role)?.control?.max);
+        if (current !== null && Number.isFinite(maximum)) void commit(role, current > 0 ? 0 : maximum);
+      }
+
+      // Full travel only when the command's 0–100 % range is confirmed:
+      // 0 % opens (raises) the blind and 100 % closes (lowers) it.
+      function blindTarget(direction) {
+        const control = pointFor("positionSet")?.control;
+        if (control?.rangeConfirmed !== true || Number(control.min) !== 0 || Number(control.max) !== 100) return null;
+        return direction === "up" ? 0 : 100;
+      }
+
+      function moveBlind(direction) {
+        if (!pointFor("positionSet") || !canControl(card.device)) return;
+        const target = blindTarget(direction);
+        if (target !== null) void commit("positionSet", target);
+      }
+
       function lightToggle() {
         const role = "brightnessSet";
         if (!pointFor(role)) return;
@@ -2071,11 +2385,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
         track.append(el("span", "dc-toggle-thumb"));
         const copy = el("span", "dc-toggle-label");
         button.append(copy, track);
-        button.addEventListener("click", () => {
-          const current = numeric(simulatedValue(role));
-          const maximum = Number(pointFor(role)?.control?.max);
-          if (current !== null && Number.isFinite(maximum)) void commit(role, current > 0 ? 0 : maximum);
-        });
+        button.addEventListener("click", () => toggleLight());
         body.append(button);
         card.bindings.push(() => {
           const number = numeric(simulatedValue(role));
@@ -2085,6 +2395,35 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
           button.title = button.disabled ? disabledReason(role) : demoMode ? "Simulacija upravljanja svjetlom." : `Šalje zadanu svjetlinu ${on ? 0 : pointFor(role).control.max} % kontroleru.`;
           button.setAttribute("aria-pressed", String(on));
           button.setAttribute("aria-label", `${card.device.label}: ${on ? "isključi" : "uključi"}, ${actionLabel()}`);
+        });
+      }
+
+      // Preset targets for the sheet, sent through the same command path.
+      function presets(role, entries) {
+        const point = pointFor(role);
+        if (!point || point.control?.rangeConfirmed !== true) return;
+        const wrap = el("div", "dc-presets");
+        wrap.setAttribute("role", "group");
+        wrap.setAttribute("aria-label", "Brze vrijednosti");
+        const buttons = entries.map(([value, text]) => {
+          const button = el("button", "dc-preset", text);
+          button.type = "button";
+          button.addEventListener("click", () => {
+            const bounds = pointFor(role)?.control;
+            if (bounds && value >= Number(bounds.min) && value <= Number(bounds.max)) void commit(role, value);
+          });
+          wrap.append(button);
+          return [button, value, text];
+        });
+        body.append(wrap);
+        card.bindings.push(() => {
+          const current = numeric(simulatedValue(role));
+          for (const [button, value, text] of buttons) {
+            button.disabled = !allowed(role);
+            button.setAttribute("aria-pressed", String(current === value));
+            button.setAttribute("aria-label", `${card.device.label}: ${text}, ${actionLabel()}`);
+            button.title = button.disabled ? disabledReason(role) : `${text}${demoMode ? " u simulaciji" : ""}`;
+          }
         });
       }
 
@@ -2218,6 +2557,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
           if (card.device.type === "light" || card.device.type === "lightGroup") {
             lightToggle();
             range("brightnessSet", demoMode ? "Svjetlina · simulacija" : "Svjetlina");
+            presets("brightnessSet", [[100, "100 %"], [50, "50 %"], [25, "25 %"]]);
           } else if (card.device.type === "climate") {
             stepper("setpoint", "Zadana temperatura");
             selection("modeSet", "Način rada");
@@ -2225,6 +2565,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
             selection("power", "Napajanje");
           } else if (card.device.type === "blind") {
             range("positionSet", demoMode ? "Položaj · simulacija" : "Položaj");
+            if (blindTarget("up") !== null) presets("positionSet", [[0, "Otvori"], [50, "Pola"], [100, "Zatvori"]]);
             range("slatSet", demoMode ? "Kut lamela · simulacija" : "Kut lamela");
           }
         }
@@ -2246,6 +2587,76 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
           if (!readings.length) list.append(el("p", "dc-muted", "Očitanja i svojstva dostupni su u detaljima."));
           if (canControl(card.device)) body.append(el("p", "dc-muted", "Funkcije za upravljanje još nisu prepoznate."));
         }
+      }
+
+      // One line of state for the tile, from the same values the card shows.
+      function renderTile() {
+        const device = card.device;
+        const roles = device.roles || {};
+        const lightType = device.type === "light" || device.type === "lightGroup";
+        const lightRole = roles.brightnessSet ? "brightnessSet" : roles.brightnessStatus ? "brightnessStatus" : null;
+        let big = null;
+        let text = "";
+        let on = null;
+        if (lightType && lightRole) {
+          const point = pointFor(lightRole);
+          const number = numeric(lightRole === "brightnessSet" ? simulatedValue(lightRole) : point?.value);
+          on = number === null || point?.error ? null : number > 0;
+          text = on === null ? "Stanje nije poznato" : on ? `Uključeno · ${format(point, number)}` : "Isključeno";
+        } else if (device.type === "blind") {
+          const point = roles.positionStatus || roles.positionSet;
+          // The card keeps the exact reading; the tile rounds a percentage to whole numbers.
+          const tilePosition = (target, value = target?.value) => {
+            const number = numeric(value);
+            return number !== null && displayUnit(target) === "%" ? `${formatter.format(Math.round(number))} %` : format(target, value);
+          };
+          text = point ? `Položaj ${point.error ? "—" : tilePosition(point)}` : typeLabels.blind;
+          // A sent or simulated target shows until a reading confirms it.
+          if (roles.positionSet && drafts.has(draftKey("positionSet"))) text += ` · cilj ${tilePosition(roles.positionSet, simulatedValue("positionSet"))}`;
+        } else {
+          big = device.metrics?.primary || (device.type === "climate" ? roles.temperature
+            : roles.illuminance || roles.temperature || roles.co2 || roles.humidity || roles.occupancy) || null;
+          if (!big && device.type === "generic") big = (device.primary || [])[0] || null;
+          if (device.type === "climate" && roles.setpoint) text = `Zadano ${format(roles.setpoint, simulatedValue("setpoint"))}`;
+          else if (device.type === "climate" && roles.modeStatus) text = format(roles.modeStatus);
+          else text = big ? big.metricLabel || roleLabels[big.role] || big.label || typeLabels[device.type] : typeLabels[device.type] || "Uređaj";
+        }
+        tileValue.hidden = !big;
+        if (big) renderReading(tileValue, big); else tileValue.textContent = "";
+        const command = commands.get(device.key);
+        const failed = command?.status === "error";
+        const stateText = command?.status === "pending" ? `${text} · šaljem…` : failed ? "Naredba nije potvrđena" : text;
+        if (tileState.textContent !== stateText) tileState.textContent = stateText;
+        tileState.classList.toggle("dc-tile-state-error", failed);
+        node.classList.toggle("dc-tile-on", on === true);
+        const valueText = big ? `${big.error ? "—" : format(big)}, ` : "";
+        tileOpen.setAttribute("aria-label", `${device.label}: ${valueText}${stateText}. Otvori upravljanje i detalje.`);
+        const quick = Boolean(lightType && roles.brightnessSet && canControl(device));
+        tileQuick.hidden = !quick;
+        if (quick) {
+          const number = numeric(simulatedValue("brightnessSet"));
+          tileQuick.disabled = !allowed("brightnessSet") || number === null || !Number.isFinite(Number(roles.brightnessSet.control?.max));
+          tileQuick.setAttribute("aria-pressed", String(on === true));
+          tileQuick.setAttribute("aria-label", `${device.label}: ${on ? "isključi" : "uključi"}, ${actionLabel()}`);
+          tileQuick.title = tileQuick.disabled ? disabledReason("brightnessSet") : `${on ? "Isključi" : "Uključi"}${demoMode ? " u simulaciji" : ""}`;
+        }
+        const blindQuick = Boolean(device.type === "blind" && roles.positionSet && canControl(device) && blindTarget("up") !== null);
+        tileBlind.hidden = !blindQuick;
+        if (blindQuick) {
+          const blocked = !allowed("positionSet");
+          for (const [button, direction] of [[tileUp, "up"], [tileDown, "down"]]) {
+            const verb = direction === "up" ? "Podigni (otvori)" : "Spusti (zatvori)";
+            button.disabled = blocked;
+            button.setAttribute("aria-label", `${device.label}: ${verb.toLowerCase()}, ${actionLabel()}`);
+            button.title = blocked ? disabledReason("positionSet") : `${verb}${demoMode ? " u simulaciji" : ""}`;
+          }
+        }
+        const chip = { pending: "Šaljem", accepted: "Prihvaćeno", readback: "Potvrđeno", error: "Nije potvrđeno" }[command?.status] || "";
+        sheetChip.hidden = !chip;
+        if (sheetChip.textContent !== chip) sheetChip.textContent = chip;
+        sheetChip.dataset.status = command?.status || "";
+        sheetClose.setAttribute("aria-label", `Zatvori ${device.label}`);
+        sheetClose.title = "Zatvori";
       }
 
       function renderDetails() {
@@ -2320,6 +2731,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
               : command.status === "readback" ? `Zadana vrijednost potvrđena je novim očitanjem. ${target}.`
                 : `Slanje nije potvrđeno: ${command.error} Provjeri očitanja prije novog pokušaja.`;
         } else commandStatus.textContent = "";
+        renderTile();
         if (details.open) renderDetails();
       };
       card.update(initial);
@@ -2419,7 +2831,7 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
         selectedKeys.clear(); selectionMode = false; applyFilter();
         managementStatus.textContent = message; managementStatus.hidden = !message;
       },
-      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); mirrors.clear(); selectedKeys.clear(); devices = []; displayOrder = []; headings.clear(); deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
+      destroy() { closeSheet({ immediate: true }); if (closingCard) finishClose(closingCard); pageDocument?.removeEventListener?.("keydown", sheetKeydown); destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); mirrors.clear(); selectedKeys.clear(); devices = []; displayOrder = []; headings.clear(); deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
   }
 
   const api = { create };

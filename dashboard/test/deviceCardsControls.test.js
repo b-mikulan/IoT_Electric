@@ -1359,3 +1359,166 @@ test("a selected floor keeps its collapsed rooms collapsed", (t) => {
   selectFloor(container, "f1");
   assert.deepEqual(gridSequence(container), ["R:Hodnik", "ES/B", "R:Ured 12 uređaja"]);
 });
+
+const hasClass = (node, name) => node.className.split(" ").includes(name);
+
+test("the tile quick button sends the card's light command and shows its progress", async (t) => {
+  let finish;
+  const calls = [];
+  const set = point("brightnessSet", 40);
+  const light = device("light", { brightnessSet: set });
+  const { container, update } = setup(t, [light], (command) => { calls.push(command); return new Promise((resolve) => { finish = resolve; }); });
+  const [quick] = byClass(container, "dc-tile-quick");
+  const [state] = byClass(container, "dc-tile-state");
+  const [card] = byClass(container, "dc-card");
+  assert.equal(quick.hidden, false);
+  assert.equal(quick.attributes["aria-pressed"], "true");
+  assert.equal(state.textContent, "Uključeno · 40 %");
+  assert.equal(hasClass(card, "dc-tile-on"), true);
+  quick.dispatch("click");
+  assert.deepEqual(calls, [{ widgetId: set.id, value: 0 }]);
+  assert.equal(state.textContent, "Isključeno · šaljem…");
+  assert.equal(quick.disabled, true);
+  // The card's own switch is blocked by the same pending command.
+  byClass(container, "dc-toggle")[0].dispatch("click");
+  quick.dispatch("click");
+  assert.equal(calls.length, 1);
+  finish();
+  await flush();
+  update([device("light", { brightnessSet: { ...set, value: 0, updatedAt: "after" } })]);
+  assert.equal(state.textContent, "Isključeno");
+  assert.equal(hasClass(card, "dc-tile-on"), false);
+});
+
+test("a tile offers no quick action without control permission", (t) => {
+  const light = device("light", { brightnessSet: point("brightnessSet", 40) });
+  const { container } = setup(t, [light], async () => {}, false, undefined, { readOnly: true });
+  assert.equal(byClass(container, "dc-tile-quick")[0].hidden, true);
+  assert.equal(byClass(container, "dc-tile-state")[0].textContent, "Uključeno · 40 %");
+});
+
+test("tiles show the main reading, and a sheet opens only in tile view and closes when its card leaves", (t) => {
+  const sensor = { ...device("sensor", { temperature: point("temperature", 21.4, { unit: "°C", control: null }) }), key: "ES/sensor", label: "Senzor sobe" };
+  const climate = { ...device("climate", { temperature: point("temperature", 22, { unit: "°C", control: null }), setpoint: point("setpoint", 23, { unit: "°C" }) }), key: "ES/climate", label: "Klima" };
+  const { container } = setup(t, [sensor, climate], async () => {});
+  const tileFor = (label) => byClass(container, "dc-card").find((node) => byClass(node, "dc-card-title")[0].textContent === label);
+  assert.equal(byClass(tileFor("Senzor sobe"), "dc-tile-value")[0].textContent, "21,4 °C");
+  assert.equal(byClass(tileFor("Senzor sobe"), "dc-tile-state")[0].textContent, "Temperatura");
+  assert.equal(byClass(tileFor("Klima"), "dc-tile-state")[0].textContent, "Zadano 23 °C");
+  const [backdrop] = byClass(container, "dc-sheet-backdrop");
+  const open = (label) => byClass(tileFor(label), "dc-tile-open")[0].dispatch("click");
+  open("Klima");
+  assert.equal(hasClass(tileFor("Klima"), "dc-sheet-open"), false, "card view never opens a sheet");
+  const [cardsOption, tilesOption] = byClass(container, "dc-view-option");
+  assert.equal(cardsOption.attributes["aria-pressed"], "true");
+  tilesOption.dispatch("click");
+  assert.equal(hasClass(container, "dc-view-tiles"), true);
+  assert.equal(tilesOption.attributes["aria-pressed"], "true");
+  open("Klima");
+  assert.equal(hasClass(tileFor("Klima"), "dc-sheet-open"), true);
+  assert.equal(tileFor("Klima").attributes.role, "dialog");
+  assert.equal(backdrop.hidden, false);
+  container.listeners.get("keydown")({ key: "Escape" });
+  assert.equal(hasClass(tileFor("Klima"), "dc-sheet-open"), false);
+  assert.equal(backdrop.hidden, true);
+  open("Klima");
+  const [search] = byClass(container, "dc-search");
+  search.value = "Senzor";
+  search.dispatch("input");
+  assert.equal(hasClass(tileFor("Klima") || { className: "" }, "dc-sheet-open"), false);
+  assert.equal(backdrop.hidden, true);
+  cardsOption.dispatch("click");
+  assert.equal(hasClass(container, "dc-view-tiles"), false);
+});
+
+test("blind tiles raise to 0 % and lower to 100 %, only with control and a confirmed range", async (t) => {
+  const calls = [];
+  const set = point("positionSet", 36);
+  const blind = device("blind", { positionSet: set });
+  const { container, update } = setup(t, [blind], async (command) => { calls.push(command); });
+  const [group] = byClass(container, "dc-tile-blind");
+  const [up, down] = byClass(container, "dc-tile-step");
+  assert.equal(group.hidden, false);
+  assert.match(up.attributes["aria-label"], /podigni \(otvori\)/);
+  up.dispatch("click");
+  await flush();
+  assert.equal(byClass(container, "dc-tile-state")[0].textContent, "Položaj 36 % · cilj 0 %");
+  update([device("blind", { positionSet: { ...set, value: 0, updatedAt: "after" } })]);
+  assert.equal(byClass(container, "dc-tile-state")[0].textContent, "Položaj 0 %");
+  down.dispatch("click");
+  await flush();
+  assert.deepEqual(calls, [{ widgetId: set.id, value: 0 }, { widgetId: set.id, value: 100 }]);
+  update([device("blind", { positionSet: { ...set, control: { min: 0, max: 255, step: 1, rangeConfirmed: true } } })]);
+  assert.equal(group.hidden, true);
+});
+
+test("blind tiles offer no movement without control permission", (t) => {
+  const { container } = setup(t, [device("blind", { positionSet: point("positionSet", 36) })], async () => {}, false, undefined, { readOnly: true });
+  assert.equal(byClass(container, "dc-tile-blind")[0].hidden, true);
+});
+
+test("sheet presets send their targets and the header chip follows the command", async (t) => {
+  let finish;
+  const calls = [];
+  const set = point("brightnessSet", 40);
+  const { container, update } = setup(t, [device("light", { brightnessSet: set })], (command) => { calls.push(command); return new Promise((resolve) => { finish = resolve; }); });
+  const presets = byClass(container, "dc-preset");
+  assert.deepEqual(presets.map((button) => button.textContent), ["100 %", "50 %", "25 %"]);
+  const [chip] = byClass(container, "dc-sheet-chip");
+  assert.equal(chip.hidden, true);
+  presets[2].dispatch("click");
+  assert.deepEqual(calls, [{ widgetId: set.id, value: 25 }]);
+  assert.equal(chip.textContent, "Šaljem");
+  assert.equal(presets[0].disabled, true);
+  finish();
+  await flush();
+  assert.equal(chip.textContent, "Prihvaćeno");
+  update([device("light", { brightnessSet: { ...set, value: 25, updatedAt: "after" } })]);
+  assert.equal(chip.textContent, "Potvrđeno");
+  assert.equal(chip.dataset.status, "readback");
+  assert.equal(byClass(container, "dc-preset")[2].attributes["aria-pressed"], "true");
+});
+
+test("blind presets open, half-close and close only with a confirmed 0–100 % range", (t) => {
+  const { container } = setup(t, [device("blind", { positionSet: point("positionSet", 36) })], async () => {});
+  assert.deepEqual(byClass(container, "dc-preset").map((button) => button.textContent), ["Otvori", "Pola", "Zatvori"]);
+  const unconfirmed = setup(t, [device("blind", { positionSet: point("positionSet", 36, { control: { min: 0, max: 255, step: 1, rangeConfirmed: true } }) })], async () => {});
+  assert.equal(byClass(unconfirmed.container, "dc-preset").length, 0);
+});
+
+test("pulling the sheet handle down far enough closes it, a short pull springs back", (t) => {
+  const light = device("light", { brightnessSet: point("brightnessSet", 40) });
+  const { container } = setup(t, [light], async () => {});
+  byClass(container, "dc-view-option")[1].dispatch("click");
+  const [card] = byClass(container, "dc-card");
+  const [handle] = byClass(card, "dc-sheet-handle");
+  const [backdrop] = byClass(container, "dc-sheet-backdrop");
+  const pull = (distance) => {
+    const event = (clientY) => ({ pointerId: 7, button: 0, clientY, target: handle, currentTarget: handle });
+    handle.listeners.get("pointerdown")(event(100));
+    handle.listeners.get("pointermove")(event(100 + distance));
+    return event(100 + distance);
+  };
+  byClass(card, "dc-tile-open")[0].dispatch("click");
+  // A short pull springs back and keeps the sheet open.
+  handle.listeners.get("pointerup")(pull(20));
+  assert.equal(hasClass(card, "dc-sheet-open"), true);
+  assert.equal(card.style.transform, "");
+  handle.listeners.get("pointerup")(pull(220));
+  assert.equal(hasClass(card, "dc-sheet-open"), false);
+  assert.equal(backdrop.hidden, true);
+  // Buttons in the header never start a drag.
+  byClass(card, "dc-tile-open")[0].dispatch("click");
+  const [closeButton] = byClass(card, "dc-sheet-close");
+  const top = byClass(card, "dc-card-top")[0];
+  top.listeners.get("pointerdown")({ pointerId: 8, button: 0, clientY: 100, target: { closest: () => closeButton }, currentTarget: top });
+  top.listeners.get("pointermove")({ pointerId: 8, clientY: 400, target: top, currentTarget: top });
+  assert.equal(card.style.transform, "");
+  assert.equal(hasClass(card, "dc-sheet-open"), true);
+});
+
+test("a blind tile rounds its position while the card keeps the exact reading", (t) => {
+  const { container } = setup(t, [device("blind", { positionStatus: point("positionStatus", 85.003, { control: null }), positionSet: point("positionSet", 85) })], async () => {});
+  assert.equal(byClass(container, "dc-tile-state")[0].textContent, "Položaj 85 %");
+  assert.equal(byClass(container, "dc-metric-value")[0].textContent, "85,003 %");
+});

@@ -11,6 +11,10 @@
     settings: ["M10 3h4l.5 2.2 1.5.9 2.2-.6 2 3.5-1.7 1.6v1.8l1.7 1.6-2 3.5-2.2-.6-1.5.9-.5 2.2h-4l-.5-2.2-1.5-.9-2.2.6-2-3.5 1.7-1.6v-1.8L3.8 9l2-3.5 2.2.6 1.5-.9L10 3Z", "M15 11.7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"],
     refresh: ["M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8M21 3v5h-5", "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16M8 16H3v5"],
     chevron: ["m9 6 6 6-6 6"],
+    power: ["M12 3v8", "M6.3 7.5a8 8 0 1 0 11.4 0"],
+    close: ["M6 6l12 12M18 6 6 18"],
+    up: ["m6 15 6-6 6 6"],
+    down: ["m6 9 6 6 6-6"],
   };
   const roleLabels = {
     brightnessSet: "Zadana svjetlina", brightnessStatus: "Očitana svjetlina",
@@ -41,6 +45,16 @@
   }
   function writeCollapsedRooms(keys) {
     try { globalThis.localStorage?.setItem(COLLAPSED_ROOMS_KEY, JSON.stringify([...keys])); } catch { /* View preference only. */ }
+  }
+
+  // Cards or compact tiles, remembered per browser like collapsed rooms.
+  // Without a stored choice the full cards are shown.
+  const CARD_VIEW_KEY = "iotElectric.dashboard.cardView";
+  function readCardView() {
+    try { return globalThis.localStorage?.getItem(CARD_VIEW_KEY) === "tiles" ? "tiles" : "cards"; } catch { return "cards"; }
+  }
+  function writeCardView(view) {
+    try { globalThis.localStorage?.setItem(CARD_VIEW_KEY, view); } catch { /* View preference only. */ }
   }
 
   function el(tag, className, text) {
@@ -186,8 +200,15 @@
     // of them and every other one holds a mirror card (device key -> parent key -> card).
     const mirrors = new Map();
     let pageDevices = [];
+    // Tile view: each top-level card shows a compact tile, and one card at a
+    // time opens as a sheet with its full controls. Both are the same card, so
+    // commands, permissions and readback are shared.
+    let tileView = readCardView() === "tiles";
+    let openCard = null;
+    let sheetReturnFocus = null;
 
     container.classList.add("device-cards-section");
+    container.classList.toggle("dc-view-tiles", tileView);
     const headerActions = el("div", "dc-header-actions");
     const simulationBadge = el("span", "chip dc-simulation-badge", "Simulacija upravljanja");
     const reset = el("button", "dc-reset", "Vrati simulaciju");
@@ -200,7 +221,18 @@
       announce.textContent = "Simulacija je vraćena na trenutačna očitanja.";
     });
     simulationBadge.hidden = !showModeBadge;
-    headerActions.append(simulationBadge, reset);
+    const viewSwitch = el("div", "dc-view-switch");
+    viewSwitch.setAttribute("role", "group");
+    viewSwitch.setAttribute("aria-label", "Prikaz uređaja");
+    const viewButtons = [["cards", "Kartice"], ["tiles", "Pločice"]].map(([view, label]) => {
+      const button = el("button", "dc-view-option", label);
+      button.type = "button";
+      button.dataset.view = view;
+      button.addEventListener("click", () => setView(view));
+      viewSwitch.append(button);
+      return button;
+    });
+    headerActions.append(viewSwitch, simulationBadge, reset);
     const searchTools = el("div", "dc-search-tools");
     const searchField = el("fieldset", "form-field dc-search-field");
     const search = el("input", "dc-search");
@@ -310,14 +342,88 @@
     const emptyTitle = el("h3", "", "Kartice čekaju vrijednosti");
     const emptyDescription = el("p", "", "Dodaj vrijednosti uređaja u postojeći prikaz. Njihove prepoznate funkcije pojavit će se zajedno ovdje.");
     empty.append(icon("generic"), emptyTitle, emptyDescription);
+    const sheetBackdrop = el("div", "dc-sheet-backdrop");
+    sheetBackdrop.hidden = true;
+    sheetBackdrop.addEventListener("click", () => closeSheet());
     const announce = el("div", "dc-sr-only");
     announce.setAttribute("role", "status");
     announce.setAttribute("aria-live", "polite");
-    container.replaceChildren(searchTools, management, selectionActions, managementStatus, roomPanel, scopeActions, scopeStatus, summary, readWarning, grid, loadMore, empty, announce);
+    container.replaceChildren(searchTools, management, selectionActions, managementStatus, roomPanel, scopeActions, scopeStatus, summary, readWarning, grid, loadMore, empty, sheetBackdrop, announce);
+    // Esc closes the sheet wherever focus is, e.g. after a drag left it on the page.
+    const sheetKeydown = (event) => { if (event.key === "Escape" && openCard) { event.preventDefault?.(); closeSheet(); } };
+    container.addEventListener("keydown", sheetKeydown);
+    const pageDocument = globalThis.document;
+    if (typeof pageDocument?.addEventListener === "function") pageDocument.addEventListener("keydown", sheetKeydown);
+    syncViewSwitch();
     const scrollObserver = typeof IntersectionObserver === "function" ? new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting) && !loadMore.hidden) showMore();
     }, { rootMargin: "0px 0px 500px 0px" }) : null;
     scrollObserver?.observe(loadMore);
+
+    function syncViewSwitch() {
+      for (const button of viewButtons) button.setAttribute("aria-pressed", String(button.dataset.view === (tileView ? "tiles" : "cards")));
+    }
+
+    function setView(view) {
+      const next = view === "tiles";
+      if (destroyed || next === tileView) return;
+      closeSheet({ immediate: true });
+      tileView = next;
+      writeCardView(tileView ? "tiles" : "cards");
+      container.classList.toggle("dc-view-tiles", tileView);
+      syncViewSwitch();
+    }
+
+    // The sheet slides in and out. Without matchMedia (tests) or with reduced
+    // motion it opens and closes at once.
+    const SHEET_MS = 220;
+    let closingCard = null;
+    let closeTimer = 0;
+    const sheetMotion = () => typeof globalThis.matchMedia === "function"
+      && !globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function finishClose(card) {
+      clearTimeout(closeTimer);
+      if (closingCard === card) closingCard = null;
+      card.node.classList.toggle("dc-sheet-open", false);
+      for (const name of ["role", "aria-modal", "aria-label"]) card.node.removeAttribute?.(name);
+      card.node.style.transform = card.node.style.transition = "";
+      sheetBackdrop.style.opacity = sheetBackdrop.style.transition = "";
+      if (!openCard) sheetBackdrop.hidden = true;
+    }
+
+    function openSheet(card, returnFocus) {
+      if (destroyed || !tileView || card.node.hidden) return;
+      if (closingCard) finishClose(closingCard);
+      if (openCard && openCard !== card) closeSheet({ immediate: true });
+      openCard = card;
+      sheetReturnFocus = returnFocus || null;
+      card.node.classList.toggle("dc-sheet-open", true);
+      card.node.setAttribute("role", "dialog");
+      card.node.setAttribute("aria-modal", "true");
+      card.node.setAttribute("aria-label", card.device.label);
+      sheetBackdrop.hidden = false;
+      if (typeof card.sheetClose?.focus === "function") card.sheetClose.focus();
+    }
+
+    // Slides the sheet down from where it is (also mid-drag), then restores
+    // the tile. Hidden cards, view changes and destroy close at once.
+    function closeSheet({ immediate = false } = {}) {
+      if (!openCard) return;
+      const card = openCard;
+      openCard = null;
+      const target = sheetReturnFocus;
+      sheetReturnFocus = null;
+      // The tile is visible again only after the sheet has gone, so focus returns then.
+      const restoreFocus = () => { if (!openCard && target?.isConnected !== false && typeof target?.focus === "function") target.focus(); };
+      if (immediate || destroyed || card.node.hidden || !sheetMotion()) { finishClose(card); restoreFocus(); return; }
+      closingCard = card;
+      card.node.style.transition = `transform ${SHEET_MS}ms ease-in`;
+      card.node.style.transform = "translateY(100%)";
+      sheetBackdrop.style.transition = `opacity ${SHEET_MS}ms ease-in`;
+      sheetBackdrop.style.opacity = "0";
+      closeTimer = setTimeout(() => { if (closingCard === card) { finishClose(card); restoreFocus(); } }, SHEET_MS);
+    }
 
     function roomKey(device) {
       return roomId(device.room) ? `room:${roomId(device.room)}` : "unassigned";
@@ -613,6 +719,9 @@
         if (grid.children[index] !== nodes[index]) grid.insertBefore(nodes[index], grid.children[index] || null);
       }
       for (const device of shownDevices) cards.get(device.key).setMembers(rows.get(device.key).map((row) => row.node));
+      // The sheet belongs to a shown top-level card; filters, collapsed rooms
+      // and removed devices close it.
+      if (openCard && (openCard.node.hidden || !topLevel.has(openCard.device.key) || cards.get(openCard.device.key) !== openCard)) closeSheet({ immediate: true });
       loadMore.hidden = shownEntries.length >= entries.length;
       loadCount.textContent = `Prikazano ${shownDevices.length} od ${visibleTotal} uređaja`;
       loadButton.disabled = loadMore.hidden;
@@ -783,7 +892,76 @@
         expand.setAttribute("aria-expanded", String(memberOpen));
       };
       expand.addEventListener("click", () => { memberOpen = !memberOpen; syncMemberOpen(); });
-      top.append(expand, deviceIcon, identity, cardActions, type);
+      // Pull the handle (or the sheet's header) down to close the sheet.
+      const sheetHandle = el("div", "dc-sheet-handle");
+      sheetHandle.setAttribute("aria-hidden", "true");
+      let drag = null;
+      const clock = () => globalThis.performance?.now?.() ?? Date.now();
+      function dragStart(event) {
+        if (openCard !== card || drag || (event.button !== undefined && event.button > 0)) return;
+        if (event.target?.closest?.("button, a, input, select, summary, label, textarea")) return;
+        drag = { id: event.pointerId, startY: event.clientY, dy: 0, at: clock(), source: event.currentTarget };
+        event.currentTarget?.setPointerCapture?.(event.pointerId);
+        node.style.transition = "none";
+        sheetBackdrop.style.transition = "none";
+      }
+      function dragMove(event) {
+        if (!drag || event.pointerId !== drag.id) return;
+        drag.dy = Math.max(0, event.clientY - drag.startY);
+        node.style.transform = drag.dy ? `translateY(${drag.dy}px)` : "";
+        sheetBackdrop.style.opacity = String(Math.max(0.15, 1 - drag.dy / 420));
+        event.preventDefault?.();
+      }
+      function dragEnd(event) {
+        if (!drag || event.pointerId !== drag.id) return;
+        const { dy, at, source } = drag;
+        drag = null;
+        source?.releasePointerCapture?.(event.pointerId);
+        const fast = dy > 30 && dy / Math.max(1, clock() - at) > 0.5;
+        if (event.type !== "pointercancel" && (dy > Math.min(140, (node.offsetHeight || 400) * 0.3) || fast)) { closeSheet(); return; }
+        node.style.transition = `transform ${SHEET_MS}ms ease-out`;
+        node.style.transform = "";
+        sheetBackdrop.style.transition = `opacity ${SHEET_MS}ms ease-out`;
+        sheetBackdrop.style.opacity = "";
+      }
+      const sheetClose = el("button", "dc-sheet-close");
+      sheetClose.type = "button";
+      sheetClose.append(icon("close"));
+      sheetClose.addEventListener("click", () => closeSheet());
+      card.sheetClose = sheetClose;
+      const sheetChip = el("span", "dc-sheet-chip");
+      sheetChip.hidden = true;
+      identity.append(sheetChip);
+      top.append(expand, deviceIcon, identity, cardActions, type, sheetClose);
+      // Compact tile, shown instead of the card body in tile view. The open
+      // button and the quick action are siblings, never nested buttons.
+      const tile = el("div", "dc-tile");
+      const tileOpen = el("button", "dc-tile-open");
+      tileOpen.type = "button";
+      tileOpen.setAttribute("aria-haspopup", "dialog");
+      tileOpen.addEventListener("click", () => openSheet(card, tileOpen));
+      const tileValue = el("strong", "dc-tile-value");
+      const tileState = el("span", "dc-tile-state");
+      const tileQuick = el("button", "dc-tile-quick");
+      tileQuick.type = "button";
+      tileQuick.append(icon("power"));
+      tileQuick.addEventListener("click", () => toggleLight());
+      // Blind position 0 % is open (up) and 100 % closed (down).
+      const tileBlind = el("div", "dc-tile-blind");
+      const tileUp = el("button", "dc-tile-step");
+      const tileDown = el("button", "dc-tile-step");
+      tileUp.type = tileDown.type = "button";
+      tileUp.dataset.direction = "up";
+      tileDown.dataset.direction = "down";
+      tileUp.append(icon("up"));
+      tileDown.append(icon("down"));
+      tileUp.addEventListener("click", () => moveBlind("up"));
+      tileDown.addEventListener("click", () => moveBlind("down"));
+      tileBlind.append(tileUp, tileDown);
+      card.tileOpen = tileOpen;
+      card.tileQuick = tileQuick;
+      card.tileState = tileState;
+      tile.append(tileOpen, tileValue, tileState, tileQuick, tileBlind);
       const body = el("div", "dc-card-body");
       const states = el("div", "dc-state-line");
       const details = el("details", "dc-details");
@@ -809,7 +987,13 @@
         }
         while (membersList.children.length > nodes.length) membersList.children[nodes.length].remove();
       };
-      node.append(selectionLabel, top, body, states, commandStatus, refreshStatus, details, membersPanel);
+      node.append(sheetHandle, selectionLabel, top, tile, body, states, commandStatus, refreshStatus, details, membersPanel);
+      for (const area of [sheetHandle, top]) {
+        area.addEventListener("pointerdown", dragStart);
+        area.addEventListener("pointermove", dragMove);
+        area.addEventListener("pointerup", dragEnd);
+        area.addEventListener("pointercancel", dragEnd);
+      }
 
       const pointFor = (role) => card.device.roles?.[role];
       const draftKey = (role) => `${card.device.key}\u0000${role}`;
@@ -900,7 +1084,7 @@
           numberControl(role, label);
           return;
         }
-        const wrap = el("div", "dc-control");
+        const wrap = el("div", `dc-control dc-control-${role}`);
         const inputId = `dc-${Math.random().toString(36).slice(2)}`;
         const row = el("div", "dc-control-heading");
         const caption = el("label", "dc-control-label", label);
@@ -934,6 +1118,29 @@
         });
       }
 
+      // The card's switch and the tile's quick button send the same command.
+      function toggleLight() {
+        const role = "brightnessSet";
+        if (!pointFor(role) || !canControl(card.device)) return;
+        const current = numeric(simulatedValue(role));
+        const maximum = Number(pointFor(role)?.control?.max);
+        if (current !== null && Number.isFinite(maximum)) void commit(role, current > 0 ? 0 : maximum);
+      }
+
+      // Full travel only when the command's 0–100 % range is confirmed:
+      // 0 % opens (raises) the blind and 100 % closes (lowers) it.
+      function blindTarget(direction) {
+        const control = pointFor("positionSet")?.control;
+        if (control?.rangeConfirmed !== true || Number(control.min) !== 0 || Number(control.max) !== 100) return null;
+        return direction === "up" ? 0 : 100;
+      }
+
+      function moveBlind(direction) {
+        if (!pointFor("positionSet") || !canControl(card.device)) return;
+        const target = blindTarget(direction);
+        if (target !== null) void commit("positionSet", target);
+      }
+
       function lightToggle() {
         const role = "brightnessSet";
         if (!pointFor(role)) return;
@@ -943,11 +1150,7 @@
         track.append(el("span", "dc-toggle-thumb"));
         const copy = el("span", "dc-toggle-label");
         button.append(copy, track);
-        button.addEventListener("click", () => {
-          const current = numeric(simulatedValue(role));
-          const maximum = Number(pointFor(role)?.control?.max);
-          if (current !== null && Number.isFinite(maximum)) void commit(role, current > 0 ? 0 : maximum);
-        });
+        button.addEventListener("click", () => toggleLight());
         body.append(button);
         card.bindings.push(() => {
           const number = numeric(simulatedValue(role));
@@ -957,6 +1160,35 @@
           button.title = button.disabled ? disabledReason(role) : demoMode ? "Simulacija upravljanja svjetlom." : `Šalje zadanu svjetlinu ${on ? 0 : pointFor(role).control.max} % kontroleru.`;
           button.setAttribute("aria-pressed", String(on));
           button.setAttribute("aria-label", `${card.device.label}: ${on ? "isključi" : "uključi"}, ${actionLabel()}`);
+        });
+      }
+
+      // Preset targets for the sheet, sent through the same command path.
+      function presets(role, entries) {
+        const point = pointFor(role);
+        if (!point || point.control?.rangeConfirmed !== true) return;
+        const wrap = el("div", "dc-presets");
+        wrap.setAttribute("role", "group");
+        wrap.setAttribute("aria-label", "Brze vrijednosti");
+        const buttons = entries.map(([value, text]) => {
+          const button = el("button", "dc-preset", text);
+          button.type = "button";
+          button.addEventListener("click", () => {
+            const bounds = pointFor(role)?.control;
+            if (bounds && value >= Number(bounds.min) && value <= Number(bounds.max)) void commit(role, value);
+          });
+          wrap.append(button);
+          return [button, value, text];
+        });
+        body.append(wrap);
+        card.bindings.push(() => {
+          const current = numeric(simulatedValue(role));
+          for (const [button, value, text] of buttons) {
+            button.disabled = !allowed(role);
+            button.setAttribute("aria-pressed", String(current === value));
+            button.setAttribute("aria-label", `${card.device.label}: ${text}, ${actionLabel()}`);
+            button.title = button.disabled ? disabledReason(role) : `${text}${demoMode ? " u simulaciji" : ""}`;
+          }
         });
       }
 
@@ -1090,6 +1322,7 @@
           if (card.device.type === "light" || card.device.type === "lightGroup") {
             lightToggle();
             range("brightnessSet", demoMode ? "Svjetlina · simulacija" : "Svjetlina");
+            presets("brightnessSet", [[100, "100 %"], [50, "50 %"], [25, "25 %"]]);
           } else if (card.device.type === "climate") {
             stepper("setpoint", "Zadana temperatura");
             selection("modeSet", "Način rada");
@@ -1097,6 +1330,7 @@
             selection("power", "Napajanje");
           } else if (card.device.type === "blind") {
             range("positionSet", demoMode ? "Položaj · simulacija" : "Položaj");
+            if (blindTarget("up") !== null) presets("positionSet", [[0, "Otvori"], [50, "Pola"], [100, "Zatvori"]]);
             range("slatSet", demoMode ? "Kut lamela · simulacija" : "Kut lamela");
           }
         }
@@ -1118,6 +1352,76 @@
           if (!readings.length) list.append(el("p", "dc-muted", "Očitanja i svojstva dostupni su u detaljima."));
           if (canControl(card.device)) body.append(el("p", "dc-muted", "Funkcije za upravljanje još nisu prepoznate."));
         }
+      }
+
+      // One line of state for the tile, from the same values the card shows.
+      function renderTile() {
+        const device = card.device;
+        const roles = device.roles || {};
+        const lightType = device.type === "light" || device.type === "lightGroup";
+        const lightRole = roles.brightnessSet ? "brightnessSet" : roles.brightnessStatus ? "brightnessStatus" : null;
+        let big = null;
+        let text = "";
+        let on = null;
+        if (lightType && lightRole) {
+          const point = pointFor(lightRole);
+          const number = numeric(lightRole === "brightnessSet" ? simulatedValue(lightRole) : point?.value);
+          on = number === null || point?.error ? null : number > 0;
+          text = on === null ? "Stanje nije poznato" : on ? `Uključeno · ${format(point, number)}` : "Isključeno";
+        } else if (device.type === "blind") {
+          const point = roles.positionStatus || roles.positionSet;
+          // The card keeps the exact reading; the tile rounds a percentage to whole numbers.
+          const tilePosition = (target, value = target?.value) => {
+            const number = numeric(value);
+            return number !== null && displayUnit(target) === "%" ? `${formatter.format(Math.round(number))} %` : format(target, value);
+          };
+          text = point ? `Položaj ${point.error ? "—" : tilePosition(point)}` : typeLabels.blind;
+          // A sent or simulated target shows until a reading confirms it.
+          if (roles.positionSet && drafts.has(draftKey("positionSet"))) text += ` · cilj ${tilePosition(roles.positionSet, simulatedValue("positionSet"))}`;
+        } else {
+          big = device.metrics?.primary || (device.type === "climate" ? roles.temperature
+            : roles.illuminance || roles.temperature || roles.co2 || roles.humidity || roles.occupancy) || null;
+          if (!big && device.type === "generic") big = (device.primary || [])[0] || null;
+          if (device.type === "climate" && roles.setpoint) text = `Zadano ${format(roles.setpoint, simulatedValue("setpoint"))}`;
+          else if (device.type === "climate" && roles.modeStatus) text = format(roles.modeStatus);
+          else text = big ? big.metricLabel || roleLabels[big.role] || big.label || typeLabels[device.type] : typeLabels[device.type] || "Uređaj";
+        }
+        tileValue.hidden = !big;
+        if (big) renderReading(tileValue, big); else tileValue.textContent = "";
+        const command = commands.get(device.key);
+        const failed = command?.status === "error";
+        const stateText = command?.status === "pending" ? `${text} · šaljem…` : failed ? "Naredba nije potvrđena" : text;
+        if (tileState.textContent !== stateText) tileState.textContent = stateText;
+        tileState.classList.toggle("dc-tile-state-error", failed);
+        node.classList.toggle("dc-tile-on", on === true);
+        const valueText = big ? `${big.error ? "—" : format(big)}, ` : "";
+        tileOpen.setAttribute("aria-label", `${device.label}: ${valueText}${stateText}. Otvori upravljanje i detalje.`);
+        const quick = Boolean(lightType && roles.brightnessSet && canControl(device));
+        tileQuick.hidden = !quick;
+        if (quick) {
+          const number = numeric(simulatedValue("brightnessSet"));
+          tileQuick.disabled = !allowed("brightnessSet") || number === null || !Number.isFinite(Number(roles.brightnessSet.control?.max));
+          tileQuick.setAttribute("aria-pressed", String(on === true));
+          tileQuick.setAttribute("aria-label", `${device.label}: ${on ? "isključi" : "uključi"}, ${actionLabel()}`);
+          tileQuick.title = tileQuick.disabled ? disabledReason("brightnessSet") : `${on ? "Isključi" : "Uključi"}${demoMode ? " u simulaciji" : ""}`;
+        }
+        const blindQuick = Boolean(device.type === "blind" && roles.positionSet && canControl(device) && blindTarget("up") !== null);
+        tileBlind.hidden = !blindQuick;
+        if (blindQuick) {
+          const blocked = !allowed("positionSet");
+          for (const [button, direction] of [[tileUp, "up"], [tileDown, "down"]]) {
+            const verb = direction === "up" ? "Podigni (otvori)" : "Spusti (zatvori)";
+            button.disabled = blocked;
+            button.setAttribute("aria-label", `${device.label}: ${verb.toLowerCase()}, ${actionLabel()}`);
+            button.title = blocked ? disabledReason("positionSet") : `${verb}${demoMode ? " u simulaciji" : ""}`;
+          }
+        }
+        const chip = { pending: "Šaljem", accepted: "Prihvaćeno", readback: "Potvrđeno", error: "Nije potvrđeno" }[command?.status] || "";
+        sheetChip.hidden = !chip;
+        if (sheetChip.textContent !== chip) sheetChip.textContent = chip;
+        sheetChip.dataset.status = command?.status || "";
+        sheetClose.setAttribute("aria-label", `Zatvori ${device.label}`);
+        sheetClose.title = "Zatvori";
       }
 
       function renderDetails() {
@@ -1192,6 +1496,7 @@
               : command.status === "readback" ? `Zadana vrijednost potvrđena je novim očitanjem. ${target}.`
                 : `Slanje nije potvrđeno: ${command.error} Provjeri očitanja prije novog pokušaja.`;
         } else commandStatus.textContent = "";
+        renderTile();
         if (details.open) renderDetails();
       };
       card.update(initial);
@@ -1291,7 +1596,7 @@
         selectedKeys.clear(); selectionMode = false; applyFilter();
         managementStatus.textContent = message; managementStatus.hidden = !message;
       },
-      destroy() { destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); mirrors.clear(); selectedKeys.clear(); devices = []; displayOrder = []; headings.clear(); deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
+      destroy() { closeSheet({ immediate: true }); if (closingCard) finishClose(closingCard); pageDocument?.removeEventListener?.("keydown", sheetKeydown); destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); mirrors.clear(); selectedKeys.clear(); devices = []; displayOrder = []; headings.clear(); deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
   }
 
   const api = { create };
