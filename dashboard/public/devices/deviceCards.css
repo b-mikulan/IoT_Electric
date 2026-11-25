@@ -298,3 +298,53 @@ ul.room-registry-list { max-height: 270px; overflow-y: auto; margin: 0; padding:
 }
 
 .device-cards-section .dc-refresh-button:disabled { cursor: wait; opacity: .6; }
+
+/* Tile view. Each top-level card shows a compact tile; one card at a time
+   opens as a bottom sheet with its full controls. Rows inside group and zone
+   cards keep their row layout. "On" is shown with the light's own tone, never
+   with the green, amber or red state colours. */
+.dc-view-switch { display: inline-flex; border: 1px solid var(--line-strong, #858F92); border-radius: var(--r-sm, 4px); overflow: hidden; }
+.dc-view-option { min-height: 32px; padding: 0 12px; border: 0; background: transparent; color: var(--dc-ink); font: inherit; font-size: var(--fs-xs, .75rem); font-weight: 600; cursor: pointer; }
+.dc-view-option + .dc-view-option { border-left: 1px solid var(--line-strong, #858F92); }
+.dc-view-option[aria-pressed="true"] { background: var(--action-tint, #E3EDF7); color: var(--action-strong, #154A7B); }
+.dc-view-option:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: -2px; }
+.dc-tile, .dc-sheet-close { display: none; }
+.dc-sheet-backdrop { position: fixed; inset: 0; z-index: 1000; background: var(--backdrop, rgba(20, 26, 30, .55)); }
+.dc-sheet-backdrop[hidden] { display: none; }
+
+.device-cards-section.dc-view-tiles .dc-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) { position: relative; display: flex; flex-direction: column; gap: 10px; min-height: 112px; margin: 0; padding: 12px; background: var(--surface-sunken, #F4F6F5); }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) > :is(.dc-card-body, .dc-state-line, .dc-command-status, .dc-refresh-status, .dc-details, .dc-group-members) { display: none; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-card-top { gap: 10px; padding-right: 46px; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) :is(.dc-room, .dc-group-note, .dc-card-actions, .dc-type-label) { display: none; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-device-icon { width: 34px; height: 34px; flex-basis: 34px; border-radius: 50%; background: var(--surface-sunken-2, #E4E8E7); color: var(--muted, #5A646A); }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-device-icon svg { width: 20px; height: 20px; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-card-title { font-size: var(--fs-base, .875rem); }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-card-selection { position: relative; z-index: 2; padding-bottom: 0; }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open):is(.dc-type-climate, .dc-type-sensor, .dc-type-zone, .dc-type-blind, .dc-type-generic) { background: var(--surface, #FFFFFF); }
+.dc-view-tiles .dc-grid > .dc-card.dc-tile-on:not(.dc-sheet-open) { background: var(--surface, #FFFFFF); border-color: var(--line-strong, #858F92); }
+.dc-view-tiles .dc-grid > .dc-card.dc-tile-on:not(.dc-sheet-open) .dc-device-icon { background: var(--tone-ochre-tint, #F5F0E7); color: var(--tone-ochre, #87683C); }
+.dc-view-tiles .dc-grid > .dc-card:not(.dc-sheet-open) .dc-tile { display: flex; flex-direction: column; gap: 2px; margin-top: auto; }
+.dc-tile-open { position: absolute; inset: 0; z-index: 1; width: 100%; padding: 0; border: 0; border-radius: inherit; background: transparent; cursor: pointer; }
+.dc-tile-open:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 2px; }
+.dc-tile-value { font-family: var(--dc-din); font-size: 1.5rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.dc-tile-value[hidden] { display: none; }
+.dc-tile-state { color: var(--muted, #5A646A); font-size: var(--fs-xs, .75rem); line-height: 1.35; }
+.dc-tile-state-error { color: var(--alarm-ink, #9E2A22); }
+.dc-tile-quick { position: absolute; top: 10px; right: 10px; z-index: 2; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid var(--line-strong, #858F92); border-radius: 50%; background: var(--surface, #FFFFFF); color: var(--dc-ink); cursor: pointer; }
+.dc-tile-quick[hidden] { display: none; }
+.dc-tile-quick svg { width: 20px; height: 20px; }
+.dc-tile-quick[aria-pressed="true"] { border-color: var(--tone-ochre, #87683C); background: var(--tone-ochre-tint, #F5F0E7); color: var(--tone-ochre, #87683C); }
+.dc-tile-quick:disabled { cursor: not-allowed; opacity: .5; }
+.dc-tile-quick:focus-visible { outline: 2px solid var(--action, #1C5D99); outline-offset: 2px; }
+
+.dc-view-tiles .dc-grid > .dc-card.dc-sheet-open { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1001; max-width: 640px; max-height: 88vh; margin: 0 auto; overflow-y: auto; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgba(0, 0, 0, .2); }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-sheet-close { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; margin-left: auto; padding: 0; border: 1px solid var(--line, #CBD1CF); border-radius: 50%; background: transparent; color: var(--dc-ink); cursor: pointer; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-sheet-close svg { width: 18px; height: 18px; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-type-label { display: none; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-range { height: 12px; margin: 18px 0 12px; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-range::-webkit-slider-thumb { width: 30px; height: 30px; }
+.dc-view-tiles .dc-card.dc-sheet-open .dc-range::-moz-range-thumb { width: 24px; height: 24px; }
+@media (max-width: 650px) {
+  .device-cards-section.dc-view-tiles .dc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+}

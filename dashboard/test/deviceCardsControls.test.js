@@ -1359,3 +1359,74 @@ test("a selected floor keeps its collapsed rooms collapsed", (t) => {
   selectFloor(container, "f1");
   assert.deepEqual(gridSequence(container), ["R:Hodnik", "ES/B", "R:Ured 12 uređaja"]);
 });
+
+const hasClass = (node, name) => node.className.split(" ").includes(name);
+
+test("the tile quick button sends the card's light command and shows its progress", async (t) => {
+  let finish;
+  const calls = [];
+  const set = point("brightnessSet", 40);
+  const light = device("light", { brightnessSet: set });
+  const { container, update } = setup(t, [light], (command) => { calls.push(command); return new Promise((resolve) => { finish = resolve; }); });
+  const [quick] = byClass(container, "dc-tile-quick");
+  const [state] = byClass(container, "dc-tile-state");
+  const [card] = byClass(container, "dc-card");
+  assert.equal(quick.hidden, false);
+  assert.equal(quick.attributes["aria-pressed"], "true");
+  assert.equal(state.textContent, "Uključeno · 40 %");
+  assert.equal(hasClass(card, "dc-tile-on"), true);
+  quick.dispatch("click");
+  assert.deepEqual(calls, [{ widgetId: set.id, value: 0 }]);
+  assert.equal(state.textContent, "Isključeno · šaljem…");
+  assert.equal(quick.disabled, true);
+  // The card's own switch is blocked by the same pending command.
+  byClass(container, "dc-toggle")[0].dispatch("click");
+  quick.dispatch("click");
+  assert.equal(calls.length, 1);
+  finish();
+  await flush();
+  update([device("light", { brightnessSet: { ...set, value: 0, updatedAt: "after" } })]);
+  assert.equal(state.textContent, "Isključeno");
+  assert.equal(hasClass(card, "dc-tile-on"), false);
+});
+
+test("a tile offers no quick action without control permission", (t) => {
+  const light = device("light", { brightnessSet: point("brightnessSet", 40) });
+  const { container } = setup(t, [light], async () => {}, false, undefined, { readOnly: true });
+  assert.equal(byClass(container, "dc-tile-quick")[0].hidden, true);
+  assert.equal(byClass(container, "dc-tile-state")[0].textContent, "Uključeno · 40 %");
+});
+
+test("tiles show the main reading, and a sheet opens only in tile view and closes when its card leaves", (t) => {
+  const sensor = { ...device("sensor", { temperature: point("temperature", 21.4, { unit: "°C", control: null }) }), key: "ES/sensor", label: "Senzor sobe" };
+  const climate = { ...device("climate", { temperature: point("temperature", 22, { unit: "°C", control: null }), setpoint: point("setpoint", 23, { unit: "°C" }) }), key: "ES/climate", label: "Klima" };
+  const { container } = setup(t, [sensor, climate], async () => {});
+  const tileFor = (label) => byClass(container, "dc-card").find((node) => byClass(node, "dc-card-title")[0].textContent === label);
+  assert.equal(byClass(tileFor("Senzor sobe"), "dc-tile-value")[0].textContent, "21,4 °C");
+  assert.equal(byClass(tileFor("Senzor sobe"), "dc-tile-state")[0].textContent, "Temperatura");
+  assert.equal(byClass(tileFor("Klima"), "dc-tile-state")[0].textContent, "Zadano 23 °C");
+  const [backdrop] = byClass(container, "dc-sheet-backdrop");
+  const open = (label) => byClass(tileFor(label), "dc-tile-open")[0].dispatch("click");
+  open("Klima");
+  assert.equal(hasClass(tileFor("Klima"), "dc-sheet-open"), false, "card view never opens a sheet");
+  const [cardsOption, tilesOption] = byClass(container, "dc-view-option");
+  assert.equal(cardsOption.attributes["aria-pressed"], "true");
+  tilesOption.dispatch("click");
+  assert.equal(hasClass(container, "dc-view-tiles"), true);
+  assert.equal(tilesOption.attributes["aria-pressed"], "true");
+  open("Klima");
+  assert.equal(hasClass(tileFor("Klima"), "dc-sheet-open"), true);
+  assert.equal(tileFor("Klima").attributes.role, "dialog");
+  assert.equal(backdrop.hidden, false);
+  container.listeners.get("keydown")({ key: "Escape" });
+  assert.equal(hasClass(tileFor("Klima"), "dc-sheet-open"), false);
+  assert.equal(backdrop.hidden, true);
+  open("Klima");
+  const [search] = byClass(container, "dc-search");
+  search.value = "Senzor";
+  search.dispatch("input");
+  assert.equal(hasClass(tileFor("Klima") || { className: "" }, "dc-sheet-open"), false);
+  assert.equal(backdrop.hidden, true);
+  cardsOption.dispatch("click");
+  assert.equal(hasClass(container, "dc-view-tiles"), false);
+});
