@@ -33,6 +33,14 @@ class UserPasswordTests(unittest.TestCase):
         self.assertRegex(record, r"^[A-Za-z0-9+/]{65}$")
         self.assertFalse(set_user_password(project, "lozinka-č"))
 
+    def test_independent_installer_password(self):
+        project = self.project(f"<conf:Password>{self.sample}</conf:Password>")
+        before = project.files.copy()
+        self.assertTrue(set_user_password(project, "installer-example", "Installer"))
+        self.assertEqual([k for k in before if before[k] != project.files[k]], ["projects/$p/users/$Installer.xml"])
+        self.assertFalse(set_user_password(project, "installer-example", "Installer"))
+        self.assertFalse(set_user_password(project, "example-only", "User"))
+
     def test_unrecognized_record_rejected(self):
         project = self.project("<conf:Password>unknown</conf:Password>")
         with self.assertRaisesRegex(ValueError, "Neprepoznat"):

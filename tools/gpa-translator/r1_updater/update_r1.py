@@ -45,7 +45,7 @@ def save(output, files):
             os.link(staged, output)
 
 
-def process_project(source, output, password):
+def process_project(source, output, passwords):
     if output:
         require(not output.exists(), f"Izlaz već postoji: {output}")
     files = read_archive(source)
@@ -53,11 +53,12 @@ def process_project(source, output, password):
     if any((widgets, rewired, promoted, deleted)):
         require(update(files) == ([], False, outputs, False, []),
                 "Završna provjera ažuriranog projekta nije uspjela.")
-    if password is not None:
+    if passwords:
         project = Project(files)
-        changed = set_user_password(project, password)
-        require(not set_user_password(project, password), "Provjera nove lozinke nije uspjela.")
-        print("Lozinka računa User:", "predviđena promjena" if changed else "već odgovara unosu")
+        for account, password in passwords.items():
+            changed = set_user_password(project, password, account)
+            require(not set_user_password(project, password, account), f"Provjera lozinke za {account} nije uspjela.")
+            print(f"Lozinka računa {account}:", "predviđena promjena" if changed else "već odgovara unosu")
     print("Widgeti za uklanjanje:", ", ".join(widgets) or "nema")
     print("Facade Lights:", "prespajanje" if rewired else "već ažurirano", f"(broj izlaza: {outputs})")
     print("Račun User:", "prijelaz u Administrator" if promoted else "već je administrator")
@@ -73,7 +74,9 @@ def main():
     parser.add_argument("--output", type=Path,
                         help="Izlazna .gpa datoteka ili izlazna mapa za skupnu obradu. Bez opcije slijedi pregled.")
     parser.add_argument("--set-user-password", action="store_true",
-                        help="Postavi novu lozinku računa User. Čita je skrivenim unosom ili iz standardnog ulaza.")
+                        help="Upitaj za novu lozinku računa User. Enter zadržava postojeću lozinku.")
+    parser.add_argument("--set-installer-password", action="store_true",
+                        help="Upitaj za novu lozinku računa Installer. Enter zadržava postojeću lozinku.")
     args = parser.parse_args()
     try:
         batch = args.project.is_dir()
@@ -89,11 +92,18 @@ def main():
             sources = [args.project]
             if args.output:
                 require(args.output.suffix.lower() == ".gpa", "Izlaz mora imati nastavak .gpa.")
-        password = None
-        if args.set_user_password:
-            password = (getpass.getpass("Nova lozinka za User: ") if sys.stdin.isatty()
-                        else sys.stdin.readline().rstrip("\r\n"))
-            require(password, "Nova lozinka računa User je prazna.")
+        passwords = {}
+        for account, requested in (("User", args.set_user_password), ("Installer", args.set_installer_password)):
+            if not requested:
+                continue
+            if sys.stdin.isatty():
+                password = getpass.getpass(f"Nova lozinka za {account} (Enter zadržava postojeću): ")
+            else:
+                line = sys.stdin.readline()
+                require(line, f"Nedostaje redak za lozinku računa {account}.")
+                password = line.rstrip("\r\n")
+            if password:
+                passwords[account] = password
     except (ValueError, OSError, EOFError) as exc:
         print(f"Greška ({args.project.name}): {exc}", file=sys.stderr)
         return 1
@@ -106,7 +116,7 @@ def main():
             if output:
                 output = output / source.name
         try:
-            process_project(source, output, password)
+            process_project(source, output, passwords)
         except (ValueError, OSError, KeyError, IndexError, TypeError, AttributeError, RuntimeError,
                 ET.ParseError, zipfile.BadZipFile) as exc:
             failed += 1

@@ -18,17 +18,29 @@ class BatchTests(unittest.TestCase):
             output = folder / "output"
             output.mkdir()
             (output / "nested.gpa").touch()
-            argv = ["update_r1.py", str(folder), "--set-user-password", "--output", str(output)]
-            stdin = StringIO("sample-only\nsecond line\n")
+            argv = ["update_r1.py", str(folder), "--set-user-password", "--set-installer-password",
+                    "--output", str(output)]
+            stdin = StringIO("sample-only\ninstaller-sample\nunused\n")
             with (patch.object(sys, "argv", argv), patch.object(sys, "stdin", stdin),
                   patch.object(update_r1, "process_project", side_effect=[None, ValueError("invalid"), None]) as run,
                   redirect_stdout(StringIO()) as stdout, redirect_stderr(StringIO()) as stderr):
                 self.assertEqual(update_r1.main(), 1)
             self.assertEqual([call.args for call in run.call_args_list],
-                             [(folder / n, output / n, "sample-only") for n in ("a.gpa", "b.GPA", "C.gpa")])
-            self.assertEqual(stdin.readline(), "second line\n")
+                             [(folder / n, output / n, {"User": "sample-only", "Installer": "installer-sample"})
+                              for n in ("a.gpa", "b.GPA", "C.gpa")])
+            self.assertEqual(stdin.readline(), "unused\n")
             self.assertIn("b.GPA", stderr.getvalue())
             self.assertIn("uspješno: 2, greške: 1", stdout.getvalue())
+
+    def test_blank_user_password_still_processes_project_with_installer_password(self):
+        with TemporaryDirectory() as directory:
+            source = Path(directory) / "a.gpa"
+            source.touch()
+            argv = ["update_r1.py", str(source), "--set-installer-password", "--set-user-password"]
+            with (patch.object(sys, "argv", argv), patch.object(sys, "stdin", StringIO("\ninstaller-sample\n")),
+                  patch.object(update_r1, "process_project") as run, redirect_stdout(StringIO())):
+                self.assertEqual(update_r1.main(), 0)
+            run.assert_called_once_with(source, None, {"Installer": "installer-sample"})
 
     def test_existing_output_is_preserved(self):
         with TemporaryDirectory() as directory:

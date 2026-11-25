@@ -7,18 +7,18 @@ python tools/gpa-translator/r1_updater/update_r1.py "stan.gpa"
 python tools/gpa-translator/r1_updater/update_r1.py "stan.gpa" --output "stan-azuriran.gpa"
 ```
 
-Za postavljanje lozinke računa `User` dodajte `--set-user-password`. Skripta traži skriveni unos nove lozinke, a za automatiziranu obradu može je pročitati iz jednog retka standardnog ulaza. Opcija radi i na već ažuriranom R1 projektu. Za spremanje navedite novu izlaznu datoteku.
+Lozinke postavljate odvojeno. Dodajte `--set-user-password` za račun `User` i/ili `--set-installer-password` za `Installer`. Za zadržavanje postojeće lozinke izostavite opciju tog računa ili na njegovu upitu pritisnite Enter. Pri ažuriranju `User` dobiva administratorska prava i kad zadrži svoju lozinku. Kod obje opcije prvi skriveni unos pripada računu `User`, a drugi računu `Installer`. Za automatiziranu obradu vrijedi isti redoslijed, po jedan redak za svaki odabrani račun. Prazan redak čuva lozinku tog računa.
 
 ```powershell
-python tools/gpa-translator/r1_updater/update_r1.py "stan.gpa" --set-user-password --output "stan-azuriran.gpa"
+python tools/gpa-translator/r1_updater/update_r1.py "stan.gpa" --set-user-password --set-installer-password --output "stan-azuriran.gpa"
 ```
 
 ### Obrada cijele mape
 
-Prvi argument može biti mapa. Skripta obrađuje jednu po jednu `.gpa` datoteku neposredno u toj mapi, abecednim redom po nazivu. Uz `--set-user-password` lozinku za račun `User` unesete jednom za sve projekte.
+Prvi argument može biti mapa. Skripta obrađuje jednu po jednu `.gpa` datoteku neposredno u toj mapi, abecednim redom po nazivu. Lozinku za svaki odabrani račun unosite jednom za cijelu mapu.
 
 ```powershell
-python tools/gpa-translator/r1_updater/update_r1.py "projects/gpa/blocks/R1/Translating" --set-user-password --output "output/gpa-r1/azurirani"
+python tools/gpa-translator/r1_updater/update_r1.py "projects/gpa/blocks/R1/Translating" --set-user-password --set-installer-password --output "output/gpa-r1/azurirani"
 ```
 
 Skripta po potrebi stvara izlaznu mapu i sprema projekte pod izvornim imenima. Za pregled izostavite `--output` i izlaznu putanju. Ako pojedini projekt ima neočekivanu strukturu ili istoimeni izlaz već postoji, skripta ispisuje ime i razlog greške te nastavlja sa sljedećim projektom. Na kraju prikazuje broj uspješnih i neuspješnih obrada te vraća izlazni kod 1 ako je bilo grešaka.

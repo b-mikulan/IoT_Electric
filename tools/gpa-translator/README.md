@@ -253,7 +253,7 @@ Drugi prioritetni rječnik možete odabrati argumentom
 
 ## R1 updater
 
-Alat za ažuriranje balkonske rasvjete, korisnika i lozinke računa `User` nalazi se u podmapi `r1_updater`. [Upute za pokretanje](r1_updater/README.md)
+Alat za ažuriranje balkonske rasvjete, korisnika i lozinki računa `User` i `Installer` nalazi se u podmapi `r1_updater`. [Upute za pokretanje](r1_updater/README.md)
 
 ## Spremanje i provjere
 

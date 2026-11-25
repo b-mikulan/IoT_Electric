@@ -126,16 +126,16 @@ def password_record(password, salt):
     return base64.b64encode(digest).decode("ascii").rstrip("=") + salt
 
 
-def set_user_password(project, password):
-    require(bool(password), "Nova lozinka računa User je prazna.")
-    user = one(project.named("users", "User"), "Račun User")
+def set_user_password(project, password, account="User"):
+    require(bool(password), f"Nova lozinka računa {account} je prazna.")
+    user = one(project.named("users", account), f"Račun {account}")
     xml = project.xml(user)
-    element = one(xml.findall(NS + "Password"), "Polje Password računa User")
+    element = one(xml.findall(NS + "Password"), f"Polje Password računa {account}")
     require(not element.attrib and len(element) == 0, "Neočekivan oblik polja Password.")
-    require(field(xml, "ResetPassword").lower() == "false", "Račun User ima neočekivanu postavku ResetPassword.")
+    require(field(xml, "ResetPassword").lower() == "false", f"Račun {account} ima neočekivanu postavku ResetPassword.")
     old = element.text or ""
     if old:
-        require(re.fullmatch(r"[A-Za-z0-9+/]{65}", old), "Neprepoznat zapis lozinke računa User.")
+        require(re.fullmatch(r"[A-Za-z0-9+/]{65}", old), f"Neprepoznat zapis lozinke računa {account}.")
         if hmac.compare_digest(old, password_record(password, old[43:])):
             return False
     salt = base64.b64encode(secrets.token_bytes(16)).decode("ascii").rstrip("=")

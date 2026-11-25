@@ -1,0 +1,15 @@
+# Raspakiraj ZIP, stavi .gpa datoteke u mapu ulaz i otvori PowerShell u mapi s update_r1.py.
+python --version  # Potreban je Python 3.10 ili noviji.
+
+# Pregled (opcionalno)
+python update_r1.py ulaz
+
+# Cijela mapa: prvo unesi lozinku za User, zatim za Installer. Svaku unosiš jednom za sve projekte.
+# Enter zadržava postojeću lozinku tog računa. User svejedno dobiva administratorska prava.
+python update_r1.py ulaz --set-user-password --set-installer-password --output izlaz
+
+# Samo lozinka za Installer, uz uobičajeno ažuriranje projekata
+python update_r1.py ulaz --set-installer-password --output izlaz
+
+# Jedan projekt: zamijeni stan.gpa imenom svoje datoteke.
+python update_r1.py "ulaz/stan.gpa" --set-user-password --set-installer-password --output "stan-azuriran.gpa"
