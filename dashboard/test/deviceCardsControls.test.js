@@ -1485,3 +1485,40 @@ test("blind presets open, half-close and close only with a confirmed 0–100 % r
   const unconfirmed = setup(t, [device("blind", { positionSet: point("positionSet", 36, { control: { min: 0, max: 255, step: 1, rangeConfirmed: true } }) })], async () => {});
   assert.equal(byClass(unconfirmed.container, "dc-preset").length, 0);
 });
+
+test("pulling the sheet handle down far enough closes it, a short pull springs back", (t) => {
+  const light = device("light", { brightnessSet: point("brightnessSet", 40) });
+  const { container } = setup(t, [light], async () => {});
+  byClass(container, "dc-view-option")[1].dispatch("click");
+  const [card] = byClass(container, "dc-card");
+  const [handle] = byClass(card, "dc-sheet-handle");
+  const [backdrop] = byClass(container, "dc-sheet-backdrop");
+  const pull = (distance) => {
+    const event = (clientY) => ({ pointerId: 7, button: 0, clientY, target: handle, currentTarget: handle });
+    handle.listeners.get("pointerdown")(event(100));
+    handle.listeners.get("pointermove")(event(100 + distance));
+    return event(100 + distance);
+  };
+  byClass(card, "dc-tile-open")[0].dispatch("click");
+  // A short pull springs back and keeps the sheet open.
+  handle.listeners.get("pointerup")(pull(20));
+  assert.equal(hasClass(card, "dc-sheet-open"), true);
+  assert.equal(card.style.transform, "");
+  handle.listeners.get("pointerup")(pull(220));
+  assert.equal(hasClass(card, "dc-sheet-open"), false);
+  assert.equal(backdrop.hidden, true);
+  // Buttons in the header never start a drag.
+  byClass(card, "dc-tile-open")[0].dispatch("click");
+  const [closeButton] = byClass(card, "dc-sheet-close");
+  const top = byClass(card, "dc-card-top")[0];
+  top.listeners.get("pointerdown")({ pointerId: 8, button: 0, clientY: 100, target: { closest: () => closeButton }, currentTarget: top });
+  top.listeners.get("pointermove")({ pointerId: 8, clientY: 400, target: top, currentTarget: top });
+  assert.equal(card.style.transform, "");
+  assert.equal(hasClass(card, "dc-sheet-open"), true);
+});
+
+test("a blind tile rounds its position while the card keeps the exact reading", (t) => {
+  const { container } = setup(t, [device("blind", { positionStatus: point("positionStatus", 85.003, { control: null }), positionSet: point("positionSet", 85) })], async () => {});
+  assert.equal(byClass(container, "dc-tile-state")[0].textContent, "Položaj 85 %");
+  assert.equal(byClass(container, "dc-metric-value")[0].textContent, "85,003 %");
+});

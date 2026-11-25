@@ -349,7 +349,11 @@
     announce.setAttribute("role", "status");
     announce.setAttribute("aria-live", "polite");
     container.replaceChildren(searchTools, management, selectionActions, managementStatus, roomPanel, scopeActions, scopeStatus, summary, readWarning, grid, loadMore, empty, sheetBackdrop, announce);
-    container.addEventListener("keydown", (event) => { if (event.key === "Escape" && openCard) { event.preventDefault?.(); closeSheet(); } });
+    // Esc closes the sheet wherever focus is, e.g. after a drag left it on the page.
+    const sheetKeydown = (event) => { if (event.key === "Escape" && openCard) { event.preventDefault?.(); closeSheet(); } };
+    container.addEventListener("keydown", sheetKeydown);
+    const pageDocument = globalThis.document;
+    if (typeof pageDocument?.addEventListener === "function") pageDocument.addEventListener("keydown", sheetKeydown);
     syncViewSwitch();
     const scrollObserver = typeof IntersectionObserver === "function" ? new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting) && !loadMore.hidden) showMore();
@@ -363,16 +367,35 @@
     function setView(view) {
       const next = view === "tiles";
       if (destroyed || next === tileView) return;
-      closeSheet();
+      closeSheet({ immediate: true });
       tileView = next;
       writeCardView(tileView ? "tiles" : "cards");
       container.classList.toggle("dc-view-tiles", tileView);
       syncViewSwitch();
     }
 
+    // The sheet slides in and out. Without matchMedia (tests) or with reduced
+    // motion it opens and closes at once.
+    const SHEET_MS = 220;
+    let closingCard = null;
+    let closeTimer = 0;
+    const sheetMotion = () => typeof globalThis.matchMedia === "function"
+      && !globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function finishClose(card) {
+      clearTimeout(closeTimer);
+      if (closingCard === card) closingCard = null;
+      card.node.classList.toggle("dc-sheet-open", false);
+      for (const name of ["role", "aria-modal", "aria-label"]) card.node.removeAttribute?.(name);
+      card.node.style.transform = card.node.style.transition = "";
+      sheetBackdrop.style.opacity = sheetBackdrop.style.transition = "";
+      if (!openCard) sheetBackdrop.hidden = true;
+    }
+
     function openSheet(card, returnFocus) {
       if (destroyed || !tileView || card.node.hidden) return;
-      if (openCard && openCard !== card) closeSheet();
+      if (closingCard) finishClose(closingCard);
+      if (openCard && openCard !== card) closeSheet({ immediate: true });
       openCard = card;
       sheetReturnFocus = returnFocus || null;
       card.node.classList.toggle("dc-sheet-open", true);
@@ -383,16 +406,23 @@
       if (typeof card.sheetClose?.focus === "function") card.sheetClose.focus();
     }
 
-    function closeSheet() {
+    // Slides the sheet down from where it is (also mid-drag), then restores
+    // the tile. Hidden cards, view changes and destroy close at once.
+    function closeSheet({ immediate = false } = {}) {
       if (!openCard) return;
       const card = openCard;
       openCard = null;
-      card.node.classList.toggle("dc-sheet-open", false);
-      for (const name of ["role", "aria-modal", "aria-label"]) card.node.removeAttribute?.(name);
-      sheetBackdrop.hidden = true;
       const target = sheetReturnFocus;
       sheetReturnFocus = null;
-      if (target?.isConnected !== false && typeof target?.focus === "function") target.focus();
+      // The tile is visible again only after the sheet has gone, so focus returns then.
+      const restoreFocus = () => { if (!openCard && target?.isConnected !== false && typeof target?.focus === "function") target.focus(); };
+      if (immediate || destroyed || card.node.hidden || !sheetMotion()) { finishClose(card); restoreFocus(); return; }
+      closingCard = card;
+      card.node.style.transition = `transform ${SHEET_MS}ms ease-in`;
+      card.node.style.transform = "translateY(100%)";
+      sheetBackdrop.style.transition = `opacity ${SHEET_MS}ms ease-in`;
+      sheetBackdrop.style.opacity = "0";
+      closeTimer = setTimeout(() => { if (closingCard === card) { finishClose(card); restoreFocus(); } }, SHEET_MS);
     }
 
     function roomKey(device) {
@@ -691,7 +721,7 @@
       for (const device of shownDevices) cards.get(device.key).setMembers(rows.get(device.key).map((row) => row.node));
       // The sheet belongs to a shown top-level card; filters, collapsed rooms
       // and removed devices close it.
-      if (openCard && (openCard.node.hidden || !topLevel.has(openCard.device.key) || cards.get(openCard.device.key) !== openCard)) closeSheet();
+      if (openCard && (openCard.node.hidden || !topLevel.has(openCard.device.key) || cards.get(openCard.device.key) !== openCard)) closeSheet({ immediate: true });
       loadMore.hidden = shownEntries.length >= entries.length;
       loadCount.textContent = `Prikazano ${shownDevices.length} od ${visibleTotal} uređaja`;
       loadButton.disabled = loadMore.hidden;
@@ -862,6 +892,38 @@
         expand.setAttribute("aria-expanded", String(memberOpen));
       };
       expand.addEventListener("click", () => { memberOpen = !memberOpen; syncMemberOpen(); });
+      // Pull the handle (or the sheet's header) down to close the sheet.
+      const sheetHandle = el("div", "dc-sheet-handle");
+      sheetHandle.setAttribute("aria-hidden", "true");
+      let drag = null;
+      const clock = () => globalThis.performance?.now?.() ?? Date.now();
+      function dragStart(event) {
+        if (openCard !== card || drag || (event.button !== undefined && event.button > 0)) return;
+        if (event.target?.closest?.("button, a, input, select, summary, label, textarea")) return;
+        drag = { id: event.pointerId, startY: event.clientY, dy: 0, at: clock(), source: event.currentTarget };
+        event.currentTarget?.setPointerCapture?.(event.pointerId);
+        node.style.transition = "none";
+        sheetBackdrop.style.transition = "none";
+      }
+      function dragMove(event) {
+        if (!drag || event.pointerId !== drag.id) return;
+        drag.dy = Math.max(0, event.clientY - drag.startY);
+        node.style.transform = drag.dy ? `translateY(${drag.dy}px)` : "";
+        sheetBackdrop.style.opacity = String(Math.max(0.15, 1 - drag.dy / 420));
+        event.preventDefault?.();
+      }
+      function dragEnd(event) {
+        if (!drag || event.pointerId !== drag.id) return;
+        const { dy, at, source } = drag;
+        drag = null;
+        source?.releasePointerCapture?.(event.pointerId);
+        const fast = dy > 30 && dy / Math.max(1, clock() - at) > 0.5;
+        if (event.type !== "pointercancel" && (dy > Math.min(140, (node.offsetHeight || 400) * 0.3) || fast)) { closeSheet(); return; }
+        node.style.transition = `transform ${SHEET_MS}ms ease-out`;
+        node.style.transform = "";
+        sheetBackdrop.style.transition = `opacity ${SHEET_MS}ms ease-out`;
+        sheetBackdrop.style.opacity = "";
+      }
       const sheetClose = el("button", "dc-sheet-close");
       sheetClose.type = "button";
       sheetClose.append(icon("close"));
@@ -925,7 +987,13 @@
         }
         while (membersList.children.length > nodes.length) membersList.children[nodes.length].remove();
       };
-      node.append(selectionLabel, top, tile, body, states, commandStatus, refreshStatus, details, membersPanel);
+      node.append(sheetHandle, selectionLabel, top, tile, body, states, commandStatus, refreshStatus, details, membersPanel);
+      for (const area of [sheetHandle, top]) {
+        area.addEventListener("pointerdown", dragStart);
+        area.addEventListener("pointermove", dragMove);
+        area.addEventListener("pointerup", dragEnd);
+        area.addEventListener("pointercancel", dragEnd);
+      }
 
       const pointFor = (role) => card.device.roles?.[role];
       const draftKey = (role) => `${card.device.key}\u0000${role}`;
@@ -1302,9 +1370,14 @@
           text = on === null ? "Stanje nije poznato" : on ? `Uključeno · ${format(point, number)}` : "Isključeno";
         } else if (device.type === "blind") {
           const point = roles.positionStatus || roles.positionSet;
-          text = point ? `Položaj ${point.error ? "—" : format(point)}` : typeLabels.blind;
+          // The card keeps the exact reading; the tile rounds a percentage to whole numbers.
+          const tilePosition = (target, value = target?.value) => {
+            const number = numeric(value);
+            return number !== null && displayUnit(target) === "%" ? `${formatter.format(Math.round(number))} %` : format(target, value);
+          };
+          text = point ? `Položaj ${point.error ? "—" : tilePosition(point)}` : typeLabels.blind;
           // A sent or simulated target shows until a reading confirms it.
-          if (roles.positionSet && drafts.has(draftKey("positionSet"))) text += ` · cilj ${format(roles.positionSet, simulatedValue("positionSet"))}`;
+          if (roles.positionSet && drafts.has(draftKey("positionSet"))) text += ` · cilj ${tilePosition(roles.positionSet, simulatedValue("positionSet"))}`;
         } else {
           big = device.metrics?.primary || (device.type === "climate" ? roles.temperature
             : roles.illuminance || roles.temperature || roles.co2 || roles.humidity || roles.occupancy) || null;
@@ -1523,7 +1596,7 @@
         selectedKeys.clear(); selectionMode = false; applyFilter();
         managementStatus.textContent = message; managementStatus.hidden = !message;
       },
-      destroy() { closeSheet(); destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); mirrors.clear(); selectedKeys.clear(); devices = []; displayOrder = []; headings.clear(); deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
+      destroy() { closeSheet({ immediate: true }); if (closingCard) finishClose(closingCard); pageDocument?.removeEventListener?.("keydown", sheetKeydown); destroyed = true; scrollObserver?.disconnect(); drafts.clear(); commands.clear(); refreshes.clear(); cards.clear(); mirrors.clear(); selectedKeys.clear(); devices = []; displayOrder = []; headings.clear(); deviceIndex = null; devicePositions.clear(); devicesByKey.clear(); searchIndex.clear(); container.replaceChildren(); } };
   }
 
   const api = { create };
