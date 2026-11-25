@@ -1430,3 +1430,58 @@ test("tiles show the main reading, and a sheet opens only in tile view and close
   cardsOption.dispatch("click");
   assert.equal(hasClass(container, "dc-view-tiles"), false);
 });
+
+test("blind tiles raise to 0 % and lower to 100 %, only with control and a confirmed range", async (t) => {
+  const calls = [];
+  const set = point("positionSet", 36);
+  const blind = device("blind", { positionSet: set });
+  const { container, update } = setup(t, [blind], async (command) => { calls.push(command); });
+  const [group] = byClass(container, "dc-tile-blind");
+  const [up, down] = byClass(container, "dc-tile-step");
+  assert.equal(group.hidden, false);
+  assert.match(up.attributes["aria-label"], /podigni \(otvori\)/);
+  up.dispatch("click");
+  await flush();
+  assert.equal(byClass(container, "dc-tile-state")[0].textContent, "Položaj 36 % · cilj 0 %");
+  update([device("blind", { positionSet: { ...set, value: 0, updatedAt: "after" } })]);
+  assert.equal(byClass(container, "dc-tile-state")[0].textContent, "Položaj 0 %");
+  down.dispatch("click");
+  await flush();
+  assert.deepEqual(calls, [{ widgetId: set.id, value: 0 }, { widgetId: set.id, value: 100 }]);
+  update([device("blind", { positionSet: { ...set, control: { min: 0, max: 255, step: 1, rangeConfirmed: true } } })]);
+  assert.equal(group.hidden, true);
+});
+
+test("blind tiles offer no movement without control permission", (t) => {
+  const { container } = setup(t, [device("blind", { positionSet: point("positionSet", 36) })], async () => {}, false, undefined, { readOnly: true });
+  assert.equal(byClass(container, "dc-tile-blind")[0].hidden, true);
+});
+
+test("sheet presets send their targets and the header chip follows the command", async (t) => {
+  let finish;
+  const calls = [];
+  const set = point("brightnessSet", 40);
+  const { container, update } = setup(t, [device("light", { brightnessSet: set })], (command) => { calls.push(command); return new Promise((resolve) => { finish = resolve; }); });
+  const presets = byClass(container, "dc-preset");
+  assert.deepEqual(presets.map((button) => button.textContent), ["100 %", "50 %", "25 %"]);
+  const [chip] = byClass(container, "dc-sheet-chip");
+  assert.equal(chip.hidden, true);
+  presets[2].dispatch("click");
+  assert.deepEqual(calls, [{ widgetId: set.id, value: 25 }]);
+  assert.equal(chip.textContent, "Šaljem");
+  assert.equal(presets[0].disabled, true);
+  finish();
+  await flush();
+  assert.equal(chip.textContent, "Prihvaćeno");
+  update([device("light", { brightnessSet: { ...set, value: 25, updatedAt: "after" } })]);
+  assert.equal(chip.textContent, "Potvrđeno");
+  assert.equal(chip.dataset.status, "readback");
+  assert.equal(byClass(container, "dc-preset")[2].attributes["aria-pressed"], "true");
+});
+
+test("blind presets open, half-close and close only with a confirmed 0–100 % range", (t) => {
+  const { container } = setup(t, [device("blind", { positionSet: point("positionSet", 36) })], async () => {});
+  assert.deepEqual(byClass(container, "dc-preset").map((button) => button.textContent), ["Otvori", "Pola", "Zatvori"]);
+  const unconfirmed = setup(t, [device("blind", { positionSet: point("positionSet", 36, { control: { min: 0, max: 255, step: 1, rangeConfirmed: true } }) })], async () => {});
+  assert.equal(byClass(unconfirmed.container, "dc-preset").length, 0);
+});

@@ -13,6 +13,8 @@
     chevron: ["m9 6 6 6-6 6"],
     power: ["M12 3v8", "M6.3 7.5a8 8 0 1 0 11.4 0"],
     close: ["M6 6l12 12M18 6 6 18"],
+    up: ["m6 15 6-6 6 6"],
+    down: ["m6 9 6 6 6-6"],
   };
   const roleLabels = {
     brightnessSet: "Zadana svjetlina", brightnessStatus: "Očitana svjetlina",
@@ -865,6 +867,9 @@
       sheetClose.append(icon("close"));
       sheetClose.addEventListener("click", () => closeSheet());
       card.sheetClose = sheetClose;
+      const sheetChip = el("span", "dc-sheet-chip");
+      sheetChip.hidden = true;
+      identity.append(sheetChip);
       top.append(expand, deviceIcon, identity, cardActions, type, sheetClose);
       // Compact tile, shown instead of the card body in tile view. The open
       // button and the quick action are siblings, never nested buttons.
@@ -879,10 +884,22 @@
       tileQuick.type = "button";
       tileQuick.append(icon("power"));
       tileQuick.addEventListener("click", () => toggleLight());
+      // Blind position 0 % is open (up) and 100 % closed (down).
+      const tileBlind = el("div", "dc-tile-blind");
+      const tileUp = el("button", "dc-tile-step");
+      const tileDown = el("button", "dc-tile-step");
+      tileUp.type = tileDown.type = "button";
+      tileUp.dataset.direction = "up";
+      tileDown.dataset.direction = "down";
+      tileUp.append(icon("up"));
+      tileDown.append(icon("down"));
+      tileUp.addEventListener("click", () => moveBlind("up"));
+      tileDown.addEventListener("click", () => moveBlind("down"));
+      tileBlind.append(tileUp, tileDown);
       card.tileOpen = tileOpen;
       card.tileQuick = tileQuick;
       card.tileState = tileState;
-      tile.append(tileOpen, tileValue, tileState, tileQuick);
+      tile.append(tileOpen, tileValue, tileState, tileQuick, tileBlind);
       const body = el("div", "dc-card-body");
       const states = el("div", "dc-state-line");
       const details = el("details", "dc-details");
@@ -999,7 +1016,7 @@
           numberControl(role, label);
           return;
         }
-        const wrap = el("div", "dc-control");
+        const wrap = el("div", `dc-control dc-control-${role}`);
         const inputId = `dc-${Math.random().toString(36).slice(2)}`;
         const row = el("div", "dc-control-heading");
         const caption = el("label", "dc-control-label", label);
@@ -1042,6 +1059,20 @@
         if (current !== null && Number.isFinite(maximum)) void commit(role, current > 0 ? 0 : maximum);
       }
 
+      // Full travel only when the command's 0–100 % range is confirmed:
+      // 0 % opens (raises) the blind and 100 % closes (lowers) it.
+      function blindTarget(direction) {
+        const control = pointFor("positionSet")?.control;
+        if (control?.rangeConfirmed !== true || Number(control.min) !== 0 || Number(control.max) !== 100) return null;
+        return direction === "up" ? 0 : 100;
+      }
+
+      function moveBlind(direction) {
+        if (!pointFor("positionSet") || !canControl(card.device)) return;
+        const target = blindTarget(direction);
+        if (target !== null) void commit("positionSet", target);
+      }
+
       function lightToggle() {
         const role = "brightnessSet";
         if (!pointFor(role)) return;
@@ -1061,6 +1092,35 @@
           button.title = button.disabled ? disabledReason(role) : demoMode ? "Simulacija upravljanja svjetlom." : `Šalje zadanu svjetlinu ${on ? 0 : pointFor(role).control.max} % kontroleru.`;
           button.setAttribute("aria-pressed", String(on));
           button.setAttribute("aria-label", `${card.device.label}: ${on ? "isključi" : "uključi"}, ${actionLabel()}`);
+        });
+      }
+
+      // Preset targets for the sheet, sent through the same command path.
+      function presets(role, entries) {
+        const point = pointFor(role);
+        if (!point || point.control?.rangeConfirmed !== true) return;
+        const wrap = el("div", "dc-presets");
+        wrap.setAttribute("role", "group");
+        wrap.setAttribute("aria-label", "Brze vrijednosti");
+        const buttons = entries.map(([value, text]) => {
+          const button = el("button", "dc-preset", text);
+          button.type = "button";
+          button.addEventListener("click", () => {
+            const bounds = pointFor(role)?.control;
+            if (bounds && value >= Number(bounds.min) && value <= Number(bounds.max)) void commit(role, value);
+          });
+          wrap.append(button);
+          return [button, value, text];
+        });
+        body.append(wrap);
+        card.bindings.push(() => {
+          const current = numeric(simulatedValue(role));
+          for (const [button, value, text] of buttons) {
+            button.disabled = !allowed(role);
+            button.setAttribute("aria-pressed", String(current === value));
+            button.setAttribute("aria-label", `${card.device.label}: ${text}, ${actionLabel()}`);
+            button.title = button.disabled ? disabledReason(role) : `${text}${demoMode ? " u simulaciji" : ""}`;
+          }
         });
       }
 
@@ -1194,6 +1254,7 @@
           if (card.device.type === "light" || card.device.type === "lightGroup") {
             lightToggle();
             range("brightnessSet", demoMode ? "Svjetlina · simulacija" : "Svjetlina");
+            presets("brightnessSet", [[100, "100 %"], [50, "50 %"], [25, "25 %"]]);
           } else if (card.device.type === "climate") {
             stepper("setpoint", "Zadana temperatura");
             selection("modeSet", "Način rada");
@@ -1201,6 +1262,7 @@
             selection("power", "Napajanje");
           } else if (card.device.type === "blind") {
             range("positionSet", demoMode ? "Položaj · simulacija" : "Položaj");
+            if (blindTarget("up") !== null) presets("positionSet", [[0, "Otvori"], [50, "Pola"], [100, "Zatvori"]]);
             range("slatSet", demoMode ? "Kut lamela · simulacija" : "Kut lamela");
           }
         }
@@ -1241,6 +1303,8 @@
         } else if (device.type === "blind") {
           const point = roles.positionStatus || roles.positionSet;
           text = point ? `Položaj ${point.error ? "—" : format(point)}` : typeLabels.blind;
+          // A sent or simulated target shows until a reading confirms it.
+          if (roles.positionSet && drafts.has(draftKey("positionSet"))) text += ` · cilj ${format(roles.positionSet, simulatedValue("positionSet"))}`;
         } else {
           big = device.metrics?.primary || (device.type === "climate" ? roles.temperature
             : roles.illuminance || roles.temperature || roles.co2 || roles.humidity || roles.occupancy) || null;
@@ -1268,6 +1332,21 @@
           tileQuick.setAttribute("aria-label", `${device.label}: ${on ? "isključi" : "uključi"}, ${actionLabel()}`);
           tileQuick.title = tileQuick.disabled ? disabledReason("brightnessSet") : `${on ? "Isključi" : "Uključi"}${demoMode ? " u simulaciji" : ""}`;
         }
+        const blindQuick = Boolean(device.type === "blind" && roles.positionSet && canControl(device) && blindTarget("up") !== null);
+        tileBlind.hidden = !blindQuick;
+        if (blindQuick) {
+          const blocked = !allowed("positionSet");
+          for (const [button, direction] of [[tileUp, "up"], [tileDown, "down"]]) {
+            const verb = direction === "up" ? "Podigni (otvori)" : "Spusti (zatvori)";
+            button.disabled = blocked;
+            button.setAttribute("aria-label", `${device.label}: ${verb.toLowerCase()}, ${actionLabel()}`);
+            button.title = blocked ? disabledReason("positionSet") : `${verb}${demoMode ? " u simulaciji" : ""}`;
+          }
+        }
+        const chip = { pending: "Šaljem", accepted: "Prihvaćeno", readback: "Potvrđeno", error: "Nije potvrđeno" }[command?.status] || "";
+        sheetChip.hidden = !chip;
+        if (sheetChip.textContent !== chip) sheetChip.textContent = chip;
+        sheetChip.dataset.status = command?.status || "";
         sheetClose.setAttribute("aria-label", `Zatvori ${device.label}`);
         sheetClose.title = "Zatvori";
       }
